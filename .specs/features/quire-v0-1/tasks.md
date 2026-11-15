@@ -87,7 +87,7 @@ T16 → T17 → T18 → T19 → T20
 - [x] T17: Abas, faixa de metadados e fallback de outros arquivos (c04312f)
 - [ ] T18: Visão de tasks por fase (32e779e) (gate passou, aguardando revisão visual)
 - [ ] T19: Visões de gates e lessons (5c4d3df) (gate passou, aguardando revisão visual)
-- [ ] T20: Seletor de instâncias
+- [ ] T20: Seletor de instâncias (56df0cf) (gate passou, aguardando revisão visual)
 
 ### Fase 4: Ao vivo e CLI
 
