@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · Fase 0 em andamento · 2/24 tarefas
+**Status:** Em execução · Fase 0 em andamento · 3/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -12,23 +12,24 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 <!-- progress:start -->
 | Fase | Repositório | Tarefas |
 |---|---|---|
-| 0: Spike e fundação | quire | 2/4 |
+| 0: Spike e fundação | quire | 3/4 |
 | 1: Núcleo (`quire-core`) | quire | 0/8 |
 | 2: Shell e base da UI | quire | 0/3 |
 | 3: Visões | quire | 0/5 |
 | 4: Ao vivo e CLI | quire | 0/2 |
 | 5: Fechamento da v0.1 | quire | 0/2 |
 
-**Total:** 2/24 tarefas
+**Total:** 3/24 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 0; T1 e T2 concluídas, próxima é a T3 (spike do watcher e do custo de scan)
-- **Concluídas:** T1 (1d09a59), T2 (cbb0913)
+- **Fase / tarefa:** Fase 0; T1, T2 e T3 concluídas (T3 só na parte medida em Linux nativo), próxima é a T4 (CI)
+- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8)
 - **Em andamento:** nada
-- **Próximo passo:** T3: binário `crates/quire-core/examples/watch_spike.rs` medindo `notify` e polling; tabela FS × eventos × latência
+- **Próximo passo:** T4: workflow de CI no GitHub Actions (Linux e Windows)
 - **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
+- **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
 - **Bloqueios:** nenhum
 - **Arquivos sem commit:** nenhum
 - **Branch / worktree:** `feat/monorepo-scaffold` (sem push)
@@ -81,6 +82,59 @@ Com cache quente (recargas no mesmo processo), o realce termina em ~0,4 s e o Me
 | + Shiki (JS) + Mermaid | 554–579 MB | 458–480 MB |
 | + Shiki (Oniguruma) + Mermaid dagre | 389 MB | ~290 MB |
 
+### T3: watcher e custo de scan (2026-11-15)
+
+**Ambiente:** Linux nativo (CachyOS, kernel 7.3.3), i5-1235U, NVMe. **O filesystem desta máquina é btrfs** (`/home`, zstd), não ext4: não há partição ext4 e montar uma imagem precisaria de root. Medido em btrfs (onde ficam os repos) e em tmpfs (`/tmp`) como comparação. O inotify fica na camada VFS, então o ext4 deve se comportar igual, mas isso não foi medido. `inotify max_user_watches` = 524288. Spike em `crates/quire-core/examples/watch_spike.rs`, rodado com `scripts/watch-spike.sh` (build release).
+
+**Eventos nativos** (`notify` 8.2.2, backend inotify, 20 repetições por operação). Os resultados de btrfs e tmpfs foram iguais, com diferenças menores que 0,1 ms:
+
+| FS | Operação | Chegou | Latência p50 | Latência máx | Eventos no alvo |
+| --- | --- | ---: | ---: | ---: | --- |
+| btrfs | criar arquivo | 20/20 | 0.15 ms | 0.28 ms | access, close-write, create, modify:data |
+| btrfs | editar in-place (truncate + write) | 20/20 | 0.15 ms | 0.23 ms | access, close-write, modify:data |
+| btrfs | rename atômico (tmp + rename) | 20/20 | 0.20 ms | 0.25 ms | rename:both, rename:to |
+| btrfs | remover arquivo | 20/20 | 0.14 ms | 0.30 ms | remove |
+| btrfs | criar pasta | 20/20 | 0.16 ms | 0.32 ms | access, create |
+| btrfs | arquivo em pasta recém-criada (mesmo instante) | 0/20 | — | — | |
+| btrfs | arquivo em pasta criada há 50 ms | 20/20 | 50.45 ms* | 50.58 ms* | access, close-write, create, modify:data |
+| btrfs | remover pasta | 20/20 | 0.17 ms | 0.23 ms | remove |
+| tmpfs | (as 8 operações) | igual ao btrfs, inclusive 0/20 no arquivo em pasta recém-criada | 0.11–0.19 ms | ≤ 0.33 ms | iguais |
+
+\* A latência inclui os 50 ms de espera entre criar a pasta e o arquivo.
+
+**Polling** (2000 arquivos em 50 repos sintéticos, só `.specs`):
+
+| FS | Modo | Intervalo | Tempo por ciclo (wall) | CPU por ciclo | CPU média | Latência de detecção |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| btrfs | stat-walk síncrono (mtime + tamanho) | 1 / 2 / 5 s | 3.37 ms (máx 4.45) | 3.27 ms | 0.33% / 0.16% / 0.07% | ≤ intervalo |
+| btrfs | notify `PollWatcher` (scan inicial 4–5 ms) | 1 s | — | — | 0.48% | 693 ms |
+| btrfs | notify `PollWatcher` | 2 s | — | — | 0.26% | 680 ms |
+| btrfs | notify `PollWatcher` | 5 s | — | — | 0.09% | 2172 ms |
+| tmpfs | stat-walk síncrono | 1 / 2 / 5 s | 2.68 ms (máx 3.47) | 2.68 ms | 0.27% / 0.13% / 0.05% | ≤ intervalo |
+| tmpfs | notify `PollWatcher` | 1 / 2 / 5 s | — | — | 0.42% / 0.24% / 0.11% | 694 / 684 / 2179 ms |
+
+A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico é o próprio intervalo.
+
+**Varredura com `ignore`** (50 repos, 20.295 arquivos, 4.601 diretórios; cada repo tem `.git`, `node_modules`, `target` e `dist` com uma pasta `.specs` de isca em cada; 1 repo em cada 10 sem `.gitignore`). "Frio" é 1 execução depois de `drop_caches`; "quente" é a mediana de 5:
+
+| FS | Varredura | Cache | Entradas visitadas | `.specs` achadas | Iscas reportadas | Tempo |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| btrfs | `ignore` sequencial | frio | 3096 | 50 | 0 | 57.3 ms |
+| btrfs | `ignore` paralelo | frio | 3096 | 50 | 0 | 8.7 ms |
+| btrfs | sem regras de ignore (baseline) | frio | 24895 | 200 | 150 | 119.7 ms |
+| btrfs | `ignore` sequencial | quente | 3096 | 50 | 0 | 3.5–3.8 ms |
+| btrfs | `ignore` paralelo | quente | 3096 | 50 | 0 | 4.0–4.2 ms |
+| btrfs | sem regras de ignore (baseline) | quente | 24895 | 200 | 150 | 12.9–25.2 ms |
+| tmpfs | `ignore` sequencial / paralelo / baseline | quente | 3096 / 3096 / 24895 | 50 / 50 / 200 | 0 / 0 / 150 | 4.0 / 3.0 / 10.5 ms |
+
+**Custo de setup do watch nativo:**
+
+| FS | Alvo do watch nativo | Diretórios observados | Tempo de setup |
+| --- | --- | ---: | ---: |
+| btrfs | raiz dos repos, recursivo | 4601 | 72.6–90.8 ms |
+| btrfs | só as pastas `.specs`, recursivo | 250 | 4.2–8.1 ms |
+| tmpfs | raiz / só `.specs` | 4601 / 250 | 41.7 / 4.5 ms |
+
 ## Journal
 
 - 2026-11-15 · planejamento · ideação concluída: nome Quire, MoSCoW, wireframe v1 (três colunas, neutro moderno, escuro primeiro) e decisões fechadas em `docs/ideation/moscow.md`
@@ -100,3 +154,11 @@ Com cache quente (recargas no mesmo processo), o realce termina em ~0,4 s e o Me
 - 2026-11-15 · T2 · recomendações para a T16, sem contradizer o design (o TD-04 não fixa engine nem layout): (1) Mermaid com `layout: "dagre"` por padrão, porque o Mermaid 12 usa ELK por padrão e isso puxa 1,46 MB a mais e deixa os diagramas 15–25% mais lentos; diagramas que pedirem ELK explicitamente continuam funcionando; (2) Shiki com engine Oniguruma (WASM) em vez do engine JS: −190 MB de PSS e realce ~35% mais rápido neste documento, ao custo de +150 KB de bundle sob demanda. Ao definir a CSP (T24), o WASM exige `'wasm-unsafe-eval'`
 - 2026-11-15 · T2 · ponto de atenção (não bloqueia): mesmo na configuração recomendada, uma spec de 40 KB aberta leva o app a ~390 MB de PSS, contra 239 MB vazio. O maior custo é do Shiki e do Mermaid já carregados, não do tamanho do documento. Vale medir de novo na T16 com o app real e com várias specs abertas em sequência
 - 2026-11-15 · T2 · o Mermaid 12.3 detecta o diagrama inválido e o mostra com a mensagem de erro sem quebrar a página (VIW-03 viável com `suppressErrorRendering: true`)
+- 2026-11-15 · T3 · spike do watcher e do scan concluído **só na parte medida** (242c3d8). As tabelas estão em "Resultados dos spikes › T3". O FS daqui é btrfs, não ext4 como a T3 previa; medi em btrfs e em tmpfs
+- 2026-11-15 · T3 · o backend nativo entregou 100% dos eventos com latência abaixo de 0,35 ms em criar, editar in-place, rename atômico, remover e criar/remover pasta. O rename atômico chega como `rename:to`/`rename:both` no arquivo final, sem `remove`, então "rename atômico não vira removido" (T21) é viável tratando o rename como mudança do destino e ignorando o tmp
+- 2026-11-15 · T3 · **achado para a T21:** um arquivo criado logo depois da pasta que o contém **perde o evento sempre** (0/20, nos dois FS): o inotify só passa a observar a pasta nova depois do evento de criação dela. Com 50 ms de intervalo, chega sempre. Como agentes criam pastas de spec com arquivos de uma vez, ao receber `create` de uma pasta o watcher precisa **varrer o conteúdo dela** em vez de confiar nos eventos dos filhos. Não contradiz o design; é detalhe de implementação do `watch`
+- 2026-11-15 · T3 · **achado para a T21:** observar o scan path inteiro de forma recursiva registra um watch por diretório, incluindo `node_modules`, `target` e `.git` (o `notify` não respeita `.gitignore`): 4.601 watches e 73–91 ms nos repos sintéticos, contra 250 watches e 4–8 ms observando só as pastas `.specs`. Repos reais com `node_modules` têm dezenas de milhares de diretórios e podem esgotar `max_user_watches`. Recomendação: watch recursivo só nas pastas `.specs` achadas pelo scan, watch não recursivo na raiz de cada repo (para pegar a criação de `.specs`) e reescanear os scan paths sob demanda ou na inicialização para achar repos novos
+- 2026-11-15 · T3 · o polling é barato nesta escala: 2000 arquivos custam ~3,4 ms de CPU por ciclo (stat de mtime + tamanho), ou seja ~0,1% de CPU no intervalo padrão de 3 s. O `PollWatcher` do `notify` custa ~1,5× isso (0,48% em 1 s) e detectou dentro do intervalo. O padrão de 3 s do WAT-03 se mantém em Linux nativo; o custo no 9p/DrvFs não foi medido e deve ser maior
+- 2026-11-15 · T3 · a varredura com `ignore` + `filter_entry` (pula `node_modules`, `target`, `dist`, `.git` por nome, além do `.gitignore`, com `hidden(false)` para enxergar `.specs`) achou as 50 specs e nenhuma das 150 iscas, inclusive nos repos sem `.gitignore`. Leva 3,5 ms com cache quente e 57 ms (sequencial) ou 8,7 ms (paralelo) com cache frio, contra 120 ms sem as regras. Para a T6: usar o walker paralelo, que ganha 6,6× no cache frio e empata no quente
+- 2026-11-15 · T3 · **regra proposta para o TD-05** (detecção de "sem eventos"), decidindo por scan path na inicialização: (1) no Linux, ler o tipo do mount em `/proc/self/mountinfo`, como o spike já faz, e usar polling se for `9p`, `v9fs`, `drvfs`, `cifs`, `smb3`, `nfs`, `nfs4` ou `fuse.*` (sshfs e similares); `ext4`, `btrfs`, `xfs`, `tmpfs` e afins usam o backend nativo; (2) no Windows, usar polling para caminhos `\\wsl$\` e `\\wsl.localhost\`, qualquer UNC `\\servidor\share` e unidades mapeadas de rede; (3) override por config para cada scan path (`watch = "auto" | "native" | "poll"`); (4) fallback em tempo de execução: se o `watch()` nativo falhar (ex.: `ENOSPC` por limite de watches), cair para polling naquele path, com aviso no rodapé. **Sem sonda de escrita**: criar arquivo de teste violaria "escrita só por ação explícita", e o spike mostra que a escrita do mesmo lado sempre gera evento, então a sonda não detectaria o caso que importa (escrita do outro lado da fronteira WSL/Windows)
+- 2026-11-15 · T3 · **NÃO VERIFICADO por falta de WSL** (nenhum resultado foi inferido): entrega de eventos do `notify` em WSL2 ext4, em DrvFs/9p (`/mnt/c`) e em `\\wsl$` a partir do Windows nativo; entrega quando quem escreve está do outro lado (editor do Windows em arquivo do WSL, agente do WSL em `C:\`); custo do polling e da varredura em 9p/DrvFs e em `\\wsl$`; qual `fstype` o `/proc/self/mountinfo` mostra para `/mnt/c` nas versões atuais do WSL (a regra cobre `9p` e `drvfs`); detecção de UNC e de unidade de rede no Windows; comportamento em NTFS nativo. Também não medido: ext4 em si (medi btrfs e tmpfs). O roteiro está em `crates/quire-core/examples/README.md`
