@@ -48,7 +48,7 @@ T1 → T2 → T3 → T4
 ```
 
 - [x] T1: Scaffold do monorepo (Cargo + pnpm, Tauri 2, Vite React TS estrito) (1d09a59)
-- [ ] T2: Spike do WebKitGTK: markdown grande, Mermaid e rolagem
+- [x] T2: Spike do WebKitGTK: markdown grande, Mermaid e rolagem (cbb0913)
 - [ ] T3: Spike do watcher e do custo de scan (ext4, WSL e `\\wsl$`)
 - [ ] T4: CI no GitHub Actions (Linux e Windows)
 
