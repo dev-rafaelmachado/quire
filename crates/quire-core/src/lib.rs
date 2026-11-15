@@ -6,6 +6,7 @@ pub mod config;
 pub mod error;
 pub mod git;
 pub mod model;
+pub mod parse;
 pub mod preset;
 pub mod scan;
 
