@@ -75,7 +75,7 @@ T13 → T14 → T15
 
 - [x] T13: Comandos e eventos Tauri com tipos compartilhados (86de96e)
 - [ ] T14: Tokens, tema, layout de três colunas e catálogo de strings (ddbe3e3) (gate passou, aguardando revisão visual)
-- [ ] T15: Sidebar de projetos e specs
+- [x] T15: Sidebar de projetos e specs (97272fe)
 
 ### Fase 3: Visões
 

@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · 2 de 6 fases completas · Fase 2 em andamento · 13/24 tarefas
+**Status:** Em execução · 2 de 6 fases completas · Fase 2 em andamento · 14/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -14,20 +14,20 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 |---|---|---|
 | 0: Spike e fundação | quire | 4/4 ✓ |
 | 1: Núcleo (`quire-core`) | quire | 8/8 ✓ |
-| 2: Shell e base da UI | quire | 1/3 |
+| 2: Shell e base da UI | quire | 2/3 |
 | 3: Visões | quire | 0/5 |
 | 4: Ao vivo e CLI | quire | 0/2 |
 | 5: Fechamento da v0.1 | quire | 0/2 |
 
-**Total:** 13/24 tarefas
+**Total:** 14/24 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 2; T14 com gate verde (aguardando revisão visual), próxima é a T15
-- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T4 (cfd7d06), T5 (a3e2c35), T6 (199f344), T7 (a5a0b9b), T8 (a7b1225), T9 (91c0f7e), T10 (60c91ca), T11 (64793b0), T12 (f452ea3), T13 (86de96e)
+- **Fase / tarefa:** Fase 2 com gate verde (T14 aguardando revisão visual); próxima é a T16
+- **Concluídas:** T1–T13 (ver tasks.md), T15 (97272fe)
 - **Em andamento:** nada
-- **Próximo passo:** T15: sidebar de projetos e specs
+- **Próximo passo:** T16: pipeline de markdown
 - **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
 - **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
 - **Bloqueios:** nenhum
@@ -179,3 +179,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T4 · o CI do Linux falhou em `crates/quire-core/tests/git.rs` com "not empty and no .quire-fixtures marker". **Causa:** os testes de integração compartilhavam um workspace gerado por binário numa pasta fixa (`target/tmp/fixtures-<binário>-shared`), protegida só por um `OnceLock`, que serializa threads dentro de um processo mas não entre processos. Com `cargo test` simples (um processo), a falha não se reproduziu (5/5 verdes). Reproduziu com o mesmo binário em 5 processos concorrentes (20 rodadas: 85 de 100 testes falharam, 22 recusas do script) e com uma pasta deixada sem o marcador (falha mesmo com um processo). **Correção (9008275), opção (a):** cada teste gera as próprias fixtures num `TempDir` novo (`common::Fixtures`), apagado no drop. A geração custa ~44 ms, então ficar sem estado compartilhado sai mais simples e robusto que lock de arquivo com marcador escrito por último. O script é localizado por `CARGO_MANIFEST_DIR`, então o diretório de trabalho não importa; a trava do script não mudou. Verificado: 20 rodadas × 5 processos do binário `git` rodando a partir de `/tmp` (100/100), os 6 binários de integração 3× ao mesmo tempo (18/18), `rm -rf target/tmp` + `--test-threads=8` 3 vezes, duas execuções seguidas com `target/tmp` sujo, e nenhum diretório temporário sobrando. Os testes do shell (`apps/desktop/src-tauri/src/main.rs`) já geravam fixtures num `tempdir` por teste e não tinham a corrida; não existe `apps/desktop/src-tauri/tests/`. T4 continua aberta
 - 2026-11-15 · T4 · CI verde em Linux e Windows no commit `fde19e5` (confirmado pelo autor); T4 marcada com o hash do commit que criou o workflow (`cfd7d06`). O CI forçou duas correções antes de ficar verde: (1) `5f3fa3d`, o teste de caminho absoluto do `config.toml` não era portável (`/abs` é relativo ao drive no Windows; a produção estava certa); (2) `9008275`, os testes de integração compartilhavam uma pasta de fixtures por binário e corriam entre processos; agora cada teste gera as suas num `TempDir`. Do "Pronto quando", o item "falha derruba o job" foi observado nas duas falhas de teste; `clippy` e `typecheck` rodam como passos `run` do mesmo tipo, mas uma falha deles especificamente não foi provocada
 - 2026-11-15 · T14 · tokens, tema, layout e catálogo (ddbe3e3); gate verde, **aguardando revisão visual**. Screenshots da janela real (1440×900, `QUIRE_CONFIG=fixtures/quire.toml`): `/tmp/quire-shots/T14-dark.png` e `T14-light.png`. `src/ui/tokens.css` é cópia exata de `docs/design/tokens.css`, com um teste que compara as duas. O Tailwind 4 lê as variáveis via `@theme inline`, com nomes que não colidem com os do tokens (`--font-ui` virou a utilidade `font-sans`, `--font-mono` virou `font-code`); os raios usam `var(--radius-*)` direto. Teste de contraste WCAG sobre os pares texto/superfície dos dois temas: tudo ≥ 4.5:1, o menor é `faint`/`raise` no claro com 4.77. Teste de strings soltas: procura texto JSX e `aria-label`/`placeholder`/`title`/`alt`/`label` literais em todo `.tsx` (exceto testes e spike), com um autoteste. O `IconButton` exige `label` no tipo, que vira `aria-label`. **Diferenças em relação ao wireframe 1, por escopo:** a busca "Buscar specs, IDs e arquivos… Ctrl K" não foi colocada (command palette e busca full-text são v0.2, fora do escopo); no lugar de "Preferências" (T23) há por enquanto um botão de tema; as fontes são as do sistema (Inter e JetBrains Mono estão instaladas aqui; em máquinas sem elas cai no fallback, já que não embuto fontes). Achados do ambiente: o vitest esvazia arquivos `.css`, inclusive com `?raw`, então os testes leem com `node:fs` e ganharam um `tsconfig.test.json`; o Hyprland 0.57 usa dispatchers em Lua, e o script de screenshot põe a janela flutuante e opaca em 1440×900 no monitor DP-2
+- 2026-11-15 · T15 · sidebar concluída (97272fe). A lista vem primeiro do cache e depois o scan roda em background; a cada `specs://changed` (lotes de 50 do índice) a lista recarrega, com throttle de 150 ms, então as specs aparecem durante o scan (DSC-04; teste do store com IPC simulado). O rodapé mostra a fase do scan, as contagens e os erros por scan path com o motivo (DSC-05; teste com jsdom). O estado de cada spec vem do progresso das tarefas da instância padrão: Concluído, Em andamento, Pendente ou Sem tarefas (este último para specs sem `tasks.md` ou com preset `generic`). Selecionar uma spec abre um placeholder com breadcrumb até a T17. Screenshots: `/tmp/quire-shots/T15-dark.png` e `T15-light.png`. **Diferenças em relação ao wireframe 1:** sem o botão "+" de adicionar pasta (preferências são da T23); o resumo do rodapé conta worktrees ligadas, sem separar as "extras" fora do scan path; há um botão "Varrer de novo" que o wireframe não tem; o badge "N versões" só aparece na sidebar e no topo quando a T20 entrar. Fixes vindos das capturas: o segmentado quebrava "Em andamento" em duas linhas (agora `nowrap`)
