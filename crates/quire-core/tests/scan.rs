@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use quire_core::scan::{ScanEvent, generic_filter, scan};
 
-fn rel(p: &std::path::Path) -> String {
-    p.strip_prefix(common::workspace())
+fn rel(root: &std::path::Path, p: &std::path::Path) -> String {
+    p.strip_prefix(root)
         .unwrap()
         .to_string_lossy()
         .replace('\\', "/")
@@ -15,10 +15,11 @@ fn rel(p: &std::path::Path) -> String {
 
 #[test]
 fn finds_every_expected_spec_in_the_fixtures() {
+    let fx = common::Fixtures::new();
     let mut found = vec![];
-    let report = scan(&[common::projects()], &generic_filter, |e| {
+    let report = scan(&[fx.projects()], &generic_filter, |e| {
         if let ScanEvent::Found(d) = e {
-            found.push(rel(&d.spec_dir));
+            found.push(rel(fx.root(), &d.spec_dir));
         }
     });
     found.sort();
@@ -40,8 +41,9 @@ fn finds_every_expected_spec_in_the_fixtures() {
 
 #[test]
 fn decoys_in_ignored_folders_never_appear() {
+    let fx = common::Fixtures::new();
     let mut found = vec![];
-    scan(&[common::workspace().to_path_buf()], &generic_filter, |e| {
+    scan(&[fx.root().to_path_buf()], &generic_filter, |e| {
         if let ScanEvent::Found(d) = e {
             found.push(d.folder);
         }
@@ -52,10 +54,11 @@ fn decoys_in_ignored_folders_never_appear() {
 
 #[test]
 fn invalid_path_does_not_stop_the_scan() {
+    let fx = common::Fixtures::new();
     let mut errors = 0;
     let mut found = 0;
     scan(
-        &[PathBuf::from("/definitely/not/here"), common::projects()],
+        &[PathBuf::from("/definitely/not/here"), fx.projects()],
         &generic_filter,
         |e| match e {
             ScanEvent::Found(_) => found += 1,

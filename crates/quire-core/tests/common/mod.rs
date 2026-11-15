@@ -1,11 +1,14 @@
-//! Shared helpers for integration tests: builds synthetic fixture workspaces with
-//! `scripts/make-fixtures.sh`.
+//! Shared helpers for integration tests.
+//!
+//! Every test builds its own fixture workspace with `scripts/make-fixtures.sh` in a fresh
+//! temporary directory (~45 ms). Nothing is shared between tests or test processes, so tests
+//! can run in parallel threads or processes and leftovers of earlier runs do not matter. The
+//! script is located from `CARGO_MANIFEST_DIR`, so the working directory is irrelevant.
 
 #![allow(dead_code, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::OnceLock;
 
 fn bash() -> PathBuf {
     if let Some(b) = std::env::var_os("QUIRE_BASH") {
@@ -19,31 +22,47 @@ fn bash() -> PathBuf {
     PathBuf::from("bash")
 }
 
-fn generate(name: &str) -> PathBuf {
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let out = Path::new(env!("CARGO_TARGET_TMPDIR"))
-        .join(format!("fixtures-{}-{name}", env!("CARGO_CRATE_NAME")));
-    let status = Command::new(bash())
-        .arg(repo.join("scripts/make-fixtures.sh"))
-        .arg(&out)
-        .status()
-        .expect("failed to run scripts/make-fixtures.sh");
-    assert!(status.success(), "make-fixtures.sh failed");
-    out.canonicalize().expect("fixture workspace missing")
+/// A generated fixture workspace (`<out>` in fixtures/README.md), deleted on drop.
+pub struct Fixtures {
+    root: PathBuf,
+    _dir: tempfile::TempDir,
 }
 
-/// Root of the shared, read-only generated workspace (`<out>` in fixtures/README.md).
-pub fn workspace() -> &'static Path {
-    static WS: OnceLock<PathBuf> = OnceLock::new();
-    WS.get_or_init(|| generate("shared"))
-}
+impl Fixtures {
+    pub fn new() -> Self {
+        let dir = tempfile::Builder::new()
+            .prefix("quire-fixtures-")
+            .tempdir()
+            .expect("cannot create a temporary directory");
+        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/make-fixtures.sh");
+        // The script accepts an empty directory and rebuilds it.
+        let status = Command::new(bash())
+            .arg(&script)
+            .arg(dir.path())
+            .status()
+            .expect("failed to run scripts/make-fixtures.sh");
+        assert!(status.success(), "make-fixtures.sh failed");
+        let root = dir
+            .path()
+            .canonicalize()
+            .expect("fixture workspace missing");
+        Self { root, _dir: dir }
+    }
 
-/// A private copy of the workspace that a test may modify.
-pub fn fresh_workspace(name: &str) -> PathBuf {
-    generate(name)
-}
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
 
-/// The scan path of the shared fixtures.
-pub fn projects() -> PathBuf {
-    workspace().join("projects")
+    /// The scan path of the fixtures.
+    pub fn projects(&self) -> PathBuf {
+        self.root.join("projects")
+    }
+
+    /// Canonical path of something inside the workspace.
+    pub fn path(&self, rel: &str) -> PathBuf {
+        self.root
+            .join(rel)
+            .canonicalize()
+            .expect("path not in the fixtures")
+    }
 }

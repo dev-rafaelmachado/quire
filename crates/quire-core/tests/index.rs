@@ -49,9 +49,10 @@ fn shape(list: &[ProjectSummary]) -> Vec<String> {
 
 #[test]
 fn deleting_the_cache_rebuilds_the_same_result() {
+    let fx = common::Fixtures::new();
     let tmp = tempfile::tempdir().unwrap();
     let config = Config::parse("[projects.acme_gateway]\npreset = \"exban\"\n").unwrap();
-    let paths = [common::projects()];
+    let paths = [fx.projects()];
     let db = tmp.path().join("index.sqlite");
     let mut a = Index::open(&db).unwrap();
     let report = reconcile(&mut a, &paths, &config);
@@ -72,11 +73,12 @@ fn deleting_the_cache_rebuilds_the_same_result() {
 
 #[test]
 fn cache_holds_what_the_list_needs() {
+    let fx = common::Fixtures::new();
     let mut index = Index::open_in_memory().unwrap();
     let config =
         Config::parse("[projects.acme_gateway]\npreset = \"exban\"\nalias = \"gateway\"\n")
             .unwrap();
-    reconcile(&mut index, &[common::projects()], &config);
+    reconcile(&mut index, &[fx.projects()], &config);
     let list = index.list().unwrap();
     let names: Vec<&str> = list.iter().map(ProjectSummary::display_name).collect();
     assert_eq!(names, ["acme_billing", "gateway"]);
@@ -117,7 +119,8 @@ fn cache_holds_what_the_list_needs() {
 
 #[test]
 fn second_scan_without_changes_rereads_nothing_and_changes_are_picked_up() {
-    let ws = common::fresh_workspace("index-changes");
+    let fx = common::Fixtures::new();
+    let ws = fx.root().to_path_buf();
     let paths = [ws.join("projects")];
     let config = Config::parse("[projects.acme_gateway]\npreset = \"exban\"\n").unwrap();
     let mut index = Index::open_in_memory().unwrap();

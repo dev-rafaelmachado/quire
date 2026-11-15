@@ -32,13 +32,10 @@ fn spec<'a>(projects: &'a [Project], project: &str, folder: &str) -> &'a Spec {
         .unwrap()
 }
 
-fn ws(rel: &str) -> PathBuf {
-    common::workspace().join(rel).canonicalize().unwrap()
-}
-
 #[test]
 fn groups_by_project_and_folder() {
-    let projects = projects_from(&[common::projects()]);
+    let fx = common::Fixtures::new();
+    let projects = projects_from(&[fx.projects()]);
     let names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
     assert_eq!(names, ["acme_billing", "acme_gateway"]);
     let folders = |i: usize| {
@@ -68,7 +65,8 @@ fn groups_by_project_and_folder() {
 
 #[test]
 fn identical_copies_are_one_entry_without_badge() {
-    let projects = projects_from(&[common::projects()]);
+    let fx = common::Fixtures::new();
+    let projects = projects_from(&[fx.projects()]);
     let s = spec(&projects, "acme_gateway", "acme-142-service-tokens");
     assert_eq!(s.instance_count(), 3);
     assert_eq!(s.versions_badge(), None);
@@ -86,12 +84,13 @@ fn identical_copies_are_one_entry_without_badge() {
 
 #[test]
 fn divergent_copy_shows_badge_and_opens_newest() {
-    let projects = projects_from(&[common::projects()]);
+    let fx = common::Fixtures::new();
+    let projects = projects_from(&[fx.projects()]);
     let s = spec(&projects, "acme_gateway", "acme-170-rate-limit");
     assert_eq!(s.versions_badge(), Some(3));
     let default = s.default_instance().unwrap();
     assert!(
-        default.spec_dir.starts_with(ws("external")),
+        default.spec_dir.starts_with(fx.path("external")),
         "{:?}",
         default.spec_dir
     );
@@ -117,7 +116,8 @@ fn divergent_copy_shows_badge_and_opens_newest() {
 
 #[test]
 fn same_folder_in_two_projects_stays_separate() {
-    let projects = projects_from(&[common::projects()]);
+    let fx = common::Fixtures::new();
+    let projects = projects_from(&[fx.projects()]);
     let a = spec(&projects, "acme_gateway", "acme-200-shared-auth");
     let b = spec(&projects, "acme_billing", "acme-200-shared-auth");
     assert_eq!(b.instance_count(), 1);
@@ -126,18 +126,20 @@ fn same_folder_in_two_projects_stays_separate() {
 
 #[test]
 fn overlapping_scan_paths_do_not_duplicate_instances() {
-    let once = projects_from(&[common::projects()]);
+    let fx = common::Fixtures::new();
+    let once = projects_from(&[fx.projects()]);
     let twice = projects_from(&[
-        common::projects(),
-        ws("projects/acme_gateway"),
-        common::workspace().to_path_buf(),
+        fx.projects(),
+        fx.path("projects/acme_gateway"),
+        fx.root().to_path_buf(),
     ]);
     assert_eq!(once, twice);
 }
 
 #[test]
 fn without_preset_projects_are_generic_and_exban_is_suggested() {
-    let projects = projects_from(&[common::projects()]);
+    let fx = common::Fixtures::new();
+    let projects = projects_from(&[fx.projects()]);
     for p in &projects {
         assert_eq!(p.preset, "generic");
         assert_eq!(p.suggested_preset.as_deref(), Some("exban"), "{}", p.name);
@@ -150,10 +152,11 @@ fn without_preset_projects_are_generic_and_exban_is_suggested() {
 
 #[test]
 fn configured_preset_alias_and_issue_keys() {
+    let fx = common::Fixtures::new();
     let config =
         Config::parse("[projects.acme_gateway]\npreset = \"exban\"\nalias = \"gateway\"\n")
             .unwrap();
-    let projects = projects_with(&[common::projects()], &config);
+    let projects = projects_with(&[fx.projects()], &config);
     let gw = projects.iter().find(|p| p.name == "acme_gateway").unwrap();
     assert_eq!(gw.display_name(), "gateway");
     assert_eq!(gw.preset, "exban");
@@ -161,7 +164,7 @@ fn configured_preset_alias_and_issue_keys() {
     let s = spec(&projects, "acme_gateway", "acme-142-service-tokens");
     assert_eq!(s.issue_key.as_deref(), Some("ACME-142"));
     // exban hashes only its own files: notes.md and payload.json do not count.
-    let generic = projects_from(&[common::projects()]);
+    let generic = projects_from(&[fx.projects()]);
     let g = spec(&generic, "acme_gateway", "acme-142-service-tokens");
     assert_ne!(s.instances[0].content_hash, g.instances[0].content_hash);
 }
