@@ -33,6 +33,7 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 - **Bloqueios:** nenhum
 - **Arquivos sem commit:** nenhum
 - **Branch / worktree:** `feat/core-and-ipc` (sem push)
+- **Pendências da T4:** o workflow de CI (cfd7d06) não rodou no GitHub. Para fechar a T4 é preciso fazer o push, abrir um PR de teste e ver o job verde em Linux e Windows; também conferir se uma falha de `clippy` ou de `typecheck` derruba o job. O Windows nunca foi testado localmente
 
 ## Resultados dos spikes
 
@@ -164,3 +165,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T3 · **NÃO VERIFICADO por falta de WSL** (nenhum resultado foi inferido): entrega de eventos do `notify` em WSL2 ext4, em DrvFs/9p (`/mnt/c`) e em `\\wsl$` a partir do Windows nativo; entrega quando quem escreve está do outro lado (editor do Windows em arquivo do WSL, agente do WSL em `C:\`); custo do polling e da varredura em 9p/DrvFs e em `\\wsl$`; qual `fstype` o `/proc/self/mountinfo` mostra para `/mnt/c` nas versões atuais do WSL (a regra cobre `9p` e `drvfs`); detecção de UNC e de unidade de rede no Windows; comportamento em NTFS nativo. Também não medido: ext4 em si (medi btrfs e tmpfs). O roteiro está em `crates/quire-core/examples/README.md`
 - 2026-11-15 · planejamento · achados do spike T3 copiados para o "Pronto quando" da T21 (varrer o conteúdo de pasta recém-criada; watch nativo só nas pastas `.specs` e na raiz de cada repo, sem recursão)
 - 2026-11-15 · dev · `feat/monorepo-scaffold` já estava mergeada na `main` (fast-forward); T4–T13 seguem na branch nova `feat/core-and-ipc`
+- 2026-11-15 · T4 · workflow `.github/workflows/ci.yml` escrito (cfd7d06): matriz `ubuntu-latest` e `windows-latest`, dependências do Tauri no Linux, caches de Cargo e pnpm, e os mesmos comandos do gate de fase. Validado com `actionlint` 1.7.12 (binário oficial, checksum conferido) e com os comandos rodados localmente no Linux. Actions: checkout v7, setup-node v7 (Node 26), pnpm/action-setup v6, dtolnay/rust-toolchain stable, Swatinem/rust-cache v2. Também adicionado `.gitattributes` com `eol=lf` para o `cargo fmt --check` não variar no Windows. **Não marcada**: depende de push e do workflow verde nos dois sistemas
