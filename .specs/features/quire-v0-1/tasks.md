@@ -58,7 +58,7 @@ T1 → T2 → T3 → T4
 T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12
 ```
 
-- [ ] T5: Fixtures sintéticas do workspace
+- [x] T5: Fixtures sintéticas do workspace (a3e2c35)
 - [ ] T6: Scanner de `.specs`
 - [ ] T7: Identidade do projeto via git
 - [ ] T8: Modelo de spec e instâncias com deduplicação

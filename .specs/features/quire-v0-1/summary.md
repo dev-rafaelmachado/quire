@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · 0 de 6 fases completas · Fase 0 em andamento · 3/24 tarefas
+**Status:** Em execução · 0 de 6 fases completas · Fase 0 em andamento · 4/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -13,21 +13,21 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 | Fase | Repositório | Tarefas |
 |---|---|---|
 | 0: Spike e fundação | quire | 3/4 |
-| 1: Núcleo (`quire-core`) | quire | 0/8 |
+| 1: Núcleo (`quire-core`) | quire | 1/8 |
 | 2: Shell e base da UI | quire | 0/3 |
 | 3: Visões | quire | 0/5 |
 | 4: Ao vivo e CLI | quire | 0/2 |
 | 5: Fechamento da v0.1 | quire | 0/2 |
 
-**Total:** 3/24 tarefas
+**Total:** 4/24 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 0; T1, T2 e T3 concluídas (T3 só na parte medida em Linux nativo), próxima é a T4 (CI)
-- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8)
+- **Fase / tarefa:** Fase 1; T5 concluída, próxima é a T6 (scanner)
+- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T5 (a3e2c35); T4 escrita, aguardando CI
 - **Em andamento:** nada
-- **Próximo passo:** T4: workflow de CI no GitHub Actions (Linux e Windows)
+- **Próximo passo:** T6: scanner de `.specs`
 - **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
 - **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
 - **Bloqueios:** nenhum
@@ -166,3 +166,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · planejamento · achados do spike T3 copiados para o "Pronto quando" da T21 (varrer o conteúdo de pasta recém-criada; watch nativo só nas pastas `.specs` e na raiz de cada repo, sem recursão)
 - 2026-11-15 · dev · `feat/monorepo-scaffold` já estava mergeada na `main` (fast-forward); T4–T13 seguem na branch nova `feat/core-and-ipc`
 - 2026-11-15 · T4 · workflow `.github/workflows/ci.yml` escrito (cfd7d06): matriz `ubuntu-latest` e `windows-latest`, dependências do Tauri no Linux, caches de Cargo e pnpm, e os mesmos comandos do gate de fase. Validado com `actionlint` 1.7.12 (binário oficial, checksum conferido) e com os comandos rodados localmente no Linux. Actions: checkout v7, setup-node v7 (Node 26), pnpm/action-setup v6, dtolnay/rust-toolchain stable, Swatinem/rust-cache v2. Também adicionado `.gitattributes` com `eol=lf` para o `cargo fmt --check` não variar no Windows. **Não marcada**: depende de push e do workflow verde nos dois sistemas
+- 2026-11-15 · T5 · fixtures sintéticas concluídas (a3e2c35): `fixtures/templates` (`acme_gateway` com origin, `acme_billing` sem origin) e `scripts/make-fixtures.sh [saída]`, que monta repos, worktrees e iscas e é idempotente e determinístico (hashes `390c2e4`/`da2aa85`/`e305867` iguais entre gerações). Cobre spec idêntica em 3 instâncias, spec divergente com cópia mais nova numa worktree fora do scan path, specs parciais, JSONL com linha inválida e truncada, repo sem origin e a mesma chave em dois projetos. O script isola o git da config do usuário e só apaga diretório com o marcador `.quire-fixtures`
