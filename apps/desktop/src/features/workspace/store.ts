@@ -15,6 +15,12 @@ interface WorkspaceState {
   status: StatusFilter;
   collapsed: Readonly<Record<number, true>>;
   selectedSpecId: number | null;
+  /** Specs of the worktree `quire .` ran in (CLI-01). */
+  highlight: { query: string; specIds: number[] } | null;
+  /** Specs a command-line key matched in several places (CLI-02). */
+  pick: { query: string; specIds: number[] } | null;
+  setHighlight: (highlight: { query: string; specIds: number[] } | null) => void;
+  setPick: (pick: { query: string; specIds: number[] } | null) => void;
   setText: (text: string) => void;
   setStatus: (status: StatusFilter) => void;
   toggleProject: (id: number) => void;
@@ -43,6 +49,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   status: "all",
   collapsed: {},
   selectedSpecId: null,
+  highlight: null,
+  pick: null,
+  setHighlight: (highlight) => set({ highlight }),
+  setPick: (pick) => set({ pick }),
   setText: (text) => set({ text }),
   setStatus: (status) => set({ status }),
   toggleProject: (id) =>

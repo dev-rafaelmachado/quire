@@ -17,7 +17,8 @@
         "width": 1280,
         "height": 800,
         "minWidth": 960,
-        "minHeight": 600
+        "minHeight": 600,
+        "create": false
       }
     ],
     "security": {
@@ -34,5 +35,32 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "cli": {
+      "description": "Quire: lê as pastas de spec de vários repositórios e worktrees num só lugar.",
+      "args": [
+        {
+          "name": "path",
+          "index": 1,
+          "takesValue": true,
+          "description": "Pasta para abrir; `quire .` abre a spec da worktree atual."
+        }
+      ],
+      "subcommands": {
+        "open": {
+          "description": "Abre uma spec pela chave da issue (ex.: ACME-142) ou pelo caminho da pasta ou de um arquivo dela.",
+          "args": [
+            {
+              "name": "target",
+              "index": 1,
+              "takesValue": true,
+              "required": true,
+              "description": "Chave da issue ou caminho."
+            }
+          ]
+        }
+      }
+    }
   }
 }

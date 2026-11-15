@@ -24,6 +24,7 @@ import type {
 
 export { commands, events } from "./bindings";
 export type { CmdError, FileKind, InstanceKind, ListFilter, PhaseState, ScanPhase, WatchStatus } from "./bindings";
+export type { CliOpen_Serialize as CliOpen } from "./bindings";
 
 export type ConfigView = ConfigView_Serialize;
 export type ProjectSummary = ProjectSummary_Serialize;

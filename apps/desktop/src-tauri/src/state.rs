@@ -17,6 +17,8 @@ pub struct AppState {
     pub scanning: AtomicBool,
     /// Scan queue and file watcher (T21).
     pub live: crate::live::Live,
+    /// Command-line navigation waiting for the index (T22).
+    pub cli: crate::cli_delivery::CliState,
 }
 
 impl AppState {
@@ -54,6 +56,7 @@ impl AppState {
             index: Mutex::new(index),
             scanning: AtomicBool::new(false),
             live: crate::live::Live::default(),
+            cli: crate::cli_delivery::CliState::default(),
         })
     }
 }

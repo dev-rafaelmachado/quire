@@ -7,6 +7,8 @@ import { useLiveUpdates } from "./features/spec-view/live";
 import { Notice } from "./features/spec-view/Notice";
 import { SpecRight, SpecView, useRightColumn } from "./features/spec-view/SpecView";
 import { useSpecView } from "./features/spec-view/store";
+import { useCliNavigation } from "./features/workspace/cli";
+import { CliPicker } from "./features/workspace/CliPicker";
 import { Sidebar } from "./features/workspace/Sidebar";
 import { findSelected } from "./features/workspace/selection";
 import { useWorkspace } from "./features/workspace/store";
@@ -24,6 +26,7 @@ export function App() {
     void init();
   }, [init]);
   useLiveUpdates();
+  useCliNavigation();
 
   useEffect(() => {
     void open(selectedSpecId);
@@ -41,6 +44,7 @@ export function App() {
       main={
         <>
           <Notice />
+          <CliPicker />
           {selected ? <SpecView /> : <EmptyView />}
         </>
       }

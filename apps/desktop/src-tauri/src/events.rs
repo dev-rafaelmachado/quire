@@ -61,3 +61,11 @@ pub struct WatchStatus {
     /// Paths whose native watch failed and fell back to polling.
     pub fallbacks: Vec<ScanPathError>,
 }
+
+/// Navigation asked on the command line (CLI-01..04).
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "cli://open")]
+pub struct CliNavigate {
+    pub open: crate::cli::CliOpen,
+}

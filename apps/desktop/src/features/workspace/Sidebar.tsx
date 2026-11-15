@@ -1,7 +1,7 @@
-import { AlertTriangle, ChevronDown, ChevronRight, Folder, Layers, Search } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Folder, GitBranch, Layers, Search, X } from "lucide-react";
 import { t } from "../../lib/i18n";
 import type { ProjectSummary, SpecSummary } from "../../lib/ipc";
-import { cx, ProgressBar, Segmented, type BarTone, type SegmentOption } from "../../ui";
+import { cx, IconButton, ProgressBar, Segmented, type BarTone, type SegmentOption } from "../../ui";
 import { filterProjects, specState, specTitle, type SpecState, type StatusFilter } from "./model";
 import { ScanFooter } from "./ScanFooter";
 import { useWorkspace } from "./store";
@@ -20,7 +20,7 @@ const STATE_TEXT: Record<SpecState, string> = {
 };
 const STATE_BAR: Record<SpecState, BarTone> = { complete: "ok", inProgress: "acc", pending: "faint", noTasks: "faint" };
 
-function SpecRow({ spec, selected, onSelect }: { spec: SpecSummary; selected: boolean; onSelect: () => void }) {
+function SpecRow({ spec, selected, highlighted, onSelect }: { spec: SpecSummary; selected: boolean; highlighted: boolean; onSelect: () => void }) {
   const state = specState(spec);
   const progress = spec.instances[spec.defaultIndex]?.progress ?? null;
   return (
@@ -28,7 +28,11 @@ function SpecRow({ spec, selected, onSelect }: { spec: SpecSummary; selected: bo
       type="button"
       aria-current={selected ? "true" : undefined}
       onClick={onSelect}
-      className={cx("flex w-full flex-col gap-[5px] py-2 pr-3 pl-9 text-left", selected ? "bg-raise" : "hover:bg-panel")}
+      className={cx(
+        "flex w-full flex-col gap-[5px] border-l-2 py-2 pr-3 pl-[34px] text-left",
+        highlighted ? "border-acc" : "border-transparent",
+        selected ? "bg-raise" : highlighted ? "bg-acc-bg/40 hover:bg-panel" : "hover:bg-panel",
+      )}
     >
       <span className="flex w-full items-center gap-2">
         <span className={cx("font-code text-xs", selected ? "text-acc" : "text-muted")}>{spec.issueKey ?? spec.folder}</span>
@@ -68,6 +72,7 @@ function ProjectGroup({ project }: { project: ProjectSummary }) {
   const collapsed = useWorkspace((s) => Boolean(s.collapsed[project.id]));
   const toggle = useWorkspace((s) => s.toggleProject);
   const selectedSpecId = useWorkspace((s) => s.selectedSpecId);
+  const highlight = useWorkspace((s) => s.highlight);
   const select = useWorkspace((s) => s.select);
   const name = project.alias ?? project.name;
   return (
@@ -102,8 +107,25 @@ function ProjectGroup({ project }: { project: ProjectSummary }) {
       {collapsed
         ? null
         : project.specs.map((spec) => (
-            <SpecRow key={spec.id} spec={spec} selected={spec.id === selectedSpecId} onSelect={() => select(spec.id)} />
+            <SpecRow
+              key={spec.id}
+              spec={spec}
+              selected={spec.id === selectedSpecId}
+              highlighted={highlight?.specIds.includes(spec.id) ?? false}
+              onSelect={() => select(spec.id)}
+            />
           ))}
+    </div>
+  );
+}
+
+function HighlightBar({ count, query }: { count: number; query: string }) {
+  const setHighlight = useWorkspace((s) => s.setHighlight);
+  return (
+    <div role="status" className="mx-3 mt-1 flex items-center gap-2 rounded-[var(--radius-md)] bg-acc-bg px-2.5 py-1.5 text-xs text-acc" title={query}>
+      <GitBranch aria-hidden="true" className="size-3.5 flex-none" />
+      <span className="flex-1">{t("cli.highlight", { n: count })}</span>
+      <IconButton label={t("cli.clearHighlight")} icon={<X className="size-3.5" />} onClick={() => setHighlight(null)} className="size-5 text-acc" />
     </div>
   );
 }
@@ -115,6 +137,7 @@ export function Sidebar() {
   const status = useWorkspace((s) => s.status);
   const setText = useWorkspace((s) => s.setText);
   const setStatus = useWorkspace((s) => s.setStatus);
+  const highlight = useWorkspace((s) => s.highlight);
   const visible = filterProjects(projects, text, status);
   const options: ReadonlyArray<SegmentOption<StatusFilter>> = [
     { value: "all", label: t("sidebar.statusAll") },
@@ -140,6 +163,7 @@ export function Sidebar() {
       <div className="px-3 pt-2.5 pb-1.5">
         <Segmented label={t("sidebar.statusFilterLabel")} options={options} value={status} onChange={setStatus} />
       </div>
+      {highlight ? <HighlightBar count={highlight.specIds.length} query={highlight.query} /> : null}
       <div className="min-h-0 flex-1 overflow-y-auto pt-1">
         {visible.map((p) => (
           <ProjectGroup key={p.id} project={p} />

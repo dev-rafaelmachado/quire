@@ -79,6 +79,7 @@ pub fn request_scan<R: Runtime>(app: &AppHandle<R>, changed: Vec<PathBuf>) -> st
                     let _ = SpecChanged { spec_dirs }.emit(&app);
                 }
                 refresh_watcher(&app);
+                crate::cli_delivery::after_scan(&app);
                 let rerun = lock(&state.live.queue).rerun;
                 if !rerun {
                     break;

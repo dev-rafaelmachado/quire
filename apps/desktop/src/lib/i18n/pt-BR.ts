@@ -189,6 +189,15 @@ export const ptBR = {
     fileRemoved: "O arquivo {name} foi removido.",
     dismiss: "Fechar aviso",
   },
+  cli: {
+    highlight: { one: "{n} spec nesta worktree", other: "{n} specs nesta worktree" },
+    clearHighlight: "Limpar destaque",
+    notFound: "Nenhuma spec encontrada para {query}.",
+    pickTitle: "Mais de uma spec para {query}",
+    pickHint: "Escolha qual abrir.",
+    pickList: "Specs encontradas",
+    cancel: "Cancelar",
+  },
   main: {
     emptyTitle: "Nenhuma spec aberta",
     emptyHint: "Escolha uma spec na lista à esquerda.",

@@ -107,6 +107,16 @@ pub async fn start_scan<R: Runtime>(app: AppHandle<R>) -> Result<(), CmdError> {
     crate::live::request_scan(&app, Vec::new()).map_err(|e| err("scan", e))
 }
 
+/// Navigation asked on the command line that the UI has not handled yet (also sent as
+/// `cli://open`); taking it clears it.
+#[tauri::command]
+#[specta::specta]
+pub async fn take_cli_open<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<Option<crate::cli::CliOpen>, CmdError> {
+    Ok(crate::cli_delivery::take(&app))
+}
+
 /// What the file watcher is doing right now (also sent as `watch://status`).
 #[tauri::command]
 #[specta::specta]

@@ -1,6 +1,8 @@
 // Prevents an extra console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cli;
+mod cli_delivery;
 mod commands;
 mod events;
 mod live;
@@ -20,6 +22,7 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
             commands::get_config,
             commands::start_scan::<Rt>,
             commands::get_watch_status,
+            commands::take_cli_open::<Rt>,
             commands::list_projects,
             commands::get_spec,
             commands::read_file,
@@ -32,7 +35,8 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
             events::ScanProgress,
             events::SpecsChanged,
             events::SpecChanged,
-            events::WatchStatus
+            events::WatchStatus,
+            events::CliNavigate
         ])
 }
 
@@ -40,8 +44,27 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
 #[cfg(test)]
 const BINDINGS: &str = "../src/lib/ipc/bindings.ts";
 
+/// Second instance (CLI-04): focus the window and navigate to what was asked.
+#[cfg(not(test))]
+fn on_second_instance(app: &tauri::AppHandle, argv: Vec<String>, cwd: String) {
+    use tauri::Manager;
+    use tauri_plugin_cli::CliExt;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    if let Ok(matches) = app.cli().matches_from(argv) {
+        let request = cli::interpret(&matches, std::path::Path::new(&cwd));
+        cli_delivery::deliver(app, request);
+    }
+}
+
 #[cfg(not(test))]
 fn main() {
+    use tauri::Manager;
+    use tauri_plugin_cli::CliExt;
+
     let builder = specta_builder();
     let state = match state::AppState::load() {
         Ok(s) => s,
@@ -52,10 +75,40 @@ fn main() {
     };
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_cli::init())
         .manage(state)
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
+            // 1. --help / --version answer in the terminal, before any window (CLI-05).
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let request = match app.cli().matches() {
+                Ok(m) => cli::interpret(&m, &cwd),
+                Err(e) => {
+                    eprintln!("quire: {e}");
+                    std::process::exit(2);
+                }
+            };
+            match &request {
+                cli::CliRequest::Help(text) => {
+                    println!("{text}");
+                    std::process::exit(0);
+                }
+                cli::CliRequest::Version => {
+                    println!("quire {}", app.package_info().version);
+                    std::process::exit(0);
+                }
+                _ => {}
+            }
+            // 2. A running instance gets our argv and this process exits (CLI-04).
+            app.handle()
+                .plugin(tauri_plugin_single_instance::init(on_second_instance))?;
+            // 3. Only now the window (created by hand: `create: false` in tauri.conf.json).
+            if let Some(config) = app.config().app.windows.first() {
+                tauri::WebviewWindowBuilder::from_config(app.handle(), config)?.build()?;
+            }
             builder.mount_events(app);
+            cli_delivery::deliver(app.handle(), request);
+            let _ = app.get_webview_window("main");
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -110,6 +163,20 @@ mod tests {
         }
     }
 
+    /// Mock context with the real `plugins.cli` grammar from tauri.conf.json.
+    fn context_with_cli() -> tauri::Context<MockRuntime> {
+        let conf: Value = serde_json::from_str(
+            &std::fs::read_to_string(manifest_dir().join("tauri.conf.json")).unwrap(),
+        )
+        .unwrap();
+        let mut ctx = mock_context(noop_assets());
+        ctx.config_mut()
+            .plugins
+            .0
+            .insert("cli".into(), conf["plugins"]["cli"].clone());
+        ctx
+    }
+
     fn app_on_fixtures(
         name: &str,
     ) -> (
@@ -140,9 +207,10 @@ mod tests {
         .unwrap();
         let builder = specta_builder();
         let app = mock_builder()
+            .plugin(tauri_plugin_cli::init())
             .manage(state)
             .invoke_handler(builder.invoke_handler())
-            .build(mock_context(noop_assets()))
+            .build(context_with_cli())
             .unwrap();
         // The mock app does not run the setup hook, so events are mounted here.
         builder.mount_events(&app);
@@ -272,6 +340,92 @@ mod tests {
             )
             .is_none()
         });
+    }
+
+    fn parse(app: &tauri::App<MockRuntime>, args: &[&str], cwd: &Path) -> cli::CliRequest {
+        use tauri_plugin_cli::CliExt;
+        let argv = std::iter::once("quire")
+            .chain(args.iter().copied())
+            .map(String::from)
+            .collect();
+        cli::interpret(&app.cli().matches_from(argv).unwrap(), cwd)
+    }
+
+    #[test]
+    fn command_line_grammar() {
+        let (app, _webview, _tmp) = app_on_fixtures("cli-grammar");
+        let cwd = Path::new("/somewhere");
+        assert!(
+            matches!(parse(&app, &["--help"], cwd), cli::CliRequest::Help(h) if h.contains("open"))
+        );
+        assert!(matches!(
+            parse(&app, &["open", "--help"], cwd),
+            cli::CliRequest::Help(_)
+        ));
+        assert_eq!(parse(&app, &["--version"], cwd), cli::CliRequest::Version);
+        assert_eq!(parse(&app, &[], cwd), cli::CliRequest::Nothing);
+        assert_eq!(
+            parse(&app, &["."], cwd),
+            cli::CliRequest::Here(cwd.join("."))
+        );
+        assert_eq!(
+            parse(&app, &["open", "ACME-142"], cwd),
+            cli::CliRequest::Open {
+                query: "ACME-142".into(),
+                cwd: cwd.to_path_buf()
+            }
+        );
+    }
+
+    #[test]
+    fn command_line_navigation_end_to_end() {
+        let (app, webview, tmp) = app_on_fixtures("cli-nav");
+        scan_and_wait(&app, &webview);
+        let ws = tmp.path().join("ws").canonicalize().unwrap();
+        let list = invoke(&webview, "list_projects", json!({})).unwrap();
+        let spec_id = |folder: &str, project: usize| -> Value {
+            list[project]["specs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|s| s["folder"] == folder)
+                .unwrap()["id"]
+                .clone()
+        };
+        let take = || invoke(&webview, "take_cli_open", json!({})).unwrap();
+
+        // CLI-02: a key in one project opens it; a key in two projects asks to pick.
+        cli_delivery::deliver(app.handle(), parse(&app, &["open", "ACME-142"], &ws));
+        assert_eq!(
+            take(),
+            json!({ "kind": "spec", "specId": spec_id("acme-142-service-tokens", 1), "instanceId": null })
+        );
+        cli_delivery::deliver(app.handle(), parse(&app, &["open", "acme-200"], &ws));
+        let pick = take();
+        assert_eq!(pick["kind"], "pick");
+        assert_eq!(pick["specIds"].as_array().unwrap().len(), 2);
+
+        // CLI-01: `quire .` inside the worktree of acme-170 lists its specs, highlighted.
+        let wt = ws.join("external/acme-170/acme_gateway");
+        cli_delivery::deliver(app.handle(), parse(&app, &["."], &wt.join("src")));
+        let here = take();
+        assert_eq!(here["kind"], "highlight", "{here}");
+        assert_eq!(here["specIds"].as_array().unwrap().len(), 3);
+
+        // CLI-03: a path to a spec file opens that spec in that instance.
+        let file = wt.join(".specs/features/acme-170-rate-limit/tasks.md");
+        cli_delivery::deliver(
+            app.handle(),
+            parse(&app, &["open", file.to_str().unwrap()], &ws),
+        );
+        let by_path = take();
+        assert_eq!(by_path["kind"], "spec");
+        assert_eq!(by_path["specId"], spec_id("acme-170-rate-limit", 1));
+        assert!(by_path["instanceId"].is_number());
+
+        cli_delivery::deliver(app.handle(), parse(&app, &["open", "NOPE-1"], &ws));
+        assert_eq!(take(), json!({ "kind": "notFound", "query": "NOPE-1" }));
+        assert_eq!(take(), Value::Null, "taking clears it");
     }
 
     #[test]

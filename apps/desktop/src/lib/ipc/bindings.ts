@@ -17,6 +17,11 @@ export const commands = {
 	startScan: (options?: InvokeOptions) => __TAURI_INVOKE<null>("start_scan", undefined, options),
 	/**  What the file watcher is doing right now (also sent as `watch://status`). */
 	getWatchStatus: (options?: InvokeOptions) => __TAURI_INVOKE<WatchStatus>("get_watch_status", undefined, options),
+	/**
+	 *  Navigation asked on the command line that the UI has not handled yet (also sent as
+	 *  `cli://open`); taking it clears it.
+	 */
+	takeCliOpen: (options?: InvokeOptions) => __TAURI_INVOKE<CliOpen_Serialize | null>("take_cli_open", undefined, options),
 	/**  Projects and specs from the index cache (fast, IDX-03). */
 	listProjects: (filter: ListFilter_Deserialize | null, options?: InvokeOptions) => __TAURI_INVOKE<ProjectSummary_Serialize[]>("list_projects", { filter }, options),
 	/**  One spec with the requested instance, or the default one (DUP-04). */
@@ -32,6 +37,7 @@ export const commands = {
 
 /** Events */
 export const events = {
+	cliOpen: makeEvent<CliNavigate_Serialize, CliNavigate_Deserialize>("cli://open"),
 	scanProgress: makeEvent<ScanProgress_Serialize, ScanProgress_Deserialize>("scan://progress"),
 	specChanged: makeEvent<SpecChanged, SpecChanged>("spec://changed"),
 	specsChanged: makeEvent<SpecsChanged, SpecsChanged>("specs://changed"),
@@ -39,6 +45,40 @@ export const events = {
 };
 
 /* Types */
+/**  Navigation asked on the command line (CLI-01..04). */
+export type CliNavigate = CliNavigate_Serialize | CliNavigate_Deserialize;
+
+/**  Navigation asked on the command line (CLI-01..04). */
+export type CliNavigate_Deserialize = {
+	open: CliOpen_Deserialize,
+};
+
+/**  Navigation asked on the command line (CLI-01..04). */
+export type CliNavigate_Serialize = {
+	open: CliOpen_Serialize,
+};
+
+/**  What the UI should do (event `cli://open`). */
+export type CliOpen = CliOpen_Serialize | CliOpen_Deserialize;
+
+/**  What the UI should do (event `cli://open`). */
+export type CliOpen_Deserialize = 
+/**  Open this spec, in this instance when given. */
+{ kind: "spec"; specId: number; instanceId?: number | null } | 
+/**  `quire .` in a worktree with several specs: the project list, these highlighted. */
+{ kind: "highlight"; query: string; specIds: number[] } | 
+/**  The key matches specs in more than one place: let the user pick (CLI-02). */
+{ kind: "pick"; query: string; specIds: number[] } | { kind: "notFound"; query: string };
+
+/**  What the UI should do (event `cli://open`). */
+export type CliOpen_Serialize = 
+/**  Open this spec, in this instance when given. */
+{ kind: "spec"; specId: number; instanceId: number | null } | 
+/**  `quire .` in a worktree with several specs: the project list, these highlighted. */
+{ kind: "highlight"; query: string; specIds: number[] } | 
+/**  The key matches specs in more than one place: let the user pick (CLI-02). */
+{ kind: "pick"; query: string; specIds: number[] } | { kind: "notFound"; query: string };
+
 export type CmdError = {
 	code: string,
 	message: string,
