@@ -47,7 +47,7 @@ Confirmados em T1 (Linux, Rust 1.100, Node 26, pnpm 12), rodando da raiz do repo
 T1 → T2 → T3 → T4
 ```
 
-- [ ] T1: Scaffold do monorepo (Cargo + pnpm, Tauri 2, Vite React TS estrito)
+- [x] T1: Scaffold do monorepo (Cargo + pnpm, Tauri 2, Vite React TS estrito) (1d09a59)
 - [ ] T2: Spike do WebKitGTK: markdown grande, Mermaid e rolagem
 - [ ] T3: Spike do watcher e do custo de scan (ext4, WSL e `\\wsl$`)
 - [ ] T4: CI no GitHub Actions (Linux e Windows)
