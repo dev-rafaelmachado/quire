@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · 1 de 6 fases completas · Fase 0 em andamento · 12/24 tarefas
+**Status:** Em execução · 2 de 6 fases completas · Fase 2 em andamento · 13/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -12,20 +12,20 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 <!-- progress:start -->
 | Fase | Repositório | Tarefas |
 |---|---|---|
-| 0: Spike e fundação | quire | 3/4 |
+| 0: Spike e fundação | quire | 4/4 ✓ |
 | 1: Núcleo (`quire-core`) | quire | 8/8 ✓ |
 | 2: Shell e base da UI | quire | 1/3 |
 | 3: Visões | quire | 0/5 |
 | 4: Ao vivo e CLI | quire | 0/2 |
 | 5: Fechamento da v0.1 | quire | 0/2 |
 
-**Total:** 12/24 tarefas
+**Total:** 13/24 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
 - **Fase / tarefa:** Fase 2; T13 concluída, próxima é a T14 (tokens, tema, layout e catálogo de strings), que **não foi iniciada**
-- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T5 (a3e2c35), T6 (199f344), T7 (a5a0b9b), T8 (a7b1225), T9 (91c0f7e), T10 (60c91ca), T11 (64793b0), T12 (f452ea3), T13 (86de96e); T4 escrita, aguardando CI
+- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T4 (cfd7d06), T5 (a3e2c35), T6 (199f344), T7 (a5a0b9b), T8 (a7b1225), T9 (91c0f7e), T10 (60c91ca), T11 (64793b0), T12 (f452ea3), T13 (86de96e)
 - **Em andamento:** nada
 - **Próximo passo:** T14: tokens, tema, layout de três colunas e catálogo de strings
 - **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
@@ -33,7 +33,6 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 - **Bloqueios:** nenhum
 - **Arquivos sem commit:** nenhum
 - **Branch / worktree:** `feat/core-and-ipc` (sem push)
-- **Pendências da T4:** o workflow de CI (cfd7d06) não rodou no GitHub. Para fechar a T4 é preciso fazer o push, abrir um PR de teste e ver o job verde em Linux e Windows; também conferir se uma falha de `clippy` ou de `typecheck` derruba o job. O Windows nunca foi testado localmente
 
 ## Resultados dos spikes
 
@@ -177,3 +176,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T13 · comandos e eventos Tauri concluídos (86de96e). Os comandos do design estão todos implementados exceto o `set_config`, que fica para a T23 junto com a gravação do `config.toml` (escrita só por ação explícita, com a tela de preferências). `spec://changed` e `cli://open` entram na T21 e na T22. **Desvio pequeno:** `get_spec` recebe `specId` (e `instanceId` opcional) em vez de `(project_id, folder)`, porque a lista já entrega o id; a busca por chave ou pasta fica para o CLI (T22). **Geração dos tipos (TD-07):** `tauri-specta` 2.0.0-rc.29 com `specta` =2.0.0-rc.28 (não há versão estável; versões fixadas com `=`, como a crate pede). Os bindings são gerados em `apps/desktop/src/lib/ipc/bindings.ts` por um **teste** (`bindings_are_up_to_date`, que roda em `cargo test --workspace`), não pelo build. O teste reescreve o arquivo e falha se ele estava desatualizado, então o gate e a CI pegam bindings velhos, e o `pnpm typecheck` valida o uso. O arquivo gerado contém `any` (código do tauri-specta); o código escrito à mão não tem. O `quire-core` deriva `specta::Type` atrás da feature opcional `specta` (specta não é Tauri, então a regra de modularidade continua valendo). Como `i64`/`usize` são proibidos no export e `f64` vira `number | null`, ids, contadores e linhas são exportados como `u32`. Os comandos usam um alias de runtime (`Wry` no app, `MockRuntime` nos testes), porque o `collect_commands!` não aceita genérico externo. Testes ponta a ponta pelo IPC do mock runtime sobre as fixtures: `start_scan` → `list_projects` (projetos, badge "3 versões", worktree padrão, filtro de texto), `get_spec` (abas em ordem, "outros", cabeçalho, troca de instância), `read_file` (rejeita `../`), `get_tasks`, `get_gates` (2 linhas puladas), `get_lessons`, `get_config`, `open_external` (rejeita `file://`). Também um teste de fumaça no app real com `QUIRE_CONFIG=fixtures/quire.toml`: abre e roda sem pânico
 - 2026-11-15 · T4 · o CI do Windows falhou em `config::tests::missing_file_loads_defaults`: o teste usava `/abs` como caminho absoluto, mas no Windows um caminho sem drive é relativo ao drive, então o `load()` o junta à pasta do config e dá `C:\abs`. **Não é bug de produção:** relativo é resolvido contra a pasta do config, absoluto é mantido, e caminho com raiz sem drive pega o drive do config, que é a semântica do Windows. Corrigido só o teste (5f3fa3d): agora usa um caminho absoluto de outro diretório temporário (string literal TOML, sem escapes de `\`) e afirma o caso `/rooted` por sistema. Varredura de casos parecidos: os demais literais Unix nos testes (`/r/app/.git`, `/definitely/not/here`, `/nonexistent/quire-test-git`, `/abs` passando pelo `parse()`) só manipulam componentes ou esperam "não encontrado", então se comportam igual no Windows; os asserts de caminho relativo já trocam `\` por `/`. Fim de linha: o `.gitattributes` com `* text=auto eol=lf` já existia desde a T4 e `git ls-files --eol` confirma 108 arquivos de texto em LF (os 6 restantes são binários); os parsers usam `str::lines()`, que também tira o `\r`. T4 continua aberta até o CI ficar verde nos dois sistemas
 - 2026-11-15 · T4 · o CI do Linux falhou em `crates/quire-core/tests/git.rs` com "not empty and no .quire-fixtures marker". **Causa:** os testes de integração compartilhavam um workspace gerado por binário numa pasta fixa (`target/tmp/fixtures-<binário>-shared`), protegida só por um `OnceLock`, que serializa threads dentro de um processo mas não entre processos. Com `cargo test` simples (um processo), a falha não se reproduziu (5/5 verdes). Reproduziu com o mesmo binário em 5 processos concorrentes (20 rodadas: 85 de 100 testes falharam, 22 recusas do script) e com uma pasta deixada sem o marcador (falha mesmo com um processo). **Correção (9008275), opção (a):** cada teste gera as próprias fixtures num `TempDir` novo (`common::Fixtures`), apagado no drop. A geração custa ~44 ms, então ficar sem estado compartilhado sai mais simples e robusto que lock de arquivo com marcador escrito por último. O script é localizado por `CARGO_MANIFEST_DIR`, então o diretório de trabalho não importa; a trava do script não mudou. Verificado: 20 rodadas × 5 processos do binário `git` rodando a partir de `/tmp` (100/100), os 6 binários de integração 3× ao mesmo tempo (18/18), `rm -rf target/tmp` + `--test-threads=8` 3 vezes, duas execuções seguidas com `target/tmp` sujo, e nenhum diretório temporário sobrando. Os testes do shell (`apps/desktop/src-tauri/src/main.rs`) já geravam fixtures num `tempdir` por teste e não tinham a corrida; não existe `apps/desktop/src-tauri/tests/`. T4 continua aberta
+- 2026-11-15 · T4 · CI verde em Linux e Windows no commit `fde19e5` (confirmado pelo autor); T4 marcada com o hash do commit que criou o workflow (`cfd7d06`). O CI forçou duas correções antes de ficar verde: (1) `5f3fa3d`, o teste de caminho absoluto do `config.toml` não era portável (`/abs` é relativo ao drive no Windows; a produção estava certa); (2) `9008275`, os testes de integração compartilhavam uma pasta de fixtures por binário e corriam entre processos; agora cada teste gera as suas num `TempDir`. Do "Pronto quando", o item "falha derruba o job" foi observado nas duas falhas de teste; `clippy` e `typecheck` rodam como passos `run` do mesmo tipo, mas uma falha deles especificamente não foi provocada

@@ -50,7 +50,7 @@ T1 → T2 → T3 → T4
 - [x] T1: Scaffold do monorepo (Cargo + pnpm, Tauri 2, Vite React TS estrito) (1d09a59)
 - [x] T2: Spike do WebKitGTK: markdown grande, Mermaid e rolagem (cbb0913)
 - [x] T3: Spike do watcher e do custo de scan (ext4, WSL e `\\wsl$`) (242c3d8)
-- [ ] T4 (aguardando CI no GitHub): CI no GitHub Actions (Linux e Windows) (cfd7d06)
+- [x] T4: CI no GitHub Actions (Linux e Windows) (cfd7d06)
 
 ### Fase 1: Núcleo (`quire-core`)
 
