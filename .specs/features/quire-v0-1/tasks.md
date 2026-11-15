@@ -83,7 +83,7 @@ T13 → T14 → T15
 T16 → T17 → T18 → T19 → T20
 ```
 
-- [ ] T16: Pipeline de markdown (GFM, código, Mermaid, outline, colapsar)
+- [ ] T16: Pipeline de markdown (GFM, código, Mermaid, outline, colapsar) (71a2796) (gate passou, aguardando revisão visual)
 - [ ] T17: Abas, faixa de metadados e fallback de outros arquivos
 - [ ] T18: Visão de tasks por fase
 - [ ] T19: Visões de gates e lessons
