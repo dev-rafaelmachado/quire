@@ -73,7 +73,7 @@ T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12
 T13 → T14 → T15
 ```
 
-- [ ] T13: Comandos e eventos Tauri com tipos compartilhados
+- [x] T13: Comandos e eventos Tauri com tipos compartilhados (86de96e)
 - [ ] T14: Tokens, tema, layout de três colunas e catálogo de strings
 - [ ] T15: Sidebar de projetos e specs
 

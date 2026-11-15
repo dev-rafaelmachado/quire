@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · 1 de 6 fases completas · Fase 0 em andamento · 11/24 tarefas
+**Status:** Em execução · 1 de 6 fases completas · Fase 0 em andamento · 12/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -14,20 +14,20 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 |---|---|---|
 | 0: Spike e fundação | quire | 3/4 |
 | 1: Núcleo (`quire-core`) | quire | 8/8 ✓ |
-| 2: Shell e base da UI | quire | 0/3 |
+| 2: Shell e base da UI | quire | 1/3 |
 | 3: Visões | quire | 0/5 |
 | 4: Ao vivo e CLI | quire | 0/2 |
 | 5: Fechamento da v0.1 | quire | 0/2 |
 
-**Total:** 11/24 tarefas
+**Total:** 12/24 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 1 concluída (menos a T4 da Fase 0, aguardando CI); próxima é a T13 (comandos Tauri)
-- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T5 (a3e2c35), T6 (199f344), T7 (a5a0b9b), T8 (a7b1225), T9 (91c0f7e), T10 (60c91ca), T11 (64793b0), T12 (f452ea3); T4 escrita, aguardando CI
+- **Fase / tarefa:** Fase 2; T13 concluída, próxima é a T14 (tokens, tema, layout e catálogo de strings), que **não foi iniciada**
+- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T5 (a3e2c35), T6 (199f344), T7 (a5a0b9b), T8 (a7b1225), T9 (91c0f7e), T10 (60c91ca), T11 (64793b0), T12 (f452ea3), T13 (86de96e); T4 escrita, aguardando CI
 - **Em andamento:** nada
-- **Próximo passo:** T13: comandos e eventos Tauri com tipos compartilhados
+- **Próximo passo:** T14: tokens, tema, layout de três colunas e catálogo de strings
 - **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
 - **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
 - **Bloqueios:** nenhum
@@ -174,3 +174,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T10 · parsers concluídos (60c91ca): `parse::{header, tasks, summary_progress, ids}`, puros, por linha, ignorando blocos de código e com número de linha. **Interpretação do cabeçalho:** o `docs/spec-format.md` diz "até a primeira linha em branco depois do título", mas no próprio exemplo há uma linha em branco logo após o `# título`, então a leitura literal não pegaria nada. Implementado: o bloco de linhas `**Chave:** valor` (ou `**Chave**: valor`) depois do título, até a próxima linha em branco, título ou linha que não seja campo. No `tasks.md`: fases com sufixo ` — repo`, diagrama do primeiro bloco cercado logo após o título da fase (uma cadeia por linha), tarefas fora de fase vão para uma fase implícita, anotação entre id e dois-pontos vira `note` (cobre a linha da T4 "aguardando CI"), hash só se for hex de 7 a 40 caracteres no fim. Os IDs de requisito por tarefa vêm do campo `**Requirement**` do detalhamento, pela regex do preset. Testado com as fixtures (7/8, fase sem diagrama, ids fora de ordem, tarefa concluída sem hash) e com o `tasks.md` do próprio Quire (24 tarefas, 6 fases, 24 detalhamentos). Regex fixas usam `expect` com justificativa, já que falhar ali é bug no código-fonte
 - 2026-11-15 · T11 · JSONL tolerante concluído (64793b0): `parse::jsonl<T>` devolve itens, contagem e números das linhas puladas. Pula linha que não é objeto JSON, inclusive a última linha truncada, mas não conta linha em branco. `GateRun` e `Lesson` ignoram campos desconhecidos e aceitam tipos próximos (número como string, `tail` como string única) em vez de derrubar a linha. `failed()` usa o `status` e, sem status, o `exit`; há também `gate_counts` e `newest_first` (sem `ts` vai para o fim). Nas fixtures: `bill-31` tem 3 execuções e 2 linhas puladas (linhas 2 e 5)
 - 2026-11-15 · T12 · índice SQLite concluído (f452ea3): `rusqlite` 0.42 `bundled`, cache em `<data dir>/quire/index.sqlite`, WAL, `user_version` = 1; arquivo que não é banco ou esquema de outra versão é apagado e reconstruído. **Desvio de nome em relação ao design:** a tabela `spec_meta` é chaveada por **instância** (`instance_id`), não por spec, porque título, status e progresso podem divergir entre cópias; a lista mostra o meta da instância padrão. `reconcile()` compara `(nome, tamanho, mtime)` de cada arquivo e só relê a instância se algo mudou (IDX-02), mas sempre atualiza a branch (que muda sem mudar arquivo), apaga instâncias, specs e projetos que sumiram, e relê o projeto inteiro se o preset mudou. Commits em lotes de 50, com eventos `Found`/`PathError`/`Progress` (DSC-04). **Medido (IDX-03):** 300 specs sintéticas em 10 repos; abrir o cache com conexão nova e listar leva 2,2 ms; a primeira reconciliação, 74 ms; a segunda, sem mudanças, 57 ms (dominada pelo scan e pelas chamadas ao git). Nas fixtures, reconstruir o cache do zero dá o mesmo resultado; o segundo scan relê 0 de 12; editar um arquivo relê 1; remover uma pasta remove 1
+- 2026-11-15 · T13 · comandos e eventos Tauri concluídos (86de96e). Os comandos do design estão todos implementados exceto o `set_config`, que fica para a T23 junto com a gravação do `config.toml` (escrita só por ação explícita, com a tela de preferências). `spec://changed` e `cli://open` entram na T21 e na T22. **Desvio pequeno:** `get_spec` recebe `specId` (e `instanceId` opcional) em vez de `(project_id, folder)`, porque a lista já entrega o id; a busca por chave ou pasta fica para o CLI (T22). **Geração dos tipos (TD-07):** `tauri-specta` 2.0.0-rc.29 com `specta` =2.0.0-rc.28 (não há versão estável; versões fixadas com `=`, como a crate pede). Os bindings são gerados em `apps/desktop/src/lib/ipc/bindings.ts` por um **teste** (`bindings_are_up_to_date`, que roda em `cargo test --workspace`), não pelo build. O teste reescreve o arquivo e falha se ele estava desatualizado, então o gate e a CI pegam bindings velhos, e o `pnpm typecheck` valida o uso. O arquivo gerado contém `any` (código do tauri-specta); o código escrito à mão não tem. O `quire-core` deriva `specta::Type` atrás da feature opcional `specta` (specta não é Tauri, então a regra de modularidade continua valendo). Como `i64`/`usize` são proibidos no export e `f64` vira `number | null`, ids, contadores e linhas são exportados como `u32`. Os comandos usam um alias de runtime (`Wry` no app, `MockRuntime` nos testes), porque o `collect_commands!` não aceita genérico externo. Testes ponta a ponta pelo IPC do mock runtime sobre as fixtures: `start_scan` → `list_projects` (projetos, badge "3 versões", worktree padrão, filtro de texto), `get_spec` (abas em ordem, "outros", cabeçalho, troca de instância), `read_file` (rejeita `../`), `get_tasks`, `get_gates` (2 linhas puladas), `get_lessons`, `get_config`, `open_external` (rejeita `file://`). Também um teste de fumaça no app real com `QUIRE_CONFIG=fixtures/quire.toml`: abre e roda sem pânico
