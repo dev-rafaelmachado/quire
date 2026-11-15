@@ -20,3 +20,6 @@ apps/desktop/src-tauri/gen/
 # local scratch
 tmp/
 .worktrees/
+
+# generated fixtures (scripts/make-fixtures.sh)
+fixtures/workspace/

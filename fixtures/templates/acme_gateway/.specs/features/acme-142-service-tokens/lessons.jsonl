@@ -1,0 +1,2 @@
+{"ts":"2026-01-07T15:00:00Z","feature":"acme-142-service-tokens","signal":"gate_fail","source":"src/gateway/cache.ts:12","text":"O TTL do cache de revogação estava acima do prazo do critério.","scope":"integration/cache"}
+{"ts":"2026-01-09T17:00:00Z","feature":"acme-142-service-tokens","signal":"ac_gap","source":"TOK-04","text":"O critério de último uso não define a precisão aceitável.","scope":"spec"}

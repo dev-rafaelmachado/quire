@@ -1,0 +1,5 @@
+{"ts":"2026-01-04T10:00:00Z","repo":"acme_billing","level":"fase","cmd":"cargo test","cwd":"/home/dev/acme/acme_billing","head":"9f8e7d6c5b4a","exit":0,"status":"pass","duration_s":12.3,"tail":[]}
+this line is not json
+{"ts":"2026-01-04T12:00:00Z","repo":"acme_billing","level":"fase","cmd":"cargo test","cwd":"/home/dev/acme/acme_billing","head":"7d6c5b4a3f2e","exit":101,"status":"fail","duration_s":15.9,"tail":["test export_large ... FAILED","thread panicked at src/invoice.rs:3"]}
+{"ts":"2026-01-04T15:00:00Z","repo":"acme_billing","level":"final","cmd":"cargo test --release","cwd":"/home/dev/acme/acme_billing","head":"6c5b4a3f2e1d","exit":0,"status":"pass","duration_s":48.0,"tail":[],"runner":"local"}
+{"ts":"2026-01-04T16:00:00Z","repo":"acme_billing","level":"e2e","cmd":"cargo test --test e2e","cwd":"/home/dev/acme/acme_bil
