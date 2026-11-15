@@ -462,6 +462,8 @@ T23 → T24
 - Criar e remover pasta de spec atualiza a lista
 - Rename atômico de editor não vira "removido"
 - Em caminho sem eventos, o polling assume com o intervalo configurado
+- Ao receber `create` de uma pasta, o watcher varre o conteúdo dela: um arquivo criado junto com a pasta não gera evento próprio (spike T3: 0/20 no inotify)
+- O watch nativo cobre só as pastas `.specs` (recursivo) e a raiz de cada repo (não recursivo, para pegar a criação de `.specs`), nunca o scan path inteiro: `node_modules`, `target` e `.git` esgotariam `max_user_watches` (spike T3)
 
 **Testes**: integration, manual
 **Gate**: fase

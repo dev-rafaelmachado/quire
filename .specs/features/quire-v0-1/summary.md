@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · Fase 0 em andamento · 3/24 tarefas
+**Status:** Em execução · 0 de 6 fases completas · Fase 0 em andamento · 3/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -32,7 +32,7 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 - **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
 - **Bloqueios:** nenhum
 - **Arquivos sem commit:** nenhum
-- **Branch / worktree:** `feat/monorepo-scaffold` (sem push)
+- **Branch / worktree:** `feat/core-and-ipc` (sem push)
 
 ## Resultados dos spikes
 
@@ -162,3 +162,5 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T3 · a varredura com `ignore` + `filter_entry` (pula `node_modules`, `target`, `dist`, `.git` por nome, além do `.gitignore`, com `hidden(false)` para enxergar `.specs`) achou as 50 specs e nenhuma das 150 iscas, inclusive nos repos sem `.gitignore`. Leva 3,5 ms com cache quente e 57 ms (sequencial) ou 8,7 ms (paralelo) com cache frio, contra 120 ms sem as regras. Para a T6: usar o walker paralelo, que ganha 6,6× no cache frio e empata no quente
 - 2026-11-15 · T3 · **regra proposta para o TD-05** (detecção de "sem eventos"), decidindo por scan path na inicialização: (1) no Linux, ler o tipo do mount em `/proc/self/mountinfo`, como o spike já faz, e usar polling se for `9p`, `v9fs`, `drvfs`, `cifs`, `smb3`, `nfs`, `nfs4` ou `fuse.*` (sshfs e similares); `ext4`, `btrfs`, `xfs`, `tmpfs` e afins usam o backend nativo; (2) no Windows, usar polling para caminhos `\\wsl$\` e `\\wsl.localhost\`, qualquer UNC `\\servidor\share` e unidades mapeadas de rede; (3) override por config para cada scan path (`watch = "auto" | "native" | "poll"`); (4) fallback em tempo de execução: se o `watch()` nativo falhar (ex.: `ENOSPC` por limite de watches), cair para polling naquele path, com aviso no rodapé. **Sem sonda de escrita**: criar arquivo de teste violaria "escrita só por ação explícita", e o spike mostra que a escrita do mesmo lado sempre gera evento, então a sonda não detectaria o caso que importa (escrita do outro lado da fronteira WSL/Windows)
 - 2026-11-15 · T3 · **NÃO VERIFICADO por falta de WSL** (nenhum resultado foi inferido): entrega de eventos do `notify` em WSL2 ext4, em DrvFs/9p (`/mnt/c`) e em `\\wsl$` a partir do Windows nativo; entrega quando quem escreve está do outro lado (editor do Windows em arquivo do WSL, agente do WSL em `C:\`); custo do polling e da varredura em 9p/DrvFs e em `\\wsl$`; qual `fstype` o `/proc/self/mountinfo` mostra para `/mnt/c` nas versões atuais do WSL (a regra cobre `9p` e `drvfs`); detecção de UNC e de unidade de rede no Windows; comportamento em NTFS nativo. Também não medido: ext4 em si (medi btrfs e tmpfs). O roteiro está em `crates/quire-core/examples/README.md`
+- 2026-11-15 · planejamento · achados do spike T3 copiados para o "Pronto quando" da T21 (varrer o conteúdo de pasta recém-criada; watch nativo só nas pastas `.specs` e na raiz de cada repo, sem recursão)
+- 2026-11-15 · dev · `feat/monorepo-scaffold` já estava mergeada na `main` (fast-forward); T4–T13 seguem na branch nova `feat/core-and-ipc`
