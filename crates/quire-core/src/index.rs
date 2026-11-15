@@ -90,6 +90,8 @@ pub struct InstanceSummary {
     pub mtime_ms: Option<i64>,
     /// Same primary-file content as the spec's default instance.
     pub same_as_default: bool,
+    /// Hash of the primary files; equal hashes mean identical copies (DUP-05).
+    pub content_hash: String,
     pub title: Option<String>,
     pub status: Option<String>,
     pub issue_url: Option<String>,
@@ -335,6 +337,7 @@ impl Index {
                 },
                 mtime_ms: r.get(15).map_err(sql)?,
                 same_as_default: true,
+                content_hash: r.get(16).map_err(sql)?,
                 title: r.get(17).map_err(sql)?,
                 status: r.get(18).map_err(sql)?,
                 issue_url: r.get(19).map_err(sql)?,

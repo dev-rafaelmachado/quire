@@ -212,6 +212,8 @@ export type InstanceSummary_Deserialize = {
 	mtimeMs?: number | null,
 	/**  Same primary-file content as the spec's default instance. */
 	sameAsDefault: boolean,
+	/**  Hash of the primary files; equal hashes mean identical copies (DUP-05). */
+	contentHash: string,
 	title?: string | null,
 	status?: string | null,
 	issueUrl?: string | null,
@@ -227,6 +229,8 @@ export type InstanceSummary_Serialize = {
 	mtimeMs: number | null,
 	/**  Same primary-file content as the spec's default instance. */
 	sameAsDefault: boolean,
+	/**  Hash of the primary files; equal hashes mean identical copies (DUP-05). */
+	contentHash: string,
 	title: string | null,
 	status: string | null,
 	issueUrl: string | null,

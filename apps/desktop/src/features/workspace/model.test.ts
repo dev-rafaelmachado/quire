@@ -11,6 +11,7 @@ function instance(over: Partial<InstanceSummary> = {}): InstanceSummary {
     kind: "checkout",
     mtimeMs: 1,
     sameAsDefault: true,
+    contentHash: "h",
     title: null,
     status: null,
     issueUrl: null,

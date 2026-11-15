@@ -29,6 +29,7 @@ function detail(over: Partial<SpecDetail> = {}): SpecDetail {
           kind: "worktree",
           mtimeMs: 1,
           sameAsDefault: true,
+    contentHash: "h",
           title: null,
           status: null,
           issueUrl: null,

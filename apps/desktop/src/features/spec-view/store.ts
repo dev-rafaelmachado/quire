@@ -27,7 +27,11 @@ interface SpecViewState {
   /** Bumped to ask the view to scroll to `active`. */
   scrollRequest: number;
   error: string | null;
+  /** Instance chosen per spec; lasts for the session (DUP-04). */
+  chosen: Readonly<Record<number, number>>;
   open: (specId: number | null) => Promise<void>;
+  /** Shows another instance of the open spec, keeping the current tab (DUP-04). */
+  switchInstance: (instanceId: number) => Promise<void>;
   selectTab: (tab: string) => Promise<void>;
   show: (file: string) => Promise<void>;
   toggle: (id: string) => void;
@@ -68,17 +72,35 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
   active: null,
   scrollRequest: 0,
   error: null,
+  chosen: {},
   open: async (specId) => {
     set({ specId, detail: null, tab: null, file: null, content: null, doc: null, outline: [], counts: {}, error: null });
     if (specId === null) return;
     try {
-      const detail = await commands.getSpec(specId, null);
+      const detail = await commands.getSpec(specId, get().chosen[specId] ?? null).catch(() =>
+        // The chosen copy may be gone (e.g. its worktree was removed): fall back to the default.
+        commands.getSpec(specId, null),
+      );
       if (get().specId !== specId) return;
       set({ detail });
       void loadCounts(detail).then((counts) => get().specId === specId && set({ counts }));
       const wanted = pendingTab !== null && detail.tabs.includes(pendingTab) ? pendingTab : null;
       pendingTab = null;
       await get().selectTab(wanted ?? detail.tabs[0] ?? OTHERS);
+    } catch (e) {
+      set({ error: asCmdError(e).message });
+    }
+  },
+  switchInstance: async (instanceId) => {
+    const { specId, tab } = get();
+    if (specId === null) return;
+    try {
+      const detail = await commands.getSpec(specId, instanceId);
+      if (get().specId !== specId) return;
+      set(({ chosen }) => ({ detail, chosen: { ...chosen, [specId]: instanceId } }));
+      void loadCounts(detail).then((counts) => get().specId === specId && set({ counts }));
+      const keep = tab !== null && (tab === OTHERS ? detail.others.length > 0 : detail.tabs.includes(tab));
+      await get().selectTab(keep && tab !== null ? tab : (detail.tabs[0] ?? OTHERS));
     } catch (e) {
       set({ error: asCmdError(e).message });
     }

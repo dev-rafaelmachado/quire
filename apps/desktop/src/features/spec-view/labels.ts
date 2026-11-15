@@ -25,3 +25,20 @@ export function issueUrl(detail: SpecDetail): string | null {
 export function displayed(detail: SpecDetail): InstanceSummary | undefined {
   return detail.spec.instances[detail.instanceIndex];
 }
+
+/** "há 3 min" / "há 2 dias" (DUP-05). */
+export function ago(mtimeMs: number | null, now: number, tr: (key: "instances.agoNow" | "instances.agoMinutes" | "instances.agoHours" | "instances.agoDays" | "instances.unknownTime", p?: { n: number }) => string): string {
+  if (mtimeMs === null) return tr("instances.unknownTime");
+  const minutes = Math.floor(Math.max(0, now - mtimeMs) / 60000);
+  if (minutes < 1) return tr("instances.agoNow");
+  if (minutes < 60) return tr("instances.agoMinutes", { n: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return tr("instances.agoHours", { n: hours });
+  return tr("instances.agoDays", { n: Math.floor(hours / 24) });
+}
+
+/** Last three segments of a path, for the instance list. */
+export function shortInstancePath(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.length <= 3 ? path : `…/${parts.slice(-3).join("/")}`;
+}
