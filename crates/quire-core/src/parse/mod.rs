@@ -3,11 +3,13 @@
 
 pub mod header;
 pub mod ids;
+pub mod jsonl;
 pub mod summary;
 pub mod tasks;
 
 pub use header::{HeaderField, header};
 pub use ids::{IdRef, ids};
+pub use jsonl::{GateCounts, GateRun, Jsonl, Lesson, gate_counts, jsonl, newest_first};
 pub use summary::{ProgressRow, summary_progress};
 pub use tasks::{DetailField, Phase, PhaseState, Task, TaskDetail, TasksDoc, tasks};
 

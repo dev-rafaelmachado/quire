@@ -110,3 +110,30 @@ fn files_out_of_format_give_empty_results() {
     assert!(parse::header(&json).is_empty());
     assert!(parse::tasks(&json, None).is_empty());
 }
+
+#[test]
+fn fixture_jsonl_with_invalid_and_truncated_lines() {
+    let dir = "fixtures/templates/acme_billing/.specs/features/bill-31-invoice-export";
+    let gates: parse::Jsonl<parse::GateRun> = parse::jsonl(&read(&format!("{dir}/gates.jsonl")));
+    assert_eq!(gates.items.len(), 3);
+    assert_eq!(gates.skipped, 2);
+    assert_eq!(gates.skipped_lines, [2, 5]);
+    let counts = parse::gate_counts(&gates.items);
+    assert_eq!((counts.runs, counts.passes, counts.fails), (3, 2, 1));
+    let fail = gates.items.iter().find(|g| g.failed()).unwrap();
+    assert_eq!(fail.exit, Some(101));
+    assert_eq!(fail.tail.len(), 2);
+    assert_eq!(fail.cwd.as_deref(), Some("/home/dev/acme/acme_billing"));
+    let lessons: parse::Jsonl<parse::Lesson> = parse::jsonl(&read(&format!("{dir}/lessons.jsonl")));
+    assert_eq!((lessons.items.len(), lessons.skipped), (1, 0));
+    assert_eq!(
+        lessons.items[0].signal.as_deref(),
+        Some("spec_precision_gap")
+    );
+
+    let ok: parse::Jsonl<parse::GateRun> = parse::jsonl(&read(&format!("{SPEC_DIR}/gates.jsonl")));
+    assert_eq!((ok.items.len(), ok.skipped), (5, 0));
+    let mut runs = ok.items;
+    parse::newest_first(&mut runs);
+    assert_eq!(runs[0].level.as_deref(), Some("final"));
+}
