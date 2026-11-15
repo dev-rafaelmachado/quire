@@ -12,9 +12,11 @@ export const commands = {
 	getConfig: (options?: InvokeOptions) => __TAURI_INVOKE<ConfigView_Serialize>("get_config", undefined, options),
 	/**
 	 *  Starts a background scan and index reconciliation; progress arrives as `scan://progress`
-	 *  events and the list as `specs://changed` (DSC-04). A call during a scan is ignored.
+	 *  events and the list as `specs://changed` (DSC-04). A call during a scan queues one rerun.
 	 */
 	startScan: (options?: InvokeOptions) => __TAURI_INVOKE<null>("start_scan", undefined, options),
+	/**  What the file watcher is doing right now (also sent as `watch://status`). */
+	getWatchStatus: (options?: InvokeOptions) => __TAURI_INVOKE<WatchStatus>("get_watch_status", undefined, options),
 	/**  Projects and specs from the index cache (fast, IDX-03). */
 	listProjects: (filter: ListFilter_Deserialize | null, options?: InvokeOptions) => __TAURI_INVOKE<ProjectSummary_Serialize[]>("list_projects", { filter }, options),
 	/**  One spec with the requested instance, or the default one (DUP-04). */
@@ -31,7 +33,9 @@ export const commands = {
 /** Events */
 export const events = {
 	scanProgress: makeEvent<ScanProgress_Serialize, ScanProgress_Deserialize>("scan://progress"),
+	specChanged: makeEvent<SpecChanged, SpecChanged>("spec://changed"),
 	specsChanged: makeEvent<SpecsChanged, SpecsChanged>("specs://changed"),
+	watchStatus: makeEvent<WatchStatus, WatchStatus>("watch://status"),
 };
 
 /* Types */
@@ -424,6 +428,11 @@ export type ScanProgress_Serialize = {
 	message: string | null,
 };
 
+/**  Files of these spec folders changed on disk (WAT-01); the index is already updated. */
+export type SpecChanged = {
+	specDirs: string[],
+};
+
 export type SpecDetail = SpecDetail_Serialize | SpecDetail_Deserialize;
 
 export type SpecDetail_Deserialize = {
@@ -540,6 +549,17 @@ export type TasksView_Serialize = {
 	details: TaskDetail[],
 	done: number,
 	total: number,
+};
+
+/**  What the file watcher is doing (status bar; WAT-03). */
+export type WatchStatus = {
+	/**  Repository roots watched. */
+	repos: number,
+	native: number,
+	polled: number,
+	pollIntervalMs: number,
+	/**  Paths whose native watch failed and fell back to polling. */
+	fallbacks: ScanPathError[],
 };
 
 /* Tauri Specta runtime */

@@ -7,13 +7,21 @@ import { useWorkspace } from "./store";
 export function WorkspaceStatus() {
   const projects = useWorkspace((s) => s.projects);
   const scan = useWorkspace((s) => s.scan);
+  const watch = useWorkspace((s) => s.watch);
   const c = counts(projects);
   const updating = scan?.phase === "scanning" || scan?.phase === "indexing";
+  const watching = watch !== null && watch.repos > 0;
   return (
     <>
       <div className="flex items-center gap-2">
-        <StatusDot tone="faint" />
-        <span>{t("statusbar.watcherOff")}</span>
+        <StatusDot tone={watching ? (watch.fallbacks.length > 0 ? "warn" : "ok") : "faint"} />
+        <span>
+          {watching ? t("statusbar.watching", { n: watch.repos }) : t("statusbar.watcherOff")}
+          {watching && watch.polled > 0
+            ? ` · ${t("statusbar.polling", { seconds: Math.round(watch.pollIntervalMs / 100) / 10, n: watch.polled })}`
+            : null}
+          {watching && watch.fallbacks.length > 0 ? ` · ${t("statusbar.fallbacks", { n: watch.fallbacks.length })}` : null}
+        </span>
       </div>
       <div className="flex-1" />
       <span>

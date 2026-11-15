@@ -3,6 +3,7 @@
 
 mod commands;
 mod events;
+mod live;
 mod state;
 
 /// Runtime the commands are compiled for: the real webview in the app, the mock one in tests.
@@ -18,6 +19,7 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
         .commands(tauri_specta::collect_commands![
             commands::get_config,
             commands::start_scan::<Rt>,
+            commands::get_watch_status,
             commands::list_projects,
             commands::get_spec,
             commands::read_file,
@@ -28,7 +30,9 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
         ])
         .events(tauri_specta::collect_events![
             events::ScanProgress,
-            events::SpecsChanged
+            events::SpecsChanged,
+            events::SpecChanged,
+            events::WatchStatus
         ])
 }
 
@@ -184,6 +188,90 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    fn wait_for(what: &str, timeout: Duration, mut check: impl FnMut() -> bool) -> Duration {
+        let t0 = Instant::now();
+        while !check() {
+            assert!(t0.elapsed() < timeout, "timed out waiting for {what}");
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        t0.elapsed()
+    }
+
+    fn spec_of(list: &Value, folder: &str) -> Option<Value> {
+        list.as_array()?
+            .iter()
+            .flat_map(|p| p["specs"].as_array().cloned().unwrap_or_default())
+            .find(|s| s["folder"] == folder)
+    }
+
+    #[test]
+    fn watcher_keeps_the_index_and_ui_in_line_with_the_disk() {
+        use tauri::Listener;
+        let (app, webview, tmp) = app_on_fixtures("watch");
+        let changed = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let sink = changed.clone();
+        app.listen("spec://changed", move |e| {
+            sink.lock().unwrap().push(e.payload().to_owned())
+        });
+        scan_and_wait(&app, &webview);
+
+        let status = invoke(&webview, "get_watch_status", json!({})).unwrap();
+        assert!(status["repos"].as_u64().unwrap() >= 4, "{status}");
+        assert_eq!(
+            status["polled"], 0,
+            "local fixtures use native events: {status}"
+        );
+
+        // WAT-01: an edit made outside the app reaches the index and the UI within 2 s.
+        let gw = tmp.path().join("ws/projects/acme_gateway/.specs/features");
+        let tasks = gw.join("acme-170-rate-limit/tasks.md");
+        let text = std::fs::read_to_string(&tasks)
+            .unwrap()
+            .replace("- [ ] T3:", "- [x] T3:");
+        std::fs::write(&tasks, text).unwrap();
+        let took = wait_for("the edit in the list", Duration::from_secs(2), || {
+            let list = invoke(&webview, "list_projects", json!({})).unwrap();
+            let spec = spec_of(&list, "acme-170-rate-limit").unwrap();
+            spec["instances"].as_array().unwrap().iter().any(|i| {
+                i["progress"] == json!([2, 3])
+                    && i["path"]
+                        .as_str()
+                        .unwrap()
+                        .contains("projects/acme_gateway")
+            })
+        });
+        eprintln!("WAT-01: edit visible in the list after {took:?}");
+        wait_for("spec://changed", Duration::from_secs(2), || {
+            changed
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|p| p.contains("acme-170-rate-limit"))
+        });
+
+        // A spec folder created together with its file appears (the folder's content is rescanned).
+        let new = gw.join("acme-300-new");
+        std::fs::create_dir(&new).unwrap();
+        std::fs::write(new.join("spec.md"), "# ACME-300 — Nova\n").unwrap();
+        wait_for("the new spec", Duration::from_secs(2), || {
+            spec_of(
+                &invoke(&webview, "list_projects", json!({})).unwrap(),
+                "acme-300-new",
+            )
+            .is_some()
+        });
+
+        // Removing it removes it from the list.
+        std::fs::remove_dir_all(&new).unwrap();
+        wait_for("the spec to go away", Duration::from_secs(2), || {
+            spec_of(
+                &invoke(&webview, "list_projects", json!({})).unwrap(),
+                "acme-300-new",
+            )
+            .is_none()
+        });
     }
 
     #[test]

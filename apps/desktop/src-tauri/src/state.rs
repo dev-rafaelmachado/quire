@@ -15,6 +15,8 @@ pub struct AppState {
     /// Connection used by queries; reconciliation opens its own (WAL allows both).
     pub index: Mutex<Index>,
     pub scanning: AtomicBool,
+    /// Scan queue and file watcher (T21).
+    pub live: crate::live::Live,
 }
 
 impl AppState {
@@ -51,6 +53,7 @@ impl AppState {
             index_path,
             index: Mutex::new(index),
             scanning: AtomicBool::new(false),
+            live: crate::live::Live::default(),
         })
     }
 }

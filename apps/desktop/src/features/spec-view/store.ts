@@ -29,7 +29,13 @@ interface SpecViewState {
   error: string | null;
   /** Instance chosen per spec; lasts for the session (DUP-04). */
   chosen: Readonly<Record<number, number>>;
+  /** Message about a change made outside the app (WAT-04). */
+  notice: string | null;
+  setNotice: (notice: string | null) => void;
   open: (specId: number | null) => Promise<void>;
+  /** Re-reads the open spec after a change on disk, keeping tab, collapsed sections and
+   *  scroll position (WAT-02). */
+  refresh: () => Promise<void>;
   /** Shows another instance of the open spec, keeping the current tab (DUP-04). */
   switchInstance: (instanceId: number) => Promise<void>;
   selectTab: (tab: string) => Promise<void>;
@@ -73,6 +79,8 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
   scrollRequest: 0,
   error: null,
   chosen: {},
+  notice: null,
+  setNotice: (notice) => set({ notice }),
   open: async (specId) => {
     set({ specId, detail: null, tab: null, file: null, content: null, doc: null, outline: [], counts: {}, error: null });
     if (specId === null) return;
@@ -89,6 +97,34 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       await get().selectTab(wanted ?? detail.tabs[0] ?? OTHERS);
     } catch (e) {
       set({ error: asCmdError(e).message });
+    }
+  },
+  refresh: async () => {
+    const { specId, detail, file } = get();
+    const instance = detail ? displayed(detail) : undefined;
+    if (specId === null || !detail || !instance) return;
+    try {
+      const next = await commands.getSpec(specId, instance.id);
+      if (get().specId !== specId) return;
+      set({ detail: next });
+      void loadCounts(next).then((counts) => get().specId === specId && set({ counts }));
+      if (!file) return;
+      if (!next.files.some((f) => f.name === file)) {
+        set({ content: null, doc: null, outline: [], notice: null, error: null });
+        await get().selectTab(next.tabs[0] ?? OTHERS);
+        return;
+      }
+      const content = await commands.readFile(instance.id, file);
+      if (get().file !== file || get().specId !== specId) return;
+      let doc: Doc | null = null;
+      if (content.kind === "markdown" && content.text !== null) {
+        const text = next.headerFiles.includes(file) ? stripHeader(content.text) : content.text;
+        doc = buildDoc(toHast(text));
+      }
+      // Collapsed sections and the active heading are kept: ids come from the heading text.
+      set({ content, doc, outline: doc ? outline(doc) : [] });
+    } catch {
+      // The instance may be gone; the list reconciliation decides what to show (WAT-04).
     }
   },
   switchInstance: async (instanceId) => {

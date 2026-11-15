@@ -58,6 +58,9 @@ export const ptBR = {
   },
   statusbar: {
     watcherOff: "Watcher desligado",
+    watching: { one: "Observando {n} repositório", other: "Observando {n} repositórios" },
+    polling: "polling a cada {seconds} s em {n}",
+    fallbacks: { one: "{n} caminho sem eventos nativos", other: "{n} caminhos sem eventos nativos" },
     counts: "{specs} · {projects}",
     indexFresh: "índice atualizado",
     indexUpdating: "atualizando índice",
@@ -179,6 +182,12 @@ export const ptBR = {
     agoHours: { one: "há {n} hora", other: "há {n} horas" },
     agoDays: { one: "há {n} dia", other: "há {n} dias" },
     unknownTime: "em data desconhecida",
+  },
+  live: {
+    specRemoved: "A spec aberta foi removida do disco.",
+    instanceRemoved: "A cópia aberta foi removida; mostrando {branch} em {worktree}.",
+    fileRemoved: "O arquivo {name} foi removido.",
+    dismiss: "Fechar aviso",
   },
   main: {
     emptyTitle: "Nenhuma spec aberta",

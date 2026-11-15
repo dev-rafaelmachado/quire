@@ -16,6 +16,7 @@ vi.mock("../../lib/ipc", () => ({
       calls.push("listProjects");
       return lists.shift() ?? [];
     },
+    getWatchStatus: async () => ({ repos: 0, native: 0, polled: 0, pollIntervalMs: 3000, fallbacks: [] }),
     startScan: async () => {
       calls.push("startScan");
       return null;
@@ -24,6 +25,7 @@ vi.mock("../../lib/ipc", () => ({
   events: {
     scanProgress: { listen: async (h: Handler) => void (handlers["scan"] = h) },
     specsChanged: { listen: async (h: Handler) => void (handlers["changed"] = h) },
+    watchStatus: { listen: async (h: Handler) => void (handlers["watch"] = h) },
   },
 }));
 

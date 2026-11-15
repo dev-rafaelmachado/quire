@@ -30,6 +30,26 @@ use crate::preset::{self, Preset, PrimaryFiles, TasksGrammar};
 
 pub const DEFAULT_POLL_INTERVAL_MS: u64 = 3000;
 
+/// How a path is watched (TD-05). `Auto` decides by filesystem and path kind.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum WatchMode {
+    #[default]
+    Auto,
+    Native,
+    Poll,
+}
+
+impl WatchMode {
+    fn parse(s: &str) -> Option<Self> {
+        match s {
+            "auto" => Some(Self::Auto),
+            "native" => Some(Self::Native),
+            "poll" => Some(Self::Poll),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProjectConfig {
     pub preset: Option<String>,
@@ -43,6 +63,10 @@ pub struct Config {
     pub poll_interval_ms: u64,
     /// Keyed by project name (the `origin` name or folder name, DUP-01).
     pub projects: BTreeMap<String, ProjectConfig>,
+    /// Default watch mode (`[watch] mode`).
+    pub watch_mode: WatchMode,
+    /// Per-path overrides (`[watch.paths]`); the longest matching prefix wins.
+    pub watch_paths: BTreeMap<PathBuf, WatchMode>,
     presets: BTreeMap<String, Preset>,
 }
 
@@ -52,6 +76,8 @@ impl Default for Config {
             scan_paths: vec![],
             poll_interval_ms: DEFAULT_POLL_INTERVAL_MS,
             projects: BTreeMap::new(),
+            watch_mode: WatchMode::Auto,
+            watch_paths: BTreeMap::new(),
             presets: builtin_presets(),
         }
     }
@@ -74,6 +100,15 @@ struct RawConfig {
     projects: BTreeMap<String, RawProject>,
     #[serde(default)]
     presets: BTreeMap<String, RawPreset>,
+    watch: Option<RawWatch>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawWatch {
+    mode: Option<Spanned<String>>,
+    #[serde(default)]
+    paths: BTreeMap<String, Spanned<String>>,
 }
 
 #[derive(Deserialize)]
@@ -215,7 +250,37 @@ impl Config {
                 },
             );
         }
+        let mode_of = |m: &Spanned<String>| {
+            WatchMode::parse(m.get_ref()).ok_or_else(|| {
+                invalid(
+                    text,
+                    m.span(),
+                    format!(
+                        "watch mode must be \"auto\", \"native\" or \"poll\", got \"{}\"",
+                        m.get_ref()
+                    ),
+                )
+            })
+        };
+        let (watch_mode, watch_paths) = match &raw.watch {
+            Some(w) => {
+                let mode = w
+                    .mode
+                    .as_ref()
+                    .map(mode_of)
+                    .transpose()?
+                    .unwrap_or_default();
+                let mut paths = BTreeMap::new();
+                for (path, m) in &w.paths {
+                    paths.insert(expand_home(path), mode_of(m)?);
+                }
+                (mode, paths)
+            }
+            None => (WatchMode::Auto, BTreeMap::new()),
+        };
         Ok(Self {
+            watch_mode,
+            watch_paths,
             scan_paths: raw.scan_paths.iter().map(|p| expand_home(p)).collect(),
             poll_interval_ms: raw.poll_interval_ms.unwrap_or(DEFAULT_POLL_INTERVAL_MS),
             projects,
@@ -235,6 +300,10 @@ impl Config {
                             *p = base.join(&*p);
                         }
                     }
+                    config.watch_paths = std::mem::take(&mut config.watch_paths)
+                        .into_iter()
+                        .map(|(p, m)| (if p.is_relative() { base.join(p) } else { p }, m))
+                        .collect();
                 }
                 Ok(config)
             }
@@ -265,6 +334,15 @@ impl Config {
         self.projects
             .get(project_name)
             .is_some_and(|p| p.preset.is_some())
+    }
+
+    /// Configured watch mode for a path: longest `[watch.paths]` prefix, else `[watch] mode`.
+    pub fn watch_mode_for(&self, path: &Path) -> WatchMode {
+        self.watch_paths
+            .iter()
+            .filter(|(p, _)| path.starts_with(p))
+            .max_by_key(|(p, _)| p.components().count())
+            .map_or(self.watch_mode, |(_, m)| *m)
     }
 
     pub fn alias_for(&self, project_name: &str) -> Option<&str> {
@@ -424,6 +502,29 @@ preset = "team"
             "{err:?}"
         );
         assert!(err.to_string().contains("line 2"), "{err}");
+    }
+
+    #[test]
+    fn watch_modes_and_overrides() {
+        let c = Config::parse(
+            "[watch]\nmode = \"native\"\n[watch.paths]\n\"/mnt/c\" = \"poll\"\n\"/mnt/c/fast\" = \"auto\"\n",
+        )
+        .unwrap();
+        assert_eq!(c.watch_mode_for(Path::new("/home/x")), WatchMode::Native);
+        assert_eq!(c.watch_mode_for(Path::new("/mnt/c/repo")), WatchMode::Poll);
+        assert_eq!(
+            c.watch_mode_for(Path::new("/mnt/c/fast/repo")),
+            WatchMode::Auto
+        );
+        assert_eq!(
+            Config::parse("").unwrap().watch_mode_for(Path::new("/x")),
+            WatchMode::Auto
+        );
+        let err = Config::parse("[watch]\nmode = \"sometimes\"\n").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::Invalid { line: 2, .. }),
+            "{err:?}"
+        );
     }
 
     #[test]

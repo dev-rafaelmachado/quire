@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { asCmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress } from "../../lib/ipc";
+import { asCmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type WatchStatus } from "../../lib/ipc";
 import type { StatusFilter } from "./model";
 
 interface WorkspaceState {
@@ -9,6 +9,8 @@ interface WorkspaceState {
   error: string | null;
   config: ConfigView | null;
   scan: ScanProgress | null;
+  /** File watcher state for the status bar (WAT-03). */
+  watch: WatchStatus | null;
   text: string;
   status: StatusFilter;
   collapsed: Readonly<Record<number, true>>;
@@ -23,7 +25,8 @@ interface WorkspaceState {
   rescan: () => Promise<void>;
 }
 
-let listening = false;
+// One init per app run: React StrictMode runs effects twice in development.
+let initRun: Promise<void> | null = null;
 // `?open=<folder>` selects that spec once it is listed (screenshots and demos, until the CLI).
 let pendingOpen: string | null =
   typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("open");
@@ -35,6 +38,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   error: null,
   config: null,
   scan: null,
+  watch: null,
   text: "",
   status: "all",
   collapsed: {},
@@ -71,10 +75,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       set({ error: asCmdError(e).message });
     }
   },
-  init: async () => {
-    if (!listening) {
-      listening = true;
-      await events.scanProgress.listen((e) => set({ scan: e.payload }));
+  init: () => {
+    initRun ??= (async () => {
+      await events.scanProgress.listen((e) => {
+        set({ scan: e.payload });
+        // The watcher follows the index; its status changes when a scan ends.
+        if (e.payload.phase === "done") void commands.getWatchStatus().then((watch) => set({ watch }));
+      });
+      await events.watchStatus.listen((e) => set({ watch: e.payload }));
       // Batches of the reconciliation arrive quickly; reload at most every 150 ms.
       await events.specsChanged.listen(() => {
         if (reloadTimer) return;
@@ -83,13 +91,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
           void get().reload();
         }, 150);
       });
-    }
-    try {
-      set({ config: await commands.getConfig() });
-    } catch (e) {
-      set({ error: asCmdError(e).message });
-    }
-    await get().reload();
-    await get().rescan();
+      try {
+        set({ config: await commands.getConfig(), watch: await commands.getWatchStatus() });
+      } catch (e) {
+        set({ error: asCmdError(e).message });
+      }
+      await get().reload();
+      await get().rescan();
+    })();
+    return initRun;
   },
 }));

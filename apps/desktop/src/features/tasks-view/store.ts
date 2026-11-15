@@ -13,6 +13,8 @@ interface TasksState {
   filter: TaskFilter;
   error: string | null;
   load: (instanceId: number) => Promise<void>;
+  /** Re-reads after a change on disk, keeping selection and expanded phases. */
+  reload: () => Promise<void>;
   select: (id: string) => void;
   togglePhase: (key: string) => void;
   setFilter: (filter: TaskFilter) => void;
@@ -37,6 +39,21 @@ export const useTasks = create<TasksState>((set, get) => ({
       set({ view, gates, selected: nextTaskId(view.phases), expanded: defaultExpanded(view.phases) });
     } catch (e) {
       set({ error: asCmdError(e).message });
+    }
+  },
+  reload: async () => {
+    const { instanceId, selected } = get();
+    if (instanceId === null || !get().view) return;
+    try {
+      const [view, gates] = await Promise.all([
+        commands.getTasks(instanceId),
+        commands.getGates(instanceId).then((g) => g.runs).catch(() => [] as GateRun[]),
+      ]);
+      if (get().instanceId !== instanceId) return;
+      const ids = new Set(view.phases.flatMap((p) => p.tasks.map((t) => t.id)));
+      set({ view, gates, selected: selected !== null && ids.has(selected) ? selected : nextTaskId(view.phases) });
+    } catch {
+      // Keep what is on screen; the next change or list reload settles it.
     }
   },
   select: (selected) => set({ selected }),

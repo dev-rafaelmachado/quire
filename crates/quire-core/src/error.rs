@@ -77,3 +77,10 @@ pub enum IndexError {
     #[error("cannot use {path}: {message}")]
     Io { path: PathBuf, message: String },
 }
+
+/// The file watcher could not start.
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum WatchError {
+    #[error("cannot start the file watcher: {0}")]
+    Start(String),
+}

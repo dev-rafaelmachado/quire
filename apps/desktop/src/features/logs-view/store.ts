@@ -14,6 +14,8 @@ interface LogsState {
   open: ReadonlySet<number>;
   error: string | null;
   load: (instanceId: number, files: { gates: boolean; lessons: boolean }) => Promise<void>;
+  /** Re-reads after a change on disk, keeping filters and expanded runs. */
+  reload: () => Promise<void>;
   setLevel: (level: LevelFilter) => void;
   setStatus: (status: StatusFilter) => void;
   toggleRun: (index: number) => void;
@@ -41,6 +43,19 @@ export const useLogs = create<LogsState>((set, get) => ({
       set({ gates, lessons, open });
     } catch (e) {
       set({ error: asCmdError(e).message });
+    }
+  },
+  reload: async () => {
+    const { instanceId, gates, lessons } = get();
+    if (instanceId === null) return;
+    try {
+      const [g, l] = await Promise.all([
+        gates ? commands.getGates(instanceId) : Promise.resolve(null),
+        lessons ? commands.getLessons(instanceId) : Promise.resolve(null),
+      ]);
+      if (get().instanceId === instanceId) set({ gates: g, lessons: l });
+    } catch {
+      // Keep what is on screen.
     }
   },
   setLevel: (level) => set({ level }),

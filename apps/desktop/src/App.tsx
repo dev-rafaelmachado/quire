@@ -3,6 +3,8 @@ import { EmptyView } from "./app/EmptyView";
 import { Shell } from "./app/Shell";
 import { TopBar } from "./app/TopBar";
 import { InstanceBadge } from "./features/spec-view/InstanceBadge";
+import { useLiveUpdates } from "./features/spec-view/live";
+import { Notice } from "./features/spec-view/Notice";
 import { SpecRight, SpecView, useRightColumn } from "./features/spec-view/SpecView";
 import { useSpecView } from "./features/spec-view/store";
 import { Sidebar } from "./features/workspace/Sidebar";
@@ -21,6 +23,7 @@ export function App() {
   useEffect(() => {
     void init();
   }, [init]);
+  useLiveUpdates();
 
   useEffect(() => {
     void open(selectedSpecId);
@@ -35,7 +38,12 @@ export function App() {
         />
       }
       side={<Sidebar />}
-      main={selected ? <SpecView /> : <EmptyView />}
+      main={
+        <>
+          <Notice />
+          {selected ? <SpecView /> : <EmptyView />}
+        </>
+      }
       right={selected && right.kind ? <SpecRight /> : undefined}
       rightWidth={right.width}
       status={<WorkspaceStatus />}

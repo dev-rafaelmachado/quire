@@ -6,7 +6,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::sync::atomic::Ordering;
 use std::sync::{Mutex, MutexGuard};
 
 use quire_core::git::GitResolver;
@@ -20,7 +19,7 @@ use specta::Type;
 use tauri::{AppHandle, Manager, Runtime, State};
 use tauri_specta::Event;
 
-use crate::events::{ScanPathError, ScanPhase, ScanProgress, SpecsChanged};
+use crate::events::{ScanPathError, ScanPhase, ScanProgress, SpecsChanged, WatchStatus};
 use crate::state::AppState;
 
 /// Files above this size open with a warning and without syntax highlighting.
@@ -101,38 +100,28 @@ pub async fn get_config(state: State<'_, AppState>) -> Result<ConfigView, CmdErr
 // ------------------------------------------------------------------ scan
 
 /// Starts a background scan and index reconciliation; progress arrives as `scan://progress`
-/// events and the list as `specs://changed` (DSC-04). A call during a scan is ignored.
+/// events and the list as `specs://changed` (DSC-04). A call during a scan queues one rerun.
 #[tauri::command]
 #[specta::specta]
-pub async fn start_scan<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, AppState>,
-) -> Result<(), CmdError> {
-    if state.scanning.swap(true, Ordering::SeqCst) {
-        return Ok(());
-    }
-    std::thread::Builder::new()
-        .name("quire-scan".into())
-        .spawn(move || run_scan(&app))
-        .map_err(|e| {
-            state.scanning.store(false, Ordering::SeqCst);
-            err("scan", e)
-        })?;
-    Ok(())
+pub async fn start_scan<R: Runtime>(app: AppHandle<R>) -> Result<(), CmdError> {
+    crate::live::request_scan(&app, Vec::new()).map_err(|e| err("scan", e))
 }
 
-/// Clears the `scanning` flag when the scan ends, even if it panics.
-struct ScanGuard<'a>(&'a std::sync::atomic::AtomicBool);
-
-impl Drop for ScanGuard<'_> {
-    fn drop(&mut self) {
-        self.0.store(false, Ordering::SeqCst);
-    }
+/// What the file watcher is doing right now (also sent as `watch://status`).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_watch_status(state: State<'_, AppState>) -> Result<WatchStatus, CmdError> {
+    Ok(state
+        .live
+        .status
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone())
 }
 
-fn run_scan<R: Runtime>(app: &AppHandle<R>) {
+/// One reconciliation; scheduling and the watcher live in `crate::live`.
+pub(crate) fn run_scan<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<AppState>();
-    let guard = ScanGuard(&state.scanning);
     let config = state
         .config
         .read()
@@ -183,7 +172,6 @@ fn run_scan<R: Runtime>(app: &AppHandle<R>) {
             progress.message = Some(e.to_string());
         }
     }
-    drop(guard);
     let _ = progress.emit(app);
     let _ = SpecsChanged.emit(app);
 }

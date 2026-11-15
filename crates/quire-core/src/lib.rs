@@ -10,7 +10,8 @@ pub mod model;
 pub mod parse;
 pub mod preset;
 pub mod scan;
+pub mod watch;
 
 pub use config::Config;
-pub use error::{ConfigError, GitError, IndexError, ScanError};
+pub use error::{ConfigError, GitError, IndexError, ScanError, WatchError};
 pub use index::Index;
