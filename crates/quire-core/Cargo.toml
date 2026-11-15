@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 ignore = "0.4.34"
 thiserror = "2"
+xxhash-rust = { version = "0.8.19", features = ["xxh3"] }
 
 [lints]
 workspace = true
