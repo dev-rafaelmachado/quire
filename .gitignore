@@ -1,0 +1,21 @@
+# dependencies and build output
+node_modules/
+dist/
+target/
+.vite/
+*.log
+
+# tauri
+apps/desktop/src-tauri/gen/
+
+# env and editor
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local scratch
+tmp/
+.worktrees/
