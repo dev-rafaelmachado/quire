@@ -28,3 +28,22 @@ impl ScanError {
         }
     }
 }
+
+/// Failure of a call to the system `git` binary (TD-03). Callers fall back to folder names.
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum GitError {
+    #[error("git is not installed or not on PATH")]
+    NotInstalled,
+    #[error("could not run git: {0}")]
+    Spawn(String),
+    #[error("git {args} timed out after {secs} s")]
+    Timeout { args: String, secs: u64 },
+    #[error("git {args} failed ({code:?}): {stderr}")]
+    Failed {
+        args: String,
+        code: Option<i32>,
+        stderr: String,
+    },
+    #[error("unexpected output from git {0}")]
+    UnexpectedOutput(String),
+}

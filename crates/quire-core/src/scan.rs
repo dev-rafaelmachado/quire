@@ -88,6 +88,58 @@ pub fn scan(
     report
 }
 
+/// Like [`scan`], then also scans the worktrees of every repository found that live outside
+/// the scan paths (DSC-03). Worktrees that are prunable (folder gone) are skipped.
+pub fn scan_with_worktrees(
+    paths: &[PathBuf],
+    filter: &SpecFilter,
+    git: &mut crate::git::GitResolver,
+    mut on_event: impl FnMut(ScanEvent),
+) -> ScanReport {
+    let mut repo_roots: Vec<PathBuf> = Vec::new();
+    let mut seen: HashSet<PathBuf> = HashSet::new();
+    let mut report = scan(paths, filter, |e| {
+        if let ScanEvent::Found(d) = &e {
+            seen.insert(d.spec_dir.clone());
+            if !repo_roots.contains(&d.repo_root) {
+                repo_roots.push(d.repo_root.clone());
+            }
+        }
+        on_event(e);
+    });
+    let roots: Vec<PathBuf> = paths.iter().filter_map(|p| p.canonicalize().ok()).collect();
+    let mut extra: Vec<PathBuf> = Vec::new();
+    for repo in &repo_roots {
+        let Ok(list) = git.worktrees(repo) else {
+            continue;
+        };
+        for wt in list {
+            if wt.bare || wt.prunable {
+                continue;
+            }
+            let Ok(path) = wt.path.canonicalize() else {
+                continue;
+            };
+            let inside = roots.iter().any(|r| path.starts_with(r));
+            if !inside && !extra.contains(&path) {
+                extra.push(path);
+            }
+        }
+    }
+    if !extra.is_empty() {
+        scan(&extra, filter, |e| {
+            match &e {
+                // Discoveries already reported through the scan paths are dropped.
+                ScanEvent::Found(d) if !seen.insert(d.spec_dir.clone()) => return,
+                ScanEvent::Found(_) => report.found += 1,
+                ScanEvent::PathError { .. } => report.path_errors += 1,
+            }
+            on_event(e);
+        });
+    }
+    report
+}
+
 fn check_root(path: &Path) -> Result<(), ScanError> {
     let meta = fs::metadata(path).map_err(|e| ScanError::from_io(path.to_path_buf(), &e))?;
     if !meta.is_dir() {
