@@ -36,6 +36,9 @@ interface SpecViewState {
 }
 
 const EMPTY: ReadonlySet<string> = new Set();
+// `?tab=<file>` opens that tab of the first spec opened (screenshots and demos, with `?open=`).
+let pendingTab: string | null =
+  typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
 
 async function loadCounts(detail: SpecDetail): Promise<TabCounts> {
   const instance = displayed(detail);
@@ -73,7 +76,9 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       if (get().specId !== specId) return;
       set({ detail });
       void loadCounts(detail).then((counts) => get().specId === specId && set({ counts }));
-      await get().selectTab(detail.tabs[0] ?? OTHERS);
+      const wanted = pendingTab !== null && detail.tabs.includes(pendingTab) ? pendingTab : null;
+      pendingTab = null;
+      await get().selectTab(wanted ?? detail.tabs[0] ?? OTHERS);
     } catch (e) {
       set({ error: asCmdError(e).message });
     }

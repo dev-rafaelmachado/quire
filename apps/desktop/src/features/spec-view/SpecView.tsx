@@ -2,7 +2,11 @@ import { useEffect, useRef } from "react";
 import { t } from "../../lib/i18n";
 import { Outline } from "../../lib/markdown/Outline";
 import { cx } from "../../ui";
+import { TaskDetailPanel } from "../tasks-view/TaskDetailPanel";
+import { TasksPanel } from "../tasks-view/TasksPanel";
+import { useTasks } from "../tasks-view/store";
 import { FileView } from "./FileView";
+import { displayed } from "./labels";
 import { MetaStrip } from "./MetaStrip";
 import { OTHERS, useSpecView } from "./store";
 import { Tabs } from "./Tabs";
@@ -80,6 +84,25 @@ export function SpecView() {
     document.getElementById(active)?.scrollIntoView({ block: "start" });
   }, [scrollRequest, active]);
 
+  const tasksView = useTasks((s) => s.view);
+  const loadTasks = useTasks((s) => s.load);
+  const instanceId = detail ? displayed(detail)?.id : undefined;
+  const onTasks = tab === "tasks.md";
+  useEffect(() => {
+    if (onTasks && instanceId !== undefined) void loadTasks(instanceId);
+  }, [onTasks, instanceId, loadTasks]);
+
+  if (detail && onTasks && tasksView?.structured) {
+    return (
+      <>
+        <Tabs detail={detail} counts={counts} tab={tab} onSelect={(next) => void selectTab(next)} />
+        <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
+          <TasksPanel view={tasksView} />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {detail ? <Tabs detail={detail} counts={counts} tab={tab} onSelect={(next) => void selectTab(next)} /> : null}
@@ -100,6 +123,14 @@ export function SpecView() {
       </div>
     </>
   );
+}
+
+/** Right column: task detail on the tasks tab, else the outline of the file. */
+export function SpecRight() {
+  const tab = useSpecView((s) => s.tab);
+  const structured = useTasks((s) => s.view?.structured ?? false);
+  if (tab === "tasks.md" && structured) return <TaskDetailPanel />;
+  return <SpecOutline />;
 }
 
 /** Right column: outline of the file. */
