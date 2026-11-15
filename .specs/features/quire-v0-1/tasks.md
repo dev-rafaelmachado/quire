@@ -31,7 +31,13 @@ Siga o `AGENTS.md`. Implemente **uma tarefa por vez, na ordem das fases**. Antes
 - **final:** o gate de fase + `pnpm --filter desktop build` + `cargo build --workspace --release`
 - **e2e:** roteiro manual de T24 sobre `fixtures/workspace`
 
-(Os comandos exatos serão confirmados em T1 e atualizados aqui.)
+Confirmados em T1 (Linux, Rust 1.100, Node 26, pnpm 12), rodando da raiz do repositório:
+
+- **setup:** `pnpm install` (o `@tauri-apps/cli` vem como devDependency de `apps/desktop`; não precisa de `cargo install tauri-cli`)
+- **dev:** `pnpm --filter desktop tauri dev` (ou `pnpm dev` na raiz); Vite fixo na porta 1420
+- `pnpm -r test` usa `vitest run --passWithNoTests`, então passa enquanto não houver testes de frontend
+- No gate final, `pnpm --filter desktop build` precisa rodar **antes** de `cargo build --workspace --release`: o `tauri::generate_context!` embute `apps/desktop/dist` no binário de release
+- Pré-requisitos no Linux (Arch/CachyOS): `webkit2gtk-4.1` e `rustup` com os componentes `clippy` e `rustfmt`
 
 ## Plano de execução
 
