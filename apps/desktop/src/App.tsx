@@ -1,4 +1,21 @@
-// Empty shell for T1. Layout, tokens and the string catalog arrive in T14.
+import { EmptyView } from "./app/EmptyView";
+import { Shell } from "./app/Shell";
+import { TopBar } from "./app/TopBar";
+import { t } from "./lib/i18n";
+import { StatusDot } from "./ui";
+
 export function App() {
-  return <main className="h-screen w-screen bg-neutral-950" />;
+  return (
+    <Shell
+      top={<TopBar />}
+      side={null}
+      main={<EmptyView />}
+      status={
+        <div className="flex items-center gap-2">
+          <StatusDot tone="faint" />
+          <span>{t("statusbar.watcherOff")}</span>
+        </div>
+      }
+    />
+  );
 }

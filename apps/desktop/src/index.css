@@ -1,4 +1,60 @@
 @import "tailwindcss";
+/* Exact copy of docs/design/tokens.css (a test keeps them identical). */
+@import "./ui/tokens.css";
 
 /* The T2 spike is a separate Vite project; keep its files out of the app's class scan. */
 @source not "./spike";
+
+/* Tailwind utilities read the design tokens, so switching .qd/.ql on <html> switches the theme
+   (TD-09). Names avoid the tokens' own variables (e.g. --font-ui) to prevent self-references. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-side: var(--side);
+  --color-panel: var(--panel);
+  --color-raise: var(--raise);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-acc: var(--acc);
+  --color-acc-bg: var(--acc-bg);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-code: var(--code);
+  --font-sans: var(--font-ui);
+  --font-code: var(--font-mono);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+  button,
+  input {
+    font: inherit;
+    color: inherit;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  input::placeholder {
+    color: var(--faint);
+    opacity: 1;
+  }
+  :where(button, a, input, [tabindex]):focus-visible {
+    outline: 2px solid var(--acc);
+    outline-offset: 1px;
+  }
+}
