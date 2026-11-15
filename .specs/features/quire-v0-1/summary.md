@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · 2 de 6 fases completas · Fase 2 em andamento · 15/24 tarefas
+**Status:** Em execução · 2 de 6 fases completas · Fase 2 em andamento · 16/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -16,18 +16,18 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 | 1: Núcleo (`quire-core`) | quire | 8/8 ✓ |
 | 2: Shell e base da UI | quire | 2/3 |
 | 3: Visões | quire | 1/5 |
-| 4: Ao vivo e CLI | quire | 0/2 |
+| 4: Ao vivo e CLI | quire | 1/2 |
 | 5: Fechamento da v0.1 | quire | 0/2 |
 
-**Total:** 15/24 tarefas
+**Total:** 16/24 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 3 com gates verdes (T16, T18, T19, T20 aguardando revisão visual); próxima é a T21
-- **Concluídas:** T1–T13, T15 (97272fe), T17 (c04312f)
+- **Fase / tarefa:** Fase 4; T21 concluída, próxima é a T22 (CLI)
+- **Concluídas:** T1–T13, T15 (97272fe), T17 (c04312f), T21 (f174742)
 - **Em andamento:** nada
-- **Próximo passo:** T21: watcher ligado ao índice e à UI
+- **Próximo passo:** T22: CLI com single-instance e seletor
 - **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
 - **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
 - **Bloqueios:** nenhum
@@ -185,3 +185,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T18 · tasks por fase (32e779e); gate verde, **aguardando revisão visual**. Screenshots: `/tmp/quire-shots/T18-dark.png` e `T18-light.png`. Fiel ao wireframe 2: faixa com x/y, barra, "N de M fases", chip "checkbox somente leitura" e filtro Todas/Pendentes; cartões de fase com contagem, barra e chip de estado (fases em andamento abrem expandidas); cadeias de dependência em chips com setas; linhas com ícone de estado, id, título, IDs de requisito, hash e gate; coluna direita de 320 px com o detalhamento e o aviso de somente leitura no rodapé. **Decisões e diferenças:** o wireframe mostra uma tarefa "em execução" com spinner, mas o `tasks.md` não tem essa informação; uso "próxima" (a primeira pendente da primeira fase não concluída). No painel, "Gate" mostra o último gate do `gates.jsonl` cujo `head` começa com o hash da tarefa, em vez de um gate "em execução há 38 s", que exigiria acompanhar processo. O caminho em "Onde" aparece como texto (o `arquivo:linha` clicável é v0.2). Os itens de "Pronto quando" usam checkbox desativado marcado quando a tarefa está concluída. Presets sem gramática de fases mostram o `tasks.md` como markdown
 - 2026-11-15 · T19 · gates e lessons (5c4d3df); gate verde, **aguardando revisão visual**. Screenshots: `/tmp/quire-shots/T19-dark.png`, `T19-light.png` (aba gates da `bill-31`, com falha e 2 linhas ignoradas) e `T19-lessons-dark.png`. Segue o wireframe 3: filtros de nível e status que se combinam; "N execuções · x pass · y fail"; chip de somente leitura; tabela da mais recente para a mais antiga com quando (hora local, "04 jan · 12:00"), nível, status com ícone, head de 7 caracteres, duração ("4m 12s") e comando; a primeira falha começa expandida com `tail`, exit e cwd abreviado (LOG-02); lessons em cartões no centro (aba lessons) e na coluna direita de 320 px (aba gates), com link para a aba; aviso de linhas ignoradas com os números (LOG-04). **Diferenças:** `spec.md:233` e `KEY-08` aparecem como texto em cor de link, sem navegação (arquivo:linha e backlinks são v0.2/v0.3); as capturas saíram em 1064 px por limite do monitor focado, então os filtros quebram de linha e as abas rolam na horizontal; em 1440 px cabem numa linha, como no wireframe
 - 2026-11-15 · T20 · seletor de instâncias (56df0cf); gate verde, **aguardando revisão visual**. Screenshots: `/tmp/quire-shots/T20-dark.png` e `T20-light.png` (ACME-170 com 3 versões e o popover aberto). Segue o wireframe 4: o selo no topo vira botão com o chip "N versões"; o popover lista branch, tipo (worktree/checkout), caminho abreviado, "modificada há…" e estado relativo à cópia **aberta** (aberta, diverge, idêntica), por isso o `InstanceSummary` passou a expor `contentHash`. "Abrir esta" troca de instância mantendo a aba; a escolha vale até o fim da sessão e cai para a padrão se a cópia sumir (DUP-04). Spec com uma instância só não tem badge nem seletor. **Diferenças em relação ao wireframe 4:** sem "Comparar selecionadas" e sem o diff lado a lado (v0.2+); o subtítulo "Edições vão para a versão marcada" virou "Escolha a cópia que você quer ler" (sem edição na v0.1); sem "N commits à frente" e "diverge em N arquivos" (exigiriam git log e diff por arquivo)
+- 2026-11-15 · T21 · watcher concluído (f174742). **Achados do T3 aplicados:** o watch nativo cobre só `<repo>/.specs` (recursivo) e `<repo>` (não recursivo); uma pasta criada vira `ListChanged`, que dispara reconciliação, e a varredura pega o arquivo criado junto com ela (teste de integração dedicado). **TD-05 implementado como proposto:** polling para `9p`, `v9fs`, `drvfs`, `cifs`, `smb3`, `smbfs`, `nfs`, `nfs4`, `afs` e `fuse*` (lidos do `/proc/self/mountinfo`), para caminhos UNC e `\\wsl$`/`\\wsl.localhost` no Windows, por `[watch] mode` e `[watch.paths]` no `config.toml`, e como fallback quando o watch nativo falha. **Desvio:** a detecção de "unidade de rede mapeada" no Windows ficou de fora, porque exige FFI (`GetDriveTypeW`), e o workspace tem `unsafe_code = forbid`; o override por caminho na config cobre esse caso. Shell: fila única de reconciliação (pedidos durante um scan viram uma reexecução), o watcher acompanha os repositórios do índice e só reinicia se os alvos mudam, eventos `spec://changed` e `watch://status`. UI: a spec aberta, tasks e gates recarregam no lugar, mantendo aba, seções recolhidas, seleção e rolagem (WAT-02); se a cópia exibida some, troca para outra instância com aviso ou volta para a lista (WAT-04). **Medido:** edição até o índice em ~210 ms no teste IPC (WAT-01 ≤ 2 s); na janela real, marcar a T6 por fora atualizou a aba para 8/8 em menos de 2 s (`/tmp/quire-shots/T21-live-dark.png`); a barra de status mostra "Observando 4 repositórios". **Bug achado na janela real e corrigido:** o `StrictMode` rodava o `init` duas vezes e o `watch://status` se perdia; o `init` agora é idempotente. **NÃO VERIFICADO:** polling real em WSL/DrvFs/`\\wsl$` (só simulado com `poll = true` nos testes; depende da pendência do T3)

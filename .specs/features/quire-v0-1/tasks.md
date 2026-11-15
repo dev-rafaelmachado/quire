@@ -95,7 +95,7 @@ T16 → T17 → T18 → T19 → T20
 T21 → T22
 ```
 
-- [ ] T21: Watcher ligado ao índice e à UI
+- [x] T21: Watcher ligado ao índice e à UI (f174742)
 - [ ] T22: CLI com single-instance e seletor
 
 ### Fase 5: Fechamento da v0.1
