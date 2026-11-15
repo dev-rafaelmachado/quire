@@ -433,12 +433,33 @@ preset = "team"
             Config::load(&tmp.path().join("none.toml")).unwrap(),
             Config::default()
         );
+        // An absolute path for the running OS (`/abs` has no drive, so it is not absolute on
+        // Windows). TOML literal strings keep Windows backslashes as they are.
+        let other = tempfile::tempdir().unwrap();
+        let abs = other.path().join("abs");
+        assert!(abs.is_absolute());
         let rel = tmp.path().join("rel.toml");
-        fs::write(&rel, "scan_paths = [\"workspace/projects\", \"/abs\"]\n").unwrap();
+        fs::write(
+            &rel,
+            format!(
+                "scan_paths = ['workspace/projects', '{}', '/rooted']\n",
+                abs.display()
+            ),
+        )
+        .unwrap();
         let c = Config::load(&rel).unwrap();
+        // `/rooted` is absolute on Unix; on Windows it is relative to a drive and takes the
+        // drive of the config file.
+        // Joining a rooted path on purpose: that is what `load` does on Windows.
+        #[allow(clippy::join_absolute_paths)]
+        let rooted = if cfg!(windows) {
+            tmp.path().join("/rooted")
+        } else {
+            PathBuf::from("/rooted")
+        };
         assert_eq!(
             c.scan_paths,
-            [tmp.path().join("workspace/projects"), PathBuf::from("/abs")]
+            [tmp.path().join("workspace/projects"), abs, rooted]
         );
         let bad = tmp.path().join("bad.toml");
         fs::write(&bad, "x = 1\n").unwrap();
