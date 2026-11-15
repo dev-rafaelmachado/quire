@@ -47,3 +47,22 @@ pub enum GitError {
     #[error("unexpected output from git {0}")]
     UnexpectedOutput(String),
 }
+
+/// Invalid or unreadable `config.toml`. Positions are 1-based.
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum ConfigError {
+    #[error("config.toml line {line}, column {column}: {message}")]
+    Parse {
+        line: usize,
+        column: usize,
+        message: String,
+    },
+    #[error("config.toml line {line}, column {column}: {message}")]
+    Invalid {
+        line: usize,
+        column: usize,
+        message: String,
+    },
+    #[error("cannot read {path}: {message}")]
+    Io { path: PathBuf, message: String },
+}

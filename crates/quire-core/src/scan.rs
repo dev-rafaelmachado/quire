@@ -45,7 +45,7 @@ pub struct ScanReport {
 }
 
 /// Decides whether a folder under `.specs/features` is a spec, from its file names (DSC-02).
-pub type SpecFilter = dyn Fn(&[String]) -> bool + Sync;
+pub type SpecFilter<'a> = dyn Fn(&[String]) -> bool + Sync + 'a;
 
 /// Filter of the `generic` preset: any `.md` or `.jsonl` file (PST-01).
 pub fn generic_filter(files: &[String]) -> bool {
@@ -60,7 +60,7 @@ pub fn generic_filter(files: &[String]) -> bool {
 /// same place) are reported once.
 pub fn scan(
     paths: &[PathBuf],
-    filter: &SpecFilter,
+    filter: &SpecFilter<'_>,
     mut on_event: impl FnMut(ScanEvent),
 ) -> ScanReport {
     let mut report = ScanReport::default();
@@ -92,7 +92,7 @@ pub fn scan(
 /// the scan paths (DSC-03). Worktrees that are prunable (folder gone) are skipped.
 pub fn scan_with_worktrees(
     paths: &[PathBuf],
-    filter: &SpecFilter,
+    filter: &SpecFilter<'_>,
     git: &mut crate::git::GitResolver,
     mut on_event: impl FnMut(ScanEvent),
 ) -> ScanReport {
@@ -154,7 +154,7 @@ fn keep_entry(entry: &DirEntry) -> bool {
     !(is_dir && IGNORED_DIRS.iter().any(|d| entry.file_name() == *d))
 }
 
-fn walk(root: &Path, filter: &SpecFilter, tx: &mpsc::Sender<Discovery>) {
+fn walk(root: &Path, filter: &SpecFilter<'_>, tx: &mpsc::Sender<Discovery>) {
     WalkBuilder::new(root)
         .hidden(false)
         .git_ignore(true)
@@ -187,7 +187,7 @@ fn walk(root: &Path, filter: &SpecFilter, tx: &mpsc::Sender<Discovery>) {
 }
 
 /// Lists the spec folders of one `.specs` directory.
-fn specs_in(specs_dir: &Path, filter: &SpecFilter) -> Vec<Discovery> {
+fn specs_in(specs_dir: &Path, filter: &SpecFilter<'_>) -> Vec<Discovery> {
     let Some(repo_root) = specs_dir.parent().and_then(|p| p.canonicalize().ok()) else {
         return Vec::new();
     };

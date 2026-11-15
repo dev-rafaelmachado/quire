@@ -2598,10 +2598,14 @@ name = "quire-core"
 version = "0.1.0"
 dependencies = [
  "cpu-time",
+ "dirs",
  "ignore",
  "notify",
+ "regex",
+ "serde",
  "tempfile",
  "thiserror 2.0.21",
+ "toml 1.2.1+spec-1.1.0",
  "xxhash-rust",
 ]
 

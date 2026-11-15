@@ -13,7 +13,9 @@ use std::time::UNIX_EPOCH;
 
 use xxhash_rust::xxh3::Xxh3;
 
+use crate::config::Config;
 use crate::git::{GitResolver, NameSource, ProjectIdentity};
+use crate::preset;
 use crate::scan::Discovery;
 
 /// Main checkout or linked worktree (DUP-05).
@@ -48,6 +50,8 @@ pub enum InstanceState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spec {
     pub folder: String,
+    /// Issue key from the folder name, per the project's preset (`ACME-142`).
+    pub issue_key: Option<String>,
     /// Sorted by path.
     pub instances: Vec<Instance>,
     /// Index into `instances` of the default instance (DUP-04).
@@ -94,8 +98,20 @@ pub struct Project {
     pub name_source: NameSource,
     pub origin_url: Option<String>,
     pub git_error: Option<crate::GitError>,
+    /// Configured alias (DUP-01); shown instead of `name` when set.
+    pub alias: Option<String>,
+    /// Name of the preset in use (PST-02).
+    pub preset: String,
+    /// Preset suggested from the folder structure when none is configured (PST-01).
+    pub suggested_preset: Option<String>,
     /// Sorted by folder name.
     pub specs: Vec<Spec>,
+}
+
+impl Project {
+    pub fn display_name(&self) -> &str {
+        self.alias.as_deref().unwrap_or(&self.name)
+    }
 }
 
 /// Index of the default instance: newest mtime, then alphabetical path (deterministic).
@@ -154,18 +170,25 @@ fn normalize_newlines(bytes: &[u8]) -> Vec<u8> {
     out
 }
 
-/// Groups discoveries into projects and specs, resolving git facts and fingerprints.
+/// Groups discoveries into projects and specs, resolving git facts, presets and fingerprints.
+///
+/// Folders without any primary file of their project's preset are dropped (DSC-02).
 pub fn build_projects(
     discoveries: &[Discovery],
     git: &mut GitResolver,
-    is_primary: &dyn Fn(&str) -> bool,
+    config: &Config,
 ) -> Vec<Project> {
     let mut identities: HashMap<PathBuf, ProjectIdentity> = HashMap::new();
     let mut groups: BTreeMap<PathBuf, BTreeMap<String, Vec<Instance>>> = BTreeMap::new();
     for d in discoveries {
         let identity = git.project(&d.repo_root);
+        let preset = config.preset_for(&identity.name);
+        if !d.files.iter().any(|f| preset.is_primary(f)) {
+            continue;
+        }
         let facts = git.worktree_facts(&d.repo_root);
-        let (content_hash, mtime_ms) = fingerprint(&d.spec_dir, &d.files, is_primary);
+        let (content_hash, mtime_ms) =
+            fingerprint(&d.spec_dir, &d.files, &|f| preset.is_primary(f));
         let instance = Instance {
             spec_dir: d.spec_dir.clone(),
             repo_root: d.repo_root.clone(),
@@ -193,20 +216,34 @@ pub fn build_projects(
         .into_iter()
         .filter_map(|(key, specs)| {
             let id = identities.remove(&key)?;
-            let specs = specs
+            let preset = config.preset_for(&id.name);
+            let specs: Vec<Spec> = specs
                 .into_iter()
                 .map(|(folder, mut instances)| {
                     instances.sort_by(|a, b| a.spec_dir.cmp(&b.spec_dir));
                     let default_index = default_index(&instances);
                     Spec {
+                        issue_key: preset.issue_key(&folder),
                         folder,
                         instances,
                         default_index,
                     }
                 })
                 .collect();
+            let folders: Vec<&[String]> = specs
+                .iter()
+                .flat_map(|s| s.instances.iter().map(|i| i.files.as_slice()))
+                .collect();
+            let suggested_preset = if config.has_explicit_preset(&id.name) {
+                None
+            } else {
+                preset::suggest(&preset.name, &folders).map(str::to_owned)
+            };
             Some(Project {
                 key,
+                alias: config.alias_for(&id.name).map(str::to_owned),
+                preset: preset.name.clone(),
+                suggested_preset,
                 name: id.name,
                 name_source: id.name_source,
                 origin_url: id.origin_url,
@@ -215,7 +252,11 @@ pub fn build_projects(
             })
         })
         .collect();
-    projects.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.key.cmp(&b.key)));
+    projects.sort_by(|a, b| {
+        a.display_name()
+            .cmp(b.display_name())
+            .then_with(|| a.key.cmp(&b.key))
+    });
     projects
 }
 
@@ -239,6 +280,7 @@ mod tests {
         let default_index = default_index(&instances);
         Spec {
             folder: "s".into(),
+            issue_key: None,
             instances,
             default_index,
         }

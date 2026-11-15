@@ -4,20 +4,24 @@ mod common;
 
 use std::path::PathBuf;
 
+use quire_core::Config;
 use quire_core::git::GitResolver;
 use quire_core::model::{InstanceKind, InstanceState, Project, Spec, build_projects};
-use quire_core::scan::{ScanEvent, generic_filter, scan_with_worktrees};
+use quire_core::scan::{ScanEvent, scan_with_worktrees};
 
-fn projects_from(paths: &[PathBuf]) -> Vec<Project> {
+fn projects_with(paths: &[PathBuf], config: &Config) -> Vec<Project> {
     let mut git = GitResolver::new();
     let mut found = vec![];
-    scan_with_worktrees(paths, &generic_filter, &mut git, |e| {
+    scan_with_worktrees(paths, &config.scan_filter(), &mut git, |e| {
         if let ScanEvent::Found(d) = e {
             found.push(d);
         }
     });
-    let is_primary = |f: &str| f.ends_with(".md") || f.ends_with(".jsonl");
-    build_projects(&found, &mut git, &is_primary)
+    build_projects(&found, &mut git, config)
+}
+
+fn projects_from(paths: &[PathBuf]) -> Vec<Project> {
+    projects_with(paths, &Config::default())
 }
 
 fn spec<'a>(projects: &'a [Project], project: &str, folder: &str) -> &'a Spec {
@@ -129,4 +133,35 @@ fn overlapping_scan_paths_do_not_duplicate_instances() {
         common::workspace().to_path_buf(),
     ]);
     assert_eq!(once, twice);
+}
+
+#[test]
+fn without_preset_projects_are_generic_and_exban_is_suggested() {
+    let projects = projects_from(&[common::projects()]);
+    for p in &projects {
+        assert_eq!(p.preset, "generic");
+        assert_eq!(p.suggested_preset.as_deref(), Some("exban"), "{}", p.name);
+    }
+    assert_eq!(
+        spec(&projects, "acme_gateway", "acme-142-service-tokens").issue_key,
+        None
+    );
+}
+
+#[test]
+fn configured_preset_alias_and_issue_keys() {
+    let config =
+        Config::parse("[projects.acme_gateway]\npreset = \"exban\"\nalias = \"gateway\"\n")
+            .unwrap();
+    let projects = projects_with(&[common::projects()], &config);
+    let gw = projects.iter().find(|p| p.name == "acme_gateway").unwrap();
+    assert_eq!(gw.display_name(), "gateway");
+    assert_eq!(gw.preset, "exban");
+    assert_eq!(gw.suggested_preset, None);
+    let s = spec(&projects, "acme_gateway", "acme-142-service-tokens");
+    assert_eq!(s.issue_key.as_deref(), Some("ACME-142"));
+    // exban hashes only its own files: notes.md and payload.json do not count.
+    let generic = projects_from(&[common::projects()]);
+    let g = spec(&generic, "acme_gateway", "acme-142-service-tokens");
+    assert_ne!(s.instances[0].content_hash, g.instances[0].content_hash);
 }
