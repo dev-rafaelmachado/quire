@@ -2,6 +2,7 @@
 // A small middleware receives the metrics POSTed by the page and appends them to $SPIKE_REPORT.
 import { appendFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { type Connect, defineConfig, type Plugin } from "vite";
 
@@ -39,9 +40,13 @@ function reportPlugin(): Plugin {
 
 export default defineConfig({
   root,
-  plugins: [react(), reportPlugin()],
+  plugins: [react(), tailwindcss(), reportPlugin()],
   clearScreen: false,
   server: { port: 1420, strictPort: true },
   preview: { port: 1420, strictPort: true },
-  build: { outDir: "../../dist-spike", emptyOutDir: true },
+  build: {
+    outDir: "../../dist-spike",
+    emptyOutDir: true,
+    rollupOptions: { input: { index: `${root}index.html`, app: `${root}app.html` } },
+  },
 });

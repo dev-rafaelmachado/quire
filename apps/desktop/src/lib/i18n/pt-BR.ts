@@ -62,6 +62,15 @@ export const ptBR = {
     indexFresh: "índice atualizado",
     indexUpdating: "atualizando índice",
   },
+  markdown: {
+    collapse: "Recolher seção {title}",
+    expand: "Expandir seção {title}",
+    mermaidError: "Diagrama Mermaid inválido: {message}",
+    rendering: "Renderizando diagrama…",
+    outline: "Neste arquivo",
+    outlineLabel: "Seções do arquivo",
+    externalLink: "{href} (abre no navegador)",
+  },
   main: {
     emptyTitle: "Nenhuma spec aberta",
     emptyHint: "Escolha uma spec na lista à esquerda.",

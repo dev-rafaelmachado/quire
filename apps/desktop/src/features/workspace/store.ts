@@ -24,6 +24,9 @@ interface WorkspaceState {
 }
 
 let listening = false;
+// `?open=<folder>` selects that spec once it is listed (screenshots and demos, until the CLI).
+let pendingOpen: string | null =
+  typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("open");
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useWorkspace = create<WorkspaceState>((set, get) => ({
@@ -50,6 +53,13 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     try {
       const projects = await commands.listProjects(null);
       set({ projects, loaded: true, error: null });
+      if (pendingOpen !== null) {
+        const spec = projects.flatMap((p) => p.specs).find((s) => s.folder === pendingOpen);
+        if (spec) {
+          pendingOpen = null;
+          set({ selectedSpecId: spec.id });
+        }
+      }
     } catch (e) {
       set({ loaded: true, error: asCmdError(e).message });
     }
