@@ -1,1 +1,4 @@
 @import "tailwindcss";
+
+/* The T2 spike is a separate Vite project; keep its files out of the app's class scan. */
+@source not "./spike";

@@ -19,5 +19,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src"],
+  "exclude": ["src/spike/vite.config.ts"]
 }

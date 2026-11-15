@@ -1,0 +1,26 @@
+/* T2 spike (disposable): reading layout close to wireframe 1, using the design tokens. */
+@import "../../../../docs/design/tokens.css";
+
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.6 var(--font-ui); }
+.spike-scroll { height: 100%; overflow-y: auto; }
+.doc { max-width: 736px; margin: 0 auto; padding: 32px 24px 96px; }
+.doc h1 { font-size: 26px; line-height: 1.25; }
+.doc h2 { font-size: 20px; margin: 40px 0 8px; border-bottom: 1px solid var(--line); }
+.doc h2 button { all: unset; cursor: pointer; display: block; width: 100%; padding: 4px 0; }
+.doc h2 button:focus-visible { outline: 2px solid var(--acc); }
+.doc h3 { font-size: 16px; margin: 24px 0 8px; color: var(--muted); }
+.doc a { color: var(--acc); }
+.doc table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.doc th, .doc td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+.doc th { background: var(--raise); }
+.doc blockquote { margin: 16px 0; padding: 4px 16px; border-left: 3px solid var(--acc); background: var(--panel); }
+.doc code { font-family: var(--font-mono); font-size: 13px; }
+.doc :not(pre) > code { background: var(--raise); padding: 1px 4px; border-radius: var(--radius-sm); }
+.doc .contains-task-list { list-style: none; padding-left: 4px; }
+.code-block, .code-block pre { margin: 12px 0; padding: 12px 14px; overflow-x: auto; border-radius: var(--radius-md); background: var(--code) !important; border: 1px solid var(--line); white-space: pre; }
+.code-block pre { margin: 0; padding: 0; border: 0; }
+.mermaid-block { margin: 16px 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel); overflow-x: auto; }
+.mermaid-block svg { max-width: 100%; height: auto; }
+.mermaid-error { color: var(--warn); margin: 0 0 8px; font-size: 13px; }
+.spike-controls button { font: inherit; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 10px; cursor: pointer; }
