@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · 0 de 6 fases completas · Fase 0 em andamento · 7/24 tarefas
+**Status:** Em execução · 0 de 6 fases completas · Fase 0 em andamento · 8/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -13,21 +13,21 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 | Fase | Repositório | Tarefas |
 |---|---|---|
 | 0: Spike e fundação | quire | 3/4 |
-| 1: Núcleo (`quire-core`) | quire | 4/8 |
+| 1: Núcleo (`quire-core`) | quire | 5/8 |
 | 2: Shell e base da UI | quire | 0/3 |
 | 3: Visões | quire | 0/5 |
 | 4: Ao vivo e CLI | quire | 0/2 |
 | 5: Fechamento da v0.1 | quire | 0/2 |
 
-**Total:** 7/24 tarefas
+**Total:** 8/24 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 1; T8 concluída, próxima é a T9 (presets)
-- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T5 (a3e2c35), T6 (199f344), T7 (a5a0b9b), T8 (a7b1225); T4 escrita, aguardando CI
+- **Fase / tarefa:** Fase 1; T9 concluída, próxima é a T10 (parsers)
+- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T5 (a3e2c35), T6 (199f344), T7 (a5a0b9b), T8 (a7b1225), T9 (91c0f7e); T4 escrita, aguardando CI
 - **Em andamento:** nada
-- **Próximo passo:** T9: framework de presets (`generic` e `exban`) e `config.toml`
+- **Próximo passo:** T10: parsers (cabeçalho, tasks, progresso, IDs)
 - **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
 - **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
 - **Bloqueios:** nenhum
@@ -170,3 +170,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T6 · scanner concluído (199f344): `scan::scan(paths, filtro, callback)` com o walker paralelo do `ignore`, eventos `Found`/`PathError` em streaming e deduplicação pelo caminho canônico (já cobre scan paths sobrepostos). Como os presets só chegam na T9, o scanner recebe o filtro de arquivos primários (padrão: regra do `generic`) e devolve a lista de arquivos de cada pasta. Os testes de integração geram as fixtures com `scripts/make-fixtures.sh` (no Windows, preferem o Git Bash, porque o `bash` do PATH pode ser o do WSL). Os testes de integração usam `#![allow(clippy::unwrap_used)]` no topo, porque o `allow-unwrap-in-tests` não cobre funções auxiliares nesses crates
 - 2026-11-15 · T7 · identidade do projeto via git concluída (a5a0b9b): `git::GitResolver` com timeout de 5 s por chamada, `GIT_OPTIONAL_LOCKS=0` e cache por repo. A chave é o common dir canônico (`rev-parse --path-format=absolute`, git ≥ 2.31). O nome vem do `origin` com fallback para a pasta do repo principal; branch por `symbolic-ref` (HEAD destacada vira `None`); worktree ligada quando git dir ≠ common dir. `scan::scan_with_worktrees` varre as worktrees fora dos scan paths (DSC-03): nas fixtures, as 3 specs de `external/` aparecem e o total vai a 12 instâncias. Sem git, o erro é tipado (`GitError::NotInstalled`) e o nome cai para a pasta. O alias configurável do DUP-01 fica para a T9, junto com o `config.toml`
 - 2026-11-15 · T8 · modelo de spec e instâncias concluído (a7b1225). **Interpretação do DUP-03:** o "N" de "N versões" é o **número de instâncias**, e o badge só aparece quando alguma diverge. Fonte: o wireframe 4 mostra "3 versões" com 3 instâncias, uma delas "idêntica", o que bate com o "Pronto quando" (`instance_count > 1`). O estado idêntica/diverge é relativo a uma instância de referência (a aberta). O hash de conteúdo é xxh3-128 sobre os nomes e o conteúdo dos arquivos primários, com CRLF normalizado para LF, para que checkouts no Windows e no WSL não pareçam divergentes; a ausência de um arquivo primário conta como divergência. Nas fixtures: `acme-142` tem 3 cópias idênticas, sem badge, e abre a primeira em ordem alfabética (mtime empatado); `acme-170` mostra "3 versões" e abre a worktree externa (a mais nova). Scan paths sobrepostos dão o mesmo resultado
+- 2026-11-15 · T9 · presets e `config.toml` concluídos (91c0f7e). `Preset` define arquivos primários (lista de nomes em ordem de aba, ou extensões), arquivos de cabeçalho, gramática de tasks (`phases`/`none`), regex de IDs e regex da chave da issue; embutidos `generic` e `exban`. O `config.toml` (em `<config dir>/quire/`, A2) tem scan paths com `~` expandido, `poll_interval_ms` (padrão 3000), por projeto `preset`/`alias`/`issue_url_base`, e `[presets.<nome>]` para sobrescrever um preset embutido ou criar outro (`extends`). Chaves desconhecidas são rejeitadas (`deny_unknown_fields`) para pegar erro de digitação; todo erro é `ConfigError` com linha e coluna, inclusive os semânticos (preset inexistente, regex inválida), via `toml::Spanned`. O scanner filtra pela união dos presets e cada projeto mantém e faz hash só dos arquivos do próprio preset. A sugestão do `exban` (PST-01) dispara quando alguma pasta tem `spec.md` + `tasks.md` + (`summary.md` ou `gates.jsonl`); nas fixtures, os dois projetos recebem a sugestão. O alias do DUP-01 entrou aqui (`Project::display_name`)

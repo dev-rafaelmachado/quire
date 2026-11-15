@@ -62,7 +62,7 @@ T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12
 - [x] T6: Scanner de `.specs` (199f344)
 - [x] T7: Identidade do projeto via git (a5a0b9b)
 - [x] T8: Modelo de spec e instâncias com deduplicação (a7b1225)
-- [ ] T9: Framework de presets (`generic` e `exban`)
+- [x] T9: Framework de presets (`generic` e `exban`) (91c0f7e)
 - [ ] T10: Parsers (cabeçalho, tasks, progresso, IDs)
 - [ ] T11: Parsers JSONL tolerantes (gates e lessons)
 - [ ] T12: Índice SQLite com scan incremental
