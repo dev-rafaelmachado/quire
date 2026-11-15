@@ -3,8 +3,7 @@ import { EmptyView } from "./app/EmptyView";
 import { Shell } from "./app/Shell";
 import { TopBar } from "./app/TopBar";
 import { InstanceBadge } from "./features/spec-view/InstanceBadge";
-import { SpecRight, SpecView } from "./features/spec-view/SpecView";
-import { useTasks } from "./features/tasks-view/store";
+import { SpecRight, SpecView, useRightColumn } from "./features/spec-view/SpecView";
 import { useSpecView } from "./features/spec-view/store";
 import { Sidebar } from "./features/workspace/Sidebar";
 import { findSelected } from "./features/workspace/selection";
@@ -16,10 +15,7 @@ export function App() {
   const projects = useWorkspace((s) => s.projects);
   const selectedSpecId = useWorkspace((s) => s.selectedSpecId);
   const open = useSpecView((s) => s.open);
-  const hasOutline = useSpecView((s) => s.outline.length > 0);
-  const onTasks = useSpecView((s) => s.tab === "tasks.md");
-  const tasksStructured = useTasks((s) => s.view?.structured ?? false);
-  const hasRight = onTasks ? tasksStructured : hasOutline;
+  const right = useRightColumn();
   const selected = findSelected(projects, selectedSpecId);
 
   useEffect(() => {
@@ -40,8 +36,8 @@ export function App() {
       }
       side={<Sidebar />}
       main={selected ? <SpecView /> : <EmptyView />}
-      right={selected && hasRight ? <SpecRight /> : undefined}
-      rightWidth={onTasks ? 320 : 248}
+      right={selected && right.kind ? <SpecRight /> : undefined}
+      rightWidth={right.width}
       status={<WorkspaceStatus />}
     />
   );

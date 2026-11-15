@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 import { t } from "../../lib/i18n";
 import { Outline } from "../../lib/markdown/Outline";
 import { cx } from "../../ui";
+import { GatesPanel } from "../logs-view/GatesPanel";
+import { LessonsAside, LessonsPanel } from "../logs-view/Lessons";
+import { useLogs } from "../logs-view/store";
 import { TaskDetailPanel } from "../tasks-view/TaskDetailPanel";
 import { TasksPanel } from "../tasks-view/TasksPanel";
 import { useTasks } from "../tasks-view/store";
@@ -92,6 +95,28 @@ export function SpecView() {
     if (onTasks && instanceId !== undefined) void loadTasks(instanceId);
   }, [onTasks, instanceId, loadTasks]);
 
+  const logsGates = useLogs((s) => s.gates);
+  const logsLessons = useLogs((s) => s.lessons);
+  const loadLogs = useLogs((s) => s.load);
+  const onLogs = tab === "gates.jsonl" || tab === "lessons.jsonl";
+  const hasGates = detail?.tabs.includes("gates.jsonl") ?? false;
+  const hasLessons = detail?.tabs.includes("lessons.jsonl") ?? false;
+  useEffect(() => {
+    if (onLogs && instanceId !== undefined) void loadLogs(instanceId, { gates: hasGates, lessons: hasLessons });
+  }, [onLogs, instanceId, hasGates, hasLessons, loadLogs]);
+
+  if (detail && onLogs && (tab === "gates.jsonl" ? logsGates : logsLessons)) {
+    return (
+      <>
+        <Tabs detail={detail} counts={counts} tab={tab} onSelect={(next) => void selectTab(next)} />
+        <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
+          {tab === "gates.jsonl" && logsGates ? <GatesPanel gates={logsGates} /> : null}
+          {tab === "lessons.jsonl" && logsLessons ? <LessonsPanel lessons={logsLessons} /> : null}
+        </div>
+      </>
+    );
+  }
+
   if (detail && onTasks && tasksView?.structured) {
     return (
       <>
@@ -125,11 +150,25 @@ export function SpecView() {
   );
 }
 
-/** Right column: task detail on the tasks tab, else the outline of the file. */
-export function SpecRight() {
+/** Which right column the open tab uses (design README: 248-320 px, contextual). */
+export function useRightColumn(): { kind: "tasks" | "lessons" | "outline" | null; width: 248 | 320 } {
   const tab = useSpecView((s) => s.tab);
+  const hasOutline = useSpecView((s) => s.outline.length > 0);
   const structured = useTasks((s) => s.view?.structured ?? false);
-  if (tab === "tasks.md" && structured) return <TaskDetailPanel />;
+  const lessons = useLogs((s) => s.lessons);
+  if (tab === "tasks.md") return { kind: structured ? "tasks" : hasOutline ? "outline" : null, width: structured ? 320 : 248 };
+  if (tab === "gates.jsonl") return { kind: lessons ? "lessons" : null, width: 320 };
+  if (tab === "lessons.jsonl") return { kind: null, width: 248 };
+  return { kind: hasOutline ? "outline" : null, width: 248 };
+}
+
+/** Right column: task detail, lessons beside the gates, or the outline of the file. */
+export function SpecRight() {
+  const { kind } = useRightColumn();
+  const lessons = useLogs((s) => s.lessons);
+  const selectTab = useSpecView((s) => s.selectTab);
+  if (kind === "tasks") return <TaskDetailPanel />;
+  if (kind === "lessons" && lessons) return <LessonsAside lessons={lessons} onOpen={() => void selectTab("lessons.jsonl")} />;
   return <SpecOutline />;
 }
 
