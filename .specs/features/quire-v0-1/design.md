@@ -91,10 +91,10 @@ Comandos (tipos gerados para TS, TD-07):
 
 | Comando | Entrada | Saída |
 | --- | --- | --- |
-| `get_config` / `set_config` | — / `Config` | `Config` |
+| `get_config` / `set_config` | — / `Config` | `Config` (`set_config` entra na T23, junto com a gravação do `config.toml`) |
 | `start_scan` | — | `()` (progresso por evento) |
 | `list_projects` | filtros | `Vec<ProjectSummary>` com specs, progresso e `instance_count` |
-| `get_spec` | `project_id, folder, instance?` | `SpecDetail` (arquivos, metadados, instâncias) |
+| `get_spec` | `spec_id, instance_id?` (ids vindos de `list_projects`) | `SpecDetail` (arquivos, abas, metadados, instâncias) |
 | `read_file` | `instance_id, file` | `FileContent` (texto, tamanho, flags) |
 | `get_tasks` | `instance_id` | `Phases` parseadas |
 | `get_gates` / `get_lessons` | `instance_id` | `(Vec<_>, skipped)` |
@@ -151,6 +151,7 @@ issue_url_base = "https://tracker.example/browse/"
 - **TD-05 Watcher com `notify` e fallback para polling:** o polling é ativado por detecção (caminho em `\\wsl$`, DrvFs/9p) ou por config.
 - **TD-06 SQLite como cache descartável**, nunca como fonte da verdade.
 - **TD-07 Tipos compartilhados** Rust → TS gerados (`tauri-specta`), sem tipos duplicados à mão.
+  - Nota (T13): `tauri-specta` 2.0.0-rc.29 com `specta` =2.0.0-rc.28 e `specta-typescript` 0.0.15; não há versão estável, então as versões ficam fixadas com `=`. Os bindings ficam versionados em `apps/desktop/src/lib/ipc/bindings.ts` e são gerados pelo teste `bindings_are_up_to_date` (em `cargo test`), que reescreve o arquivo e falha se ele estava desatualizado; assim o gate e a CI pegam bindings velhos. Ids e contadores saem como `u32`/`number`, porque o exportador proíbe `i64`/`usize`.
 - **TD-08 Estado do frontend com Zustand;** dados do core consultados por comandos tipados com cache simples.
 - **TD-09 Tailwind com variáveis CSS** de `docs/design/tokens.css`; tema por classe na raiz.
 - **TD-10 CLI e GUI no mesmo binário** (`tauri-plugin-cli` + `tauri-plugin-single-instance`); `--help` e `--version` respondem sem abrir janela.

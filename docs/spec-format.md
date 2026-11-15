@@ -26,7 +26,7 @@ As primeiras linhas de `spec.md` e `summary.md` carregam metadados como `**Chave
 **Idioma:** pt-BR
 ```
 
-O parser lê pares `**Chave:** valor` até a primeira linha em branco depois do título ou até o primeiro `##`. A URL base do tracker vem do link da issue.
+O cabeçalho é o bloco de campos `**Chave:** valor` (também aceito `**Chave**: valor`) logo depois do título `# …`, com linhas em branco permitidas entre o título e o bloco. O bloco termina na primeira linha em branco depois dos campos, no próximo título (`#`, `##`, …) ou na primeira linha que não seja um campo; linhas `**Chave:**` mais abaixo no arquivo não fazem parte do cabeçalho. A URL base do tracker vem do link da issue.
 
 ## `tasks.md`
 
