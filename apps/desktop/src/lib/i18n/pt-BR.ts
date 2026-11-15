@@ -65,5 +65,7 @@ export const ptBR = {
   main: {
     emptyTitle: "Nenhuma spec aberta",
     emptyHint: "Escolha uma spec na lista à esquerda.",
+    placeholder: "A leitura dos arquivos da spec chega nas próximas tarefas.",
+    instances: { one: "{n} instância", other: "{n} instâncias" },
   },
 } as const;

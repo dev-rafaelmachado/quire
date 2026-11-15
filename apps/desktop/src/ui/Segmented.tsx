@@ -27,7 +27,7 @@ export function Segmented<V extends string>({ label, options, value, onChange }:
           aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
           className={cx(
-            "h-6 rounded-[5px] px-2.5 text-xs font-medium",
+            "h-6 rounded-[5px] px-2.5 text-xs font-medium whitespace-nowrap",
             o.value === value ? "bg-raise text-text" : "text-muted hover:text-text",
           )}
         >
