@@ -66,3 +66,14 @@ pub enum ConfigError {
     #[error("cannot read {path}: {message}")]
     Io { path: PathBuf, message: String },
 }
+
+/// Failure of the SQLite cache. The cache is disposable: callers may delete it and rescan.
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum IndexError {
+    #[error("sqlite: {0}")]
+    Sqlite(String),
+    #[error("cache schema version {found}, expected {expected}")]
+    SchemaMismatch { found: i64, expected: i64 },
+    #[error("cannot use {path}: {message}")]
+    Io { path: PathBuf, message: String },
+}

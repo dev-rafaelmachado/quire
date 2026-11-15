@@ -5,10 +5,12 @@
 pub mod config;
 pub mod error;
 pub mod git;
+pub mod index;
 pub mod model;
 pub mod parse;
 pub mod preset;
 pub mod scan;
 
 pub use config::Config;
-pub use error::{ConfigError, GitError, ScanError};
+pub use error::{ConfigError, GitError, IndexError, ScanError};
+pub use index::Index;
