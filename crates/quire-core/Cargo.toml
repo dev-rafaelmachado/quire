@@ -10,3 +10,8 @@ repository.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+cpu-time = "1.0.0"
+ignore = "0.4.34"
+notify = "8.2.2"
