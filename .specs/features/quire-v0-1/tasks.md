@@ -96,7 +96,7 @@ T21 → T22
 ```
 
 - [x] T21: Watcher ligado ao índice e à UI (f174742)
-- [ ] T22: CLI com single-instance e seletor
+- [ ] T22: CLI com single-instance e seletor (b4d523a) (gate passou, aguardando revisão visual)
 
 ### Fase 5: Fechamento da v0.1
 
