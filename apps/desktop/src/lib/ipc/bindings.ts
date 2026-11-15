@@ -434,6 +434,8 @@ export type SpecDetail_Deserialize = {
 	others: string[],
 	/**  `**Chave:** valor` lines of the preset's header files (VIW-07). */
 	header: HeaderField_Deserialize[],
+	/**  Files whose header block is shown as metadata instead of body text. */
+	headerFiles: string[],
 };
 
 export type SpecDetail_Serialize = {
@@ -448,6 +450,8 @@ export type SpecDetail_Serialize = {
 	others: string[],
 	/**  `**Chave:** valor` lines of the preset's header files (VIW-07). */
 	header: HeaderField_Serialize[],
+	/**  Files whose header block is shown as metadata instead of body text. */
+	headerFiles: string[],
 };
 
 export type SpecSummary = SpecSummary_Serialize | SpecSummary_Deserialize;

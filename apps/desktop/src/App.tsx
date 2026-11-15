@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { EmptyView } from "./app/EmptyView";
 import { Shell } from "./app/Shell";
 import { TopBar } from "./app/TopBar";
+import { InstanceBadge } from "./features/spec-view/InstanceBadge";
 import { SpecOutline, SpecView } from "./features/spec-view/SpecView";
 import { useSpecView } from "./features/spec-view/store";
 import { Sidebar } from "./features/workspace/Sidebar";
@@ -30,6 +31,7 @@ export function App() {
       top={
         <TopBar
           crumbs={selected ? { project: selected.project.alias ?? selected.project.name, spec: selected.spec.folder } : undefined}
+          actions={selected ? <InstanceBadge /> : null}
         />
       }
       side={<Sidebar />}

@@ -1,11 +1,44 @@
 import { useEffect, useRef } from "react";
 import { t } from "../../lib/i18n";
-import { Markdown } from "../../lib/markdown/Markdown";
 import { Outline } from "../../lib/markdown/Outline";
-import { useSpecView } from "./store";
+import { cx } from "../../ui";
+import { FileView } from "./FileView";
+import { MetaStrip } from "./MetaStrip";
+import { OTHERS, useSpecView } from "./store";
+import { Tabs } from "./Tabs";
+
+/** File chooser of the "outros" tab. */
+function OthersBar() {
+  const detail = useSpecView((s) => s.detail);
+  const file = useSpecView((s) => s.file);
+  const show = useSpecView((s) => s.show);
+  if (!detail) return null;
+  return (
+    <div role="group" aria-label={t("specView.othersFiles")} className="flex flex-none flex-wrap gap-1.5 border-b border-line px-6 py-2">
+      {detail.others.map((name) => (
+        <button
+          key={name}
+          type="button"
+          aria-pressed={name === file}
+          onClick={() => void show(name)}
+          className={cx(
+            "h-6 rounded-[var(--radius-md)] px-2 font-code text-xs",
+            name === file ? "bg-acc-bg text-acc" : "bg-raise text-muted hover:text-text",
+          )}
+        >
+          {name}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** Center column: the rendered file of the open spec. */
 export function SpecView() {
+  const detail = useSpecView((s) => s.detail);
+  const tab = useSpecView((s) => s.tab);
+  const counts = useSpecView((s) => s.counts);
+  const selectTab = useSpecView((s) => s.selectTab);
   const doc = useSpecView((s) => s.doc);
   const content = useSpecView((s) => s.content);
   const collapsed = useSpecView((s) => s.collapsed);
@@ -48,20 +81,24 @@ export function SpecView() {
   }, [scrollRequest, active]);
 
   return (
-    <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-      <div className="px-10 pt-9 pb-24">
-        {error ? (
-          <p role="alert" className="m-0 text-warn">
-            {error}
-          </p>
-        ) : null}
-        {doc ? <Markdown doc={doc} collapsed={collapsed} onToggle={toggle} plain={content?.large ?? false} /> : null}
-        {!doc && content?.text ? (
-          <pre className="m-0 font-code text-[12.5px] whitespace-pre-wrap">{content.text}</pre>
-        ) : null}
-        {!doc && content && content.text === null ? <p className="m-0 text-muted">{t("main.placeholder")}</p> : null}
+    <>
+      {detail ? <Tabs detail={detail} counts={counts} tab={tab} onSelect={(next) => void selectTab(next)} /> : null}
+      {detail && tab !== OTHERS ? <MetaStrip detail={detail} /> : null}
+      {tab === OTHERS ? <OthersBar /> : null}
+      <div ref={scroller} role="tabpanel" className="min-h-0 flex-1 overflow-y-auto">
+        <div className="px-10 pt-9 pb-24">
+          {error ? (
+            <p role="alert" className="m-0 text-warn">
+              {error}
+            </p>
+          ) : null}
+          {content ? <FileView content={content} doc={doc} collapsed={collapsed} onToggle={toggle} /> : null}
+          {detail && detail.tabs.length === 0 && detail.others.length === 0 ? (
+            <p className="m-0 text-muted">{t("specView.noFiles")}</p>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

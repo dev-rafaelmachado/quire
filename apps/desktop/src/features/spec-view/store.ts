@@ -1,22 +1,34 @@
 import { create } from "zustand";
 import { asCmdError, commands, type FileContent, type SpecDetail } from "../../lib/ipc";
+import { stripHeader } from "../../lib/markdown/header";
 import { ancestry, buildDoc, type Doc, outline, type OutlineEntry, toHast } from "../../lib/markdown/pipeline";
+import { displayed } from "./labels";
+
+/** Tab id of the "outros" tab; primary tabs use their file name. */
+export const OTHERS = "\u0000others";
+
+export interface TabCounts {
+  gates?: number;
+  lessons?: number;
+}
 
 interface SpecViewState {
   specId: number | null;
   detail: SpecDetail | null;
+  tab: string | null;
   /** File shown in the center column. */
   file: string | null;
   content: FileContent | null;
   doc: Doc | null;
   outline: OutlineEntry[];
+  counts: TabCounts;
   collapsed: ReadonlySet<string>;
   active: string | null;
   /** Bumped to ask the view to scroll to `active`. */
   scrollRequest: number;
-  loading: boolean;
   error: string | null;
   open: (specId: number | null) => Promise<void>;
+  selectTab: (tab: string) => Promise<void>;
   show: (file: string) => Promise<void>;
   toggle: (id: string) => void;
   setActive: (id: string | null) => void;
@@ -25,43 +37,68 @@ interface SpecViewState {
 
 const EMPTY: ReadonlySet<string> = new Set();
 
+async function loadCounts(detail: SpecDetail): Promise<TabCounts> {
+  const instance = displayed(detail);
+  if (!instance) return {};
+  const counts: TabCounts = {};
+  const jobs: Promise<void>[] = [];
+  if (detail.tabs.includes("gates.jsonl")) {
+    jobs.push(commands.getGates(instance.id).then((g) => void (counts.gates = g.counts.runs)));
+  }
+  if (detail.tabs.includes("lessons.jsonl")) {
+    jobs.push(commands.getLessons(instance.id).then((l) => void (counts.lessons = l.lessons.length)));
+  }
+  await Promise.allSettled(jobs);
+  return counts;
+}
+
 export const useSpecView = create<SpecViewState>((set, get) => ({
   specId: null,
   detail: null,
+  tab: null,
   file: null,
   content: null,
   doc: null,
   outline: [],
+  counts: {},
   collapsed: EMPTY,
   active: null,
   scrollRequest: 0,
-  loading: false,
   error: null,
   open: async (specId) => {
-    set({ specId, detail: null, file: null, content: null, doc: null, outline: [], collapsed: EMPTY, active: null, error: null });
+    set({ specId, detail: null, tab: null, file: null, content: null, doc: null, outline: [], counts: {}, error: null });
     if (specId === null) return;
-    set({ loading: true });
     try {
       const detail = await commands.getSpec(specId, null);
       if (get().specId !== specId) return;
       set({ detail });
-      const first = detail.tabs.find((f) => f.endsWith(".md")) ?? detail.tabs[0] ?? detail.others[0];
-      if (first) await get().show(first);
+      void loadCounts(detail).then((counts) => get().specId === specId && set({ counts }));
+      await get().selectTab(detail.tabs[0] ?? OTHERS);
     } catch (e) {
       set({ error: asCmdError(e).message });
-    } finally {
-      set({ loading: false });
     }
+  },
+  selectTab: async (tab) => {
+    const { detail } = get();
+    if (!detail) return;
+    set({ tab });
+    const file = tab === OTHERS ? detail.others[0] : tab;
+    if (file) await get().show(file);
+    else set({ file: null, content: null, doc: null, outline: [] });
   },
   show: async (file) => {
     const { detail } = get();
-    const instance = detail?.spec.instances[detail.instanceIndex];
+    const instance = detail ? displayed(detail) : undefined;
     if (!detail || !instance) return;
-    set({ file, content: null, doc: null, outline: [], collapsed: EMPTY, active: null });
+    set({ file, content: null, doc: null, outline: [], collapsed: EMPTY, active: null, error: null });
     try {
       const content = await commands.readFile(instance.id, file);
       if (get().file !== file) return;
-      const doc = content.kind === "markdown" && content.text !== null ? buildDoc(toHast(content.text)) : null;
+      let doc: Doc | null = null;
+      if (content.kind === "markdown" && content.text !== null) {
+        const text = detail.headerFiles.includes(file) ? stripHeader(content.text) : content.text;
+        doc = buildDoc(toHast(text));
+      }
       set({ content, doc, outline: doc ? outline(doc) : [] });
     } catch (e) {
       set({ error: asCmdError(e).message });

@@ -261,6 +261,8 @@ pub struct SpecDetail {
     pub others: Vec<String>,
     /// `**Chave:** valor` lines of the preset's header files (VIW-07).
     pub header: Vec<HeaderField>,
+    /// Files whose header block is shown as metadata instead of body text.
+    pub header_files: Vec<String>,
 }
 
 fn id(n: u32) -> i64 {
@@ -365,6 +367,7 @@ pub async fn get_spec(
         tabs,
         others,
         header,
+        header_files: preset.header_files.clone(),
     })
 }
 
