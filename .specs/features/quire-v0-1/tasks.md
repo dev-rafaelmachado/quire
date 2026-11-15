@@ -65,7 +65,7 @@ T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12
 - [x] T9: Framework de presets (`generic` e `exban`) (91c0f7e)
 - [x] T10: Parsers (cabeçalho, tasks, progresso, IDs) (60c91ca)
 - [x] T11: Parsers JSONL tolerantes (gates e lessons) (64793b0)
-- [ ] T12: Índice SQLite com scan incremental
+- [x] T12: Índice SQLite com scan incremental (f452ea3)
 
 ### Fase 2: Shell e base da UI
 
