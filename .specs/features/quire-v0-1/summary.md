@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · 0 de 6 fases completas · Fase 0 em andamento · 5/24 tarefas
+**Status:** Em execução · 0 de 6 fases completas · Fase 0 em andamento · 6/24 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -13,21 +13,21 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 | Fase | Repositório | Tarefas |
 |---|---|---|
 | 0: Spike e fundação | quire | 3/4 |
-| 1: Núcleo (`quire-core`) | quire | 2/8 |
+| 1: Núcleo (`quire-core`) | quire | 3/8 |
 | 2: Shell e base da UI | quire | 0/3 |
 | 3: Visões | quire | 0/5 |
 | 4: Ao vivo e CLI | quire | 0/2 |
 | 5: Fechamento da v0.1 | quire | 0/2 |
 
-**Total:** 5/24 tarefas
+**Total:** 6/24 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 1; T6 concluída, próxima é a T7 (identidade do projeto via git)
-- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T5 (a3e2c35), T6 (199f344); T4 escrita, aguardando CI
+- **Fase / tarefa:** Fase 1; T7 concluída, próxima é a T8 (modelo de spec e instâncias)
+- **Concluídas:** T1 (1d09a59), T2 (cbb0913), T3 (242c3d8), T5 (a3e2c35), T6 (199f344), T7 (a5a0b9b); T4 escrita, aguardando CI
 - **Em andamento:** nada
-- **Próximo passo:** T7: identidade do projeto via git
+- **Próximo passo:** T8: modelo de spec e instâncias com deduplicação
 - **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
 - **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
 - **Bloqueios:** nenhum
@@ -168,3 +168,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T4 · workflow `.github/workflows/ci.yml` escrito (cfd7d06): matriz `ubuntu-latest` e `windows-latest`, dependências do Tauri no Linux, caches de Cargo e pnpm, e os mesmos comandos do gate de fase. Validado com `actionlint` 1.7.12 (binário oficial, checksum conferido) e com os comandos rodados localmente no Linux. Actions: checkout v7, setup-node v7 (Node 26), pnpm/action-setup v6, dtolnay/rust-toolchain stable, Swatinem/rust-cache v2. Também adicionado `.gitattributes` com `eol=lf` para o `cargo fmt --check` não variar no Windows. **Não marcada**: depende de push e do workflow verde nos dois sistemas
 - 2026-11-15 · T5 · fixtures sintéticas concluídas (a3e2c35): `fixtures/templates` (`acme_gateway` com origin, `acme_billing` sem origin) e `scripts/make-fixtures.sh [saída]`, que monta repos, worktrees e iscas e é idempotente e determinístico (hashes `390c2e4`/`da2aa85`/`e305867` iguais entre gerações). Cobre spec idêntica em 3 instâncias, spec divergente com cópia mais nova numa worktree fora do scan path, specs parciais, JSONL com linha inválida e truncada, repo sem origin e a mesma chave em dois projetos. O script isola o git da config do usuário e só apaga diretório com o marcador `.quire-fixtures`
 - 2026-11-15 · T6 · scanner concluído (199f344): `scan::scan(paths, filtro, callback)` com o walker paralelo do `ignore`, eventos `Found`/`PathError` em streaming e deduplicação pelo caminho canônico (já cobre scan paths sobrepostos). Como os presets só chegam na T9, o scanner recebe o filtro de arquivos primários (padrão: regra do `generic`) e devolve a lista de arquivos de cada pasta. Os testes de integração geram as fixtures com `scripts/make-fixtures.sh` (no Windows, preferem o Git Bash, porque o `bash` do PATH pode ser o do WSL). Os testes de integração usam `#![allow(clippy::unwrap_used)]` no topo, porque o `allow-unwrap-in-tests` não cobre funções auxiliares nesses crates
+- 2026-11-15 · T7 · identidade do projeto via git concluída (a5a0b9b): `git::GitResolver` com timeout de 5 s por chamada, `GIT_OPTIONAL_LOCKS=0` e cache por repo. A chave é o common dir canônico (`rev-parse --path-format=absolute`, git ≥ 2.31). O nome vem do `origin` com fallback para a pasta do repo principal; branch por `symbolic-ref` (HEAD destacada vira `None`); worktree ligada quando git dir ≠ common dir. `scan::scan_with_worktrees` varre as worktrees fora dos scan paths (DSC-03): nas fixtures, as 3 specs de `external/` aparecem e o total vai a 12 instâncias. Sem git, o erro é tipado (`GitError::NotInstalled`) e o nome cai para a pasta. O alias configurável do DUP-01 fica para a T9, junto com o `config.toml`
