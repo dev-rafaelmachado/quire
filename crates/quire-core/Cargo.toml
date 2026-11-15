@@ -7,11 +7,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+ignore = "0.4.34"
+thiserror = "2"
 
 [lints]
 workspace = true
 
 [dev-dependencies]
 cpu-time = "1.0.0"
-ignore = "0.4.34"
 notify = "8.2.2"
+tempfile = "3.27.0"
