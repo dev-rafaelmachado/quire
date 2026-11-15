@@ -20,6 +20,7 @@ use crate::scan::Discovery;
 
 /// Main checkout or linked worktree (DUP-05).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum InstanceKind {
     Checkout,

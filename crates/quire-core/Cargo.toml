@@ -6,7 +6,12 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# Derives specta::Type on the types the desktop shell exposes to TypeScript (TD-07).
+specta = ["dep:specta"]
+
 [dependencies]
+specta = { version = "=2.0.0-rc.28", features = ["derive"], optional = true }
 dirs = "7.0.0"
 ignore = "0.4.34"
 regex = "1.13.1"

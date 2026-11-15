@@ -16,7 +16,8 @@ use regex::Regex;
 
 use super::{Fence, bold_field};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Task {
     pub id: String,
     pub title: String,
@@ -27,17 +28,21 @@ pub struct Task {
     pub note: Option<String>,
     /// Requirement ids from the task's detail section (TSK-03).
     pub requirements: Vec<String>,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub line: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
 pub enum PhaseState {
     Complete,
     InProgress,
     Pending,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Phase {
     /// `None` for the implicit phase that holds tasks listed before any phase heading.
     pub number: Option<u32>,
@@ -46,6 +51,7 @@ pub struct Phase {
     /// Dependency chains, one per diagram line, ids in order (TSK-02).
     pub diagram: Vec<Vec<String>>,
     pub tasks: Vec<Task>,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub line: usize,
 }
 
@@ -68,18 +74,21 @@ impl Phase {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct DetailField {
     pub name: String,
     pub text: String,
     pub items: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct TaskDetail {
     pub id: String,
     pub title: String,
     pub fields: Vec<DetailField>,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub line: usize,
 }
 
@@ -99,7 +108,8 @@ impl TaskDetail {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct TasksDoc {
     pub phases: Vec<Phase>,
     pub details: Vec<TaskDetail>,

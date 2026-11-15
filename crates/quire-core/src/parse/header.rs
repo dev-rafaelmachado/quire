@@ -2,7 +2,8 @@
 
 use super::bold_field;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct HeaderField {
     pub key: String,
     /// Raw markdown value.
@@ -11,6 +12,7 @@ pub struct HeaderField {
     pub text: String,
     /// First link target in the value (markdown link or bare http(s) URL).
     pub url: Option<String>,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub line: usize,
 }
 

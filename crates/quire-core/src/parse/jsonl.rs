@@ -47,30 +47,41 @@ pub fn jsonl<T: DeserializeOwned>(text: &str) -> Jsonl<T> {
 /// One line of `gates.jsonl`.
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 #[serde(default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct GateRun {
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub ts: Option<String>,
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub repo: Option<String>,
     /// `fase`, `final` or `e2e`.
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub level: Option<String>,
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub cmd: Option<String>,
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub cwd: Option<String>,
     /// Commit tested; links the run to tasks through the short hash.
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub head: Option<String>,
     #[serde(deserialize_with = "lenient_i64")]
+    #[cfg_attr(feature = "specta", specta(type = Option<i32>))]
     pub exit: Option<i64>,
     /// `pass` or `fail`.
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub status: Option<String>,
     #[serde(deserialize_with = "lenient_f64")]
+    #[cfg_attr(feature = "specta", specta(type = Option<f64>))]
     pub duration_s: Option<f64>,
     /// Last output lines, usually only on failures (LOG-02).
     #[serde(deserialize_with = "lenient_lines")]
+    #[cfg_attr(feature = "specta", specta(type = Vec<String>))]
     pub tail: Vec<String>,
 }
 
@@ -86,9 +97,13 @@ impl GateRun {
 
 /// Counts for the gates view header (LOG-01).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct GateCounts {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub runs: usize,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub passes: usize,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub fails: usize,
 }
 
@@ -114,20 +129,27 @@ pub fn newest_first(runs: &mut [GateRun]) {
 /// One line of `lessons.jsonl` (LOG-03).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Lesson {
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub ts: Option<String>,
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub feature: Option<String>,
     /// `ac_gap`, `gate_fail`, `spec_precision_gap`, …
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub signal: Option<String>,
     /// `file:line`, a code path or a requirement id.
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub source: Option<String>,
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub text: Option<String>,
     #[serde(deserialize_with = "lenient_string")]
+    #[cfg_attr(feature = "specta", specta(type = Option<String>))]
     pub scope: Option<String>,
 }
 

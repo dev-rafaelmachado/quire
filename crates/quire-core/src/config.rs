@@ -223,10 +223,21 @@ impl Config {
         })
     }
 
-    /// Loads the file; a missing file means the default configuration.
+    /// Loads the file; a missing file means the default configuration. Relative scan paths
+    /// are resolved against the directory of the file.
     pub fn load(path: &Path) -> Result<Self, ConfigError> {
         match fs::read_to_string(path) {
-            Ok(text) => Self::parse(&text),
+            Ok(text) => {
+                let mut config = Self::parse(&text)?;
+                if let Some(base) = path.parent() {
+                    for p in &mut config.scan_paths {
+                        if p.is_relative() {
+                            *p = base.join(&*p);
+                        }
+                    }
+                }
+                Ok(config)
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
             Err(e) => Err(ConfigError::Io {
                 path: path.to_path_buf(),
@@ -421,6 +432,13 @@ preset = "team"
         assert_eq!(
             Config::load(&tmp.path().join("none.toml")).unwrap(),
             Config::default()
+        );
+        let rel = tmp.path().join("rel.toml");
+        fs::write(&rel, "scan_paths = [\"workspace/projects\", \"/abs\"]\n").unwrap();
+        let c = Config::load(&rel).unwrap();
+        assert_eq!(
+            c.scan_paths,
+            [tmp.path().join("workspace/projects"), PathBuf::from("/abs")]
         );
         let bad = tmp.path().join("bad.toml");
         fs::write(&bad, "x = 1\n").unwrap();

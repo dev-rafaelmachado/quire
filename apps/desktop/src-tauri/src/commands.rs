@@ -1,0 +1,609 @@
+//! Typed commands exposed to the webview (design: "Shell Tauri"). Types are exported to
+//! `apps/desktop/src/lib/ipc/bindings.ts` by tauri-specta (TD-07).
+//!
+//! Ids cross the boundary as plain numbers (`u32` in arguments): SQLite row ids of the cache
+//! stay far below that range.
+
+use std::fs;
+use std::path::Path;
+use std::sync::atomic::Ordering;
+use std::sync::{Mutex, MutexGuard};
+
+use quire_core::git::GitResolver;
+use quire_core::index::{Index, IndexEvent, InstanceInfo, ProjectSummary, SpecSummary};
+use quire_core::parse::{
+    self, GateCounts, GateRun, HeaderField, Lesson, Phase, PhaseState, TaskDetail,
+};
+use quire_core::preset::TasksGrammar;
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use tauri::{AppHandle, Manager, Runtime, State};
+use tauri_specta::Event;
+
+use crate::events::{ScanPathError, ScanPhase, ScanProgress, SpecsChanged};
+use crate::state::AppState;
+
+/// Files above this size open with a warning and without syntax highlighting.
+pub const LARGE_FILE_BYTES: u64 = 2 * 1024 * 1024;
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CmdError {
+    pub code: String,
+    pub message: String,
+}
+
+fn err(code: &str, message: impl ToString) -> CmdError {
+    CmdError {
+        code: code.to_owned(),
+        message: message.to_string(),
+    }
+}
+
+fn lock(m: &Mutex<Index>) -> MutexGuard<'_, Index> {
+    // A panic while holding the lock cannot leave the cache inconsistent (it is a cache).
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+// ------------------------------------------------------------------ config
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectConfigView {
+    pub name: String,
+    pub preset: Option<String>,
+    pub alias: Option<String>,
+    pub issue_url_base: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigView {
+    pub path: Option<String>,
+    /// Why `config.toml` was ignored, if it was.
+    pub error: Option<String>,
+    pub scan_paths: Vec<String>,
+    pub poll_interval_ms: u32,
+    pub projects: Vec<ProjectConfigView>,
+    pub presets: Vec<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_config(state: State<'_, AppState>) -> Result<ConfigView, CmdError> {
+    let config = state
+        .config
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    Ok(ConfigView {
+        path: state.config_path.as_ref().map(|p| p.display().to_string()),
+        error: state.config_error.clone(),
+        scan_paths: config
+            .scan_paths
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect(),
+        poll_interval_ms: u32::try_from(config.poll_interval_ms).unwrap_or(u32::MAX),
+        projects: config
+            .projects
+            .iter()
+            .map(|(name, p)| ProjectConfigView {
+                name: name.clone(),
+                preset: p.preset.clone(),
+                alias: p.alias.clone(),
+                issue_url_base: p.issue_url_base.clone(),
+            })
+            .collect(),
+        presets: config.preset_names().map(str::to_owned).collect(),
+    })
+}
+
+// ------------------------------------------------------------------ scan
+
+/// Starts a background scan and index reconciliation; progress arrives as `scan://progress`
+/// events and the list as `specs://changed` (DSC-04). A call during a scan is ignored.
+#[tauri::command]
+#[specta::specta]
+pub async fn start_scan<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<(), CmdError> {
+    if state.scanning.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    std::thread::Builder::new()
+        .name("quire-scan".into())
+        .spawn(move || run_scan(&app))
+        .map_err(|e| {
+            state.scanning.store(false, Ordering::SeqCst);
+            err("scan", e)
+        })?;
+    Ok(())
+}
+
+/// Clears the `scanning` flag when the scan ends, even if it panics.
+struct ScanGuard<'a>(&'a std::sync::atomic::AtomicBool);
+
+impl Drop for ScanGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+fn run_scan<R: Runtime>(app: &AppHandle<R>) {
+    let state = app.state::<AppState>();
+    let guard = ScanGuard(&state.scanning);
+    let config = state
+        .config
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    let mut progress = ScanProgress {
+        phase: ScanPhase::Scanning,
+        found: 0,
+        processed: 0,
+        total: 0,
+        errors: vec![],
+        message: None,
+    };
+    let _ = progress.emit(app);
+    let result = Index::open(&state.index_path).and_then(|mut index| {
+        index.reconcile(
+            &config.scan_paths,
+            &config,
+            &mut GitResolver::new(),
+            |event| match event {
+                IndexEvent::Found { count } => {
+                    progress.found = u32::try_from(count).unwrap_or(u32::MAX);
+                    if count % 25 == 0 {
+                        let _ = progress.emit(app);
+                    }
+                }
+                IndexEvent::PathError { path, error } => {
+                    progress.errors.push(ScanPathError {
+                        path: path.display().to_string(),
+                        message: error.to_string(),
+                    });
+                    let _ = progress.emit(app);
+                }
+                IndexEvent::Progress { processed, total } => {
+                    progress.phase = ScanPhase::Indexing;
+                    progress.processed = u32::try_from(processed).unwrap_or(u32::MAX);
+                    progress.total = u32::try_from(total).unwrap_or(u32::MAX);
+                    let _ = progress.emit(app);
+                    let _ = SpecsChanged.emit(app);
+                }
+            },
+        )
+    });
+    match result {
+        Ok(_) => progress.phase = ScanPhase::Done,
+        Err(e) => {
+            progress.phase = ScanPhase::Failed;
+            progress.message = Some(e.to_string());
+        }
+    }
+    drop(guard);
+    let _ = progress.emit(app);
+    let _ = SpecsChanged.emit(app);
+}
+
+// ------------------------------------------------------------------ list and spec
+
+#[derive(Debug, Clone, Default, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ListFilter {
+    /// Case-insensitive match on folder, issue key or title.
+    pub text: Option<String>,
+}
+
+fn matches(spec: &SpecSummary, needle: &str) -> bool {
+    let hit = |s: &str| s.to_lowercase().contains(needle);
+    hit(&spec.folder)
+        || spec.issue_key.as_deref().is_some_and(hit)
+        || spec
+            .default_instance()
+            .and_then(|i| i.title.as_deref())
+            .is_some_and(hit)
+}
+
+/// Projects and specs from the index cache (fast, IDX-03).
+#[tauri::command]
+#[specta::specta]
+pub async fn list_projects(
+    state: State<'_, AppState>,
+    filter: Option<ListFilter>,
+) -> Result<Vec<ProjectSummary>, CmdError> {
+    let mut list = lock(&state.index).list().map_err(|e| err("index", e))?;
+    if let Some(needle) = filter
+        .and_then(|f| f.text)
+        .map(|t| t.trim().to_lowercase())
+        .filter(|t| !t.is_empty())
+    {
+        for p in &mut list {
+            p.specs.retain(|s| matches(s, &needle));
+        }
+        list.retain(|p| !p.specs.is_empty());
+    }
+    Ok(list)
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectRef {
+    pub id: u32,
+    pub name: String,
+    pub display_name: String,
+    pub preset: String,
+    pub issue_url_base: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEntry {
+    pub name: String,
+    pub size: u32,
+    pub mtime_ms: Option<f64>,
+    pub primary: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SpecDetail {
+    pub project: ProjectRef,
+    pub spec: SpecSummary,
+    /// Index into `spec.instances` of the instance shown.
+    pub instance_index: u32,
+    pub files: Vec<FileEntry>,
+    /// Primary files present, in tab order (VIW-01).
+    pub tabs: Vec<String>,
+    /// Every other file of the folder, for the "outros" tab.
+    pub others: Vec<String>,
+    /// `**Chave:** valor` lines of the preset's header files (VIW-07).
+    pub header: Vec<HeaderField>,
+}
+
+fn id(n: u32) -> i64 {
+    i64::from(n)
+}
+
+fn to_u32(n: i64) -> u32 {
+    u32::try_from(n).unwrap_or(u32::MAX)
+}
+
+/// One spec with the requested instance, or the default one (DUP-04).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_spec(
+    state: State<'_, AppState>,
+    spec_id: u32,
+    instance_id: Option<u32>,
+) -> Result<SpecDetail, CmdError> {
+    let (project, spec, info) = {
+        let index = lock(&state.index);
+        let list = index.list().map_err(|e| err("index", e))?;
+        let (project, spec) = list
+            .into_iter()
+            .find_map(|p| {
+                let s = p.specs.iter().find(|s| s.id == id(spec_id)).cloned()?;
+                Some((p, s))
+            })
+            .ok_or_else(|| err("not_found", format!("spec {spec_id} not found")))?;
+        let instance_index = match instance_id {
+            Some(i) => spec
+                .instances
+                .iter()
+                .position(|x| x.id == id(i))
+                .ok_or_else(|| {
+                    err(
+                        "not_found",
+                        format!("instance {i} is not part of spec {spec_id}"),
+                    )
+                })?,
+            None => spec.default_index,
+        };
+        let inst_id = spec
+            .instances
+            .get(instance_index)
+            .map(|i| i.id)
+            .ok_or_else(|| err("not_found", "no instance"))?;
+        let info = index
+            .instance_info(inst_id)
+            .map_err(|e| err("index", e))?
+            .ok_or_else(|| err("not_found", "instance not found"))?;
+        (project, spec, (instance_index, info))
+    };
+    let (instance_index, info) = info;
+    let config = state
+        .config
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let preset = config.preset_for(&project.name);
+    let names: Vec<String> = info.files.iter().map(|f| f.0.clone()).collect();
+    let tabs = preset.tabs(&names);
+    let others = names
+        .iter()
+        .filter(|n| !tabs.contains(n))
+        .cloned()
+        .collect();
+    let mut header = Vec::new();
+    for h in preset.header_files.iter().filter(|h| names.contains(h)) {
+        if let Ok(text) = fs::read_to_string(info.path.join(h)) {
+            for field in parse::header(&text) {
+                if !header
+                    .iter()
+                    .any(|f: &HeaderField| f.key.eq_ignore_ascii_case(&field.key))
+                {
+                    header.push(field);
+                }
+            }
+        }
+    }
+    Ok(SpecDetail {
+        project: ProjectRef {
+            id: to_u32(project.id),
+            display_name: project.display_name().to_owned(),
+            issue_url_base: config
+                .projects
+                .get(&project.name)
+                .and_then(|p| p.issue_url_base.clone()),
+            name: project.name.clone(),
+            preset: project.preset.clone(),
+        },
+        files: info
+            .files
+            .iter()
+            .map(|(name, size, mtime)| FileEntry {
+                name: name.clone(),
+                size: u32::try_from(*size).unwrap_or(u32::MAX),
+                mtime_ms: mtime.map(|m| m as f64),
+                primary: preset.is_primary(name),
+            })
+            .collect(),
+        spec,
+        instance_index: u32::try_from(instance_index).unwrap_or(0),
+        tabs,
+        others,
+        header,
+    })
+}
+
+fn instance(state: &AppState, instance_id: u32) -> Result<InstanceInfo, CmdError> {
+    lock(&state.index)
+        .instance_info(id(instance_id))
+        .map_err(|e| err("index", e))?
+        .ok_or_else(|| err("not_found", format!("instance {instance_id} not found")))
+}
+
+/// Reads a file of an instance. Only names recorded for that instance are accepted, so no
+/// path can escape the spec folder.
+fn read_known(info: &InstanceInfo, name: &str) -> Result<Option<Vec<u8>>, CmdError> {
+    if !info.files.iter().any(|f| f.0 == name) || Path::new(name).components().count() != 1 {
+        return Err(err(
+            "not_found",
+            format!("{name} is not a file of this spec"),
+        ));
+    }
+    match fs::read(info.path.join(name)) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(err("io", e)),
+    }
+}
+
+// ------------------------------------------------------------------ files
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum FileKind {
+    Markdown,
+    Json,
+    Jsonl,
+    Text,
+    Binary,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FileContent {
+    pub name: String,
+    pub kind: FileKind,
+    pub size: u32,
+    /// `None` for binary or non-UTF-8 files (VIW-08).
+    pub text: Option<String>,
+    /// Above 2 MB: shown with a warning and without highlighting.
+    pub large: bool,
+}
+
+fn kind_of(name: &str) -> FileKind {
+    match name
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("md" | "markdown") => FileKind::Markdown,
+        Some("json") => FileKind::Json,
+        Some("jsonl") => FileKind::Jsonl,
+        _ => FileKind::Text,
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn read_file(
+    state: State<'_, AppState>,
+    instance_id: u32,
+    name: String,
+) -> Result<FileContent, CmdError> {
+    let info = instance(&state, instance_id)?;
+    let bytes =
+        read_known(&info, &name)?.ok_or_else(|| err("gone", format!("{name} was removed")))?;
+    let size = bytes.len() as u64;
+    let looks_binary = bytes.iter().take(8192).any(|b| *b == 0);
+    let text = if looks_binary {
+        None
+    } else {
+        String::from_utf8(bytes).ok()
+    };
+    Ok(FileContent {
+        kind: if text.is_some() {
+            kind_of(&name)
+        } else {
+            FileKind::Binary
+        },
+        name,
+        size: u32::try_from(size).unwrap_or(u32::MAX),
+        text,
+        large: size > LARGE_FILE_BYTES,
+    })
+}
+
+// ------------------------------------------------------------------ tasks, gates, lessons
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PhaseView {
+    #[serde(flatten)]
+    pub phase: Phase,
+    pub done: u32,
+    pub total: u32,
+    pub state: PhaseState,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TasksView {
+    /// `false` when the project's preset has no tasks grammar or there is no `tasks.md`.
+    pub structured: bool,
+    pub phases: Vec<PhaseView>,
+    pub details: Vec<TaskDetail>,
+    pub done: u32,
+    pub total: u32,
+}
+
+/// `tasks.md` by phase (TSK-01..04). Read-only (TSK-05).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_tasks(
+    state: State<'_, AppState>,
+    instance_id: u32,
+) -> Result<TasksView, CmdError> {
+    let info = instance(&state, instance_id)?;
+    let config = state
+        .config
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let preset = config.preset_for(&info.project_name);
+    let text = match info.files.iter().any(|f| f.0 == "tasks.md") {
+        true => read_known(&info, "tasks.md")?.map(|b| String::from_utf8_lossy(&b).into_owned()),
+        false => None,
+    };
+    let doc = match (preset.tasks, text) {
+        (TasksGrammar::Phases, Some(t)) => parse::tasks(&t, preset.id_pattern.as_ref()),
+        _ => parse::TasksDoc::default(),
+    };
+    let (done, total) = doc.progress();
+    Ok(TasksView {
+        structured: !doc.is_empty(),
+        phases: doc
+            .phases
+            .into_iter()
+            .map(|p| PhaseView {
+                done: u32::try_from(p.done()).unwrap_or(u32::MAX),
+                total: u32::try_from(p.total()).unwrap_or(u32::MAX),
+                state: p.state(),
+                phase: p,
+            })
+            .collect(),
+        details: doc.details,
+        done: u32::try_from(done).unwrap_or(u32::MAX),
+        total: u32::try_from(total).unwrap_or(u32::MAX),
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct GatesView {
+    /// Most recent first (LOG-01).
+    pub runs: Vec<GateRun>,
+    pub counts: GateCounts,
+    /// Lines that could not be read (LOG-04).
+    pub skipped: u32,
+    pub skipped_lines: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonsView {
+    pub lessons: Vec<Lesson>,
+    pub skipped: u32,
+    pub skipped_lines: Vec<u32>,
+}
+
+fn jsonl_text(state: &AppState, instance_id: u32, name: &str) -> Result<String, CmdError> {
+    let info = instance(state, instance_id)?;
+    if !info.files.iter().any(|f| f.0 == name) {
+        return Ok(String::new());
+    }
+    Ok(read_known(&info, name)?
+        .map(|b| String::from_utf8_lossy(&b).into_owned())
+        .unwrap_or_default())
+}
+
+fn lines_u32(v: &[usize]) -> Vec<u32> {
+    v.iter()
+        .map(|n| u32::try_from(*n).unwrap_or(u32::MAX))
+        .collect()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_gates(
+    state: State<'_, AppState>,
+    instance_id: u32,
+) -> Result<GatesView, CmdError> {
+    let parsed: parse::Jsonl<GateRun> =
+        parse::jsonl(&jsonl_text(&state, instance_id, "gates.jsonl")?);
+    let mut runs = parsed.items;
+    parse::newest_first(&mut runs);
+    Ok(GatesView {
+        counts: parse::gate_counts(&runs),
+        runs,
+        skipped: u32::try_from(parsed.skipped).unwrap_or(u32::MAX),
+        skipped_lines: lines_u32(&parsed.skipped_lines),
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_lessons(
+    state: State<'_, AppState>,
+    instance_id: u32,
+) -> Result<LessonsView, CmdError> {
+    let parsed: parse::Jsonl<Lesson> =
+        parse::jsonl(&jsonl_text(&state, instance_id, "lessons.jsonl")?);
+    Ok(LessonsView {
+        lessons: parsed.items,
+        skipped: u32::try_from(parsed.skipped).unwrap_or(u32::MAX),
+        skipped_lines: lines_u32(&parsed.skipped_lines),
+    })
+}
+
+// ------------------------------------------------------------------ external links
+
+/// Opens an http(s) link in the system browser (VIW-07). Nothing else is accepted.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_external<R: Runtime>(app: AppHandle<R>, url: String) -> Result<(), CmdError> {
+    let lower = url.to_ascii_lowercase();
+    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+        return Err(err(
+            "invalid_url",
+            "only http and https links can be opened",
+        ));
+    }
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| err("open", e))
+}

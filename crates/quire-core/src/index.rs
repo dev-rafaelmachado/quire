@@ -78,12 +78,15 @@ CREATE TABLE spec_meta (
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InstanceSummary {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub id: i64,
     pub path: PathBuf,
     pub repo_root: PathBuf,
     pub branch: Option<String>,
     pub kind: InstanceKind,
+    #[cfg_attr(feature = "specta", specta(type = Option<f64>))]
     pub mtime_ms: Option<i64>,
     /// Same primary-file content as the spec's default instance.
     pub same_as_default: bool,
@@ -95,15 +98,19 @@ pub struct InstanceSummary {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct SpecSummary {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub id: i64,
     pub folder: String,
     pub issue_key: Option<String>,
     /// Sorted by path.
     pub instances: Vec<InstanceSummary>,
     /// Index into `instances` (DUP-04).
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub default_index: usize,
     /// "N versões" badge (DUP-03).
+    #[cfg_attr(feature = "specta", specta(type = Option<u32>))]
     pub versions_badge: Option<usize>,
 }
 
@@ -119,7 +126,9 @@ impl SpecSummary {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ProjectSummary {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub id: i64,
     pub key: PathBuf,
     pub name: String,
@@ -158,13 +167,19 @@ pub enum IndexEvent {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ReconcileReport {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub found: usize,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub path_errors: usize,
     /// Instances read and parsed again because a file changed (or was new).
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub reprocessed: usize,
     /// Instances skipped because every file kept its size and mtime.
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub unchanged: usize,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
     pub removed: usize,
 }
 
@@ -360,6 +375,34 @@ impl Index {
                 .then_with(|| a.key.cmp(&b.key))
         });
         Ok(projects)
+    }
+
+    /// Where an instance lives and how its project reads it.
+    pub fn instance_info(&self, instance_id: i64) -> Result<Option<InstanceInfo>, IndexError> {
+        let row: Option<(i64, i64, String, String, String, String)> = self
+            .conn
+            .query_row(
+                "SELECT i.spec_id, p.id, i.path, i.repo_root, p.name, p.preset
+                 FROM instances i JOIN specs s ON s.id = i.spec_id JOIN projects p ON p.id = s.project_id
+                 WHERE i.id = ?1",
+                [instance_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+            )
+            .optional()
+            .map_err(sql)?;
+        let Some((spec_id, project_id, path, repo_root, project_name, preset)) = row else {
+            return Ok(None);
+        };
+        Ok(Some(InstanceInfo {
+            id: instance_id,
+            spec_id,
+            project_id,
+            path: PathBuf::from(path),
+            repo_root: PathBuf::from(repo_root),
+            project_name,
+            preset,
+            files: self.files(instance_id)?,
+        }))
     }
 
     /// Files recorded for an instance: `(name, size, mtime_ms)`, sorted by name.
@@ -638,6 +681,20 @@ impl Index {
         }
         Ok(())
     }
+}
+
+/// An instance with what is needed to read its files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstanceInfo {
+    pub id: i64,
+    pub spec_id: i64,
+    pub project_id: i64,
+    pub path: PathBuf,
+    pub repo_root: PathBuf,
+    pub project_name: String,
+    pub preset: String,
+    /// `(name, size, mtime_ms)`, sorted by name.
+    pub files: Vec<(String, u64, Option<i64>)>,
 }
 
 #[derive(Debug, Clone)]
