@@ -39,6 +39,7 @@ const config: ConfigView = {
   projects: [{ name: "acme_gateway", preset: "exban", alias: null, issueUrlBase: null }],
   presets: ["exban", "generic"],
   theme: null,
+  language: null,
   scanPathStatus: [
     { path: "/ws/projects", error: null },
     { path: "/missing", error: { code: "path_not_found", message: "path does not exist: /missing" } },
@@ -79,6 +80,7 @@ describe("preferences", () => {
       scanPaths: ["/ws/projects", "~/code"],
       pollIntervalMs: 3000,
       theme: "light",
+      language: null,
       projects: [{ name: "acme_gateway", preset: null, alias: "gateway", issueUrlBase: null }],
     });
     expect(useTheme.getState().theme).toBe("light");
@@ -99,5 +101,28 @@ describe("preferences", () => {
     expect(text).toContain("syntax error in config.toml");
     expect(portugueseOnly().length).toBeGreaterThan(100);
     expect(portugueseOnly().filter((p) => text.includes(p))).toEqual([]);
+  });
+
+  it("switches the language on save without a restart, and System removes it (DEB-10)", async () => {
+    setConfig.mockImplementation(async (s: { language: string | null }) => ({ ...config, language: s.language }));
+    render(<Preferences config={config} />);
+    fireEvent.click(within(screen.getByRole("group", { name: "Idioma" })).getByRole("button", { name: "English" }));
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByRole("button", { name: "Save" })).toBeTruthy();
+    expect(setConfig.mock.calls[0]?.[0]).toMatchObject({ language: "en" });
+    fireEvent.click(within(screen.getByRole("group", { name: "Language" })).getByRole("button", { name: "System" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("button", { name: "Salvar" })).toBeTruthy();
+    expect(setConfig.mock.calls[1]?.[0]).toMatchObject({ language: null });
+  });
+
+  it("keeps an unknown configured language untouched and warns (DEB-10)", () => {
+    setConfig.mockImplementation(async (s: unknown) => ({ ...config, ...(s as object) }));
+    render(<Preferences config={{ ...config, language: "fr" }} />);
+    expect(screen.getByText("Idioma desconhecido no config.toml: fr. Usando o do sistema.")).toBeTruthy();
+    const system = within(screen.getByRole("group", { name: "Idioma" })).getByRole("button", { name: "Sistema" });
+    expect(system.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(setConfig.mock.calls[0]?.[0]).toMatchObject({ language: "fr" });
   });
 });

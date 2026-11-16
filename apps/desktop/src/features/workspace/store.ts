@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { applyConfiguredTheme } from "../../app/theme";
+import { applyConfiguredLanguage } from "../../lib/i18n/locale";
 import { asCmdError, type CmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type WatchStatus } from "../../lib/ipc";
 import type { StatusFilter } from "./model";
 
@@ -57,7 +58,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   // `?prefs` opens the preferences on start (screenshots and demos).
   prefsOpen: typeof window !== "undefined" && new URLSearchParams(window.location.search).has("prefs"),
   setPrefsOpen: (prefsOpen) => set({ prefsOpen }),
-  setConfig: (config) => set({ config }),
+  setConfig: (config) => {
+    applyConfiguredLanguage(config.language);
+    set({ config });
+  },
   highlight: null,
   pick: null,
   setHighlight: (highlight) => set({ highlight }),
@@ -113,6 +117,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       try {
         const config = await commands.getConfig();
         applyConfiguredTheme(config.theme);
+        applyConfiguredLanguage(config.language);
         set({ config, watch: await commands.getWatchStatus() });
       } catch (e) {
         set({ error: asCmdError(e) });

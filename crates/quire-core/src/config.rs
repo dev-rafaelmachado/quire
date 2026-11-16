@@ -84,6 +84,9 @@ pub struct Config {
     /// Per-path overrides (`[watch.paths]`); the longest matching prefix wins.
     pub watch_paths: BTreeMap<PathBuf, WatchMode>,
     pub theme: Option<Theme>,
+    /// UI language as written (`pt-BR`, `en`); absent = the system's (DEB-10). Kept as text:
+    /// the UI decides what it supports, so an unknown value never invalidates the file.
+    pub language: Option<String>,
     presets: BTreeMap<String, Preset>,
 }
 
@@ -96,6 +99,7 @@ impl Default for Config {
             watch_mode: WatchMode::Auto,
             watch_paths: BTreeMap::new(),
             theme: None,
+            language: None,
             presets: builtin_presets(),
         }
     }
@@ -120,6 +124,7 @@ struct RawConfig {
     presets: BTreeMap<String, RawPreset>,
     watch: Option<RawWatch>,
     theme: Option<Spanned<String>>,
+    language: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -313,6 +318,7 @@ impl Config {
         };
         Ok(Self {
             theme,
+            language: raw.language.filter(|l| !l.trim().is_empty()),
             watch_mode,
             watch_paths,
             scan_paths: raw.scan_paths.iter().map(|p| expand_home(p)).collect(),
@@ -411,6 +417,8 @@ pub struct Settings {
     pub scan_paths: Vec<String>,
     pub poll_interval_ms: u64,
     pub theme: Option<Theme>,
+    /// `None` removes the key: the UI follows the system language.
+    pub language: Option<String>,
     /// Projects to write; a project with no setting is removed from the file.
     pub projects: Vec<(String, ProjectConfig)>,
 }
@@ -431,12 +439,52 @@ fn put(table: &mut toml_edit::Table, key: &str, value: impl Into<toml_edit::Valu
     }
 }
 
+/// Removes `key`; comment lines written above it (its key's prefix decor) move to the next
+/// key, so removing a setting never deletes a comment the user wrote (DEB-10).
+fn remove_keeping_comments(table: &mut toml_edit::Table, key: &str) {
+    let prefix = table
+        .key(key)
+        .and_then(|k| k.leaf_decor().prefix())
+        .and_then(|p| p.as_str())
+        .filter(|p| p.contains('#'))
+        .map(str::to_owned);
+    let next = table
+        .iter()
+        .map(|(k, _)| k.to_owned())
+        .skip_while(|k| k != key)
+        .nth(1);
+    table.remove(key);
+    let Some(prefix) = prefix else { return };
+    match next.and_then(|n| table.key_mut(&n)) {
+        Some(mut next_key) => {
+            let rest = next_key
+                .leaf_decor()
+                .prefix()
+                .and_then(|p| p.as_str())
+                .unwrap_or("")
+                .to_owned();
+            next_key
+                .leaf_decor_mut()
+                .set_prefix(format!("{prefix}{rest}"));
+        }
+        None => {
+            let trailing = table
+                .decor()
+                .suffix()
+                .and_then(|p| p.as_str())
+                .unwrap_or("")
+                .to_owned();
+            table
+                .decor_mut()
+                .set_suffix(format!("{trailing}\n{}", prefix.trim_end()));
+        }
+    }
+}
+
 fn set_or_remove(table: &mut toml_edit::Table, key: &str, value: Option<&str>) {
     match value {
         Some(v) => put(table, key, v),
-        None => {
-            table.remove(key);
-        }
+        None => remove_keeping_comments(table, key),
     }
 }
 
@@ -473,6 +521,7 @@ pub fn save_settings(path: &Path, settings: &Settings) -> Result<Config, ConfigE
         i64::try_from(settings.poll_interval_ms).unwrap_or(i64::MAX),
     );
     set_or_remove(root, "theme", settings.theme.map(Theme::as_str));
+    set_or_remove(root, "language", settings.language.as_deref());
     if !root.contains_key("projects") {
         let mut t = toml_edit::Table::new();
         t.set_implicit(true);
@@ -688,6 +737,7 @@ preset = "team"
             scan_paths: vec!["~/code".into(), abs_text.clone(), "/srv/specs".into()],
             poll_interval_ms: 2000,
             theme: Some(Theme::Light),
+            language: Some("en".into()),
             projects: vec![
                 (
                     "a".into(),
@@ -716,6 +766,8 @@ preset = "team"
         assert!(!text.contains("[projects.gone]"), "{text}");
         assert_eq!(c.poll_interval_ms, 2000);
         assert_eq!(c.theme, Some(Theme::Light));
+        assert_eq!(c.language.as_deref(), Some("en"));
+        assert!(text.contains("language = \"en\""), "{text}");
         assert_eq!(c.preset_for("a").name, "generic");
         assert_eq!(c.alias_for("a"), Some("A"));
         assert_eq!(
@@ -731,6 +783,49 @@ preset = "team"
     }
 
     #[test]
+    fn language_is_kept_as_written_and_removed_with_the_comments_intact() {
+        // DEB-10: an unknown value does not invalidate the file; choosing "system" removes it.
+        let c = Config::parse("language = \"fr\"\n").unwrap();
+        assert_eq!(c.language.as_deref(), Some("fr"));
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("config.toml");
+        fs::write(
+            &path,
+            "# top\nlanguage = \"pt-BR\" # mine\nscan_paths = [] # paths\n",
+        )
+        .unwrap();
+        let mut settings = Settings {
+            scan_paths: vec![],
+            poll_interval_ms: 3000,
+            theme: None,
+            language: Some("en".into()),
+            projects: vec![],
+        };
+        let c = save_settings(&path, &settings).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("language = \"en\" # mine"), "{text}");
+        assert_eq!(c.language.as_deref(), Some("en"));
+        settings.language = None;
+        let c = save_settings(&path, &settings).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("language"), "{text}");
+        assert!(text.starts_with("# top\n"), "{text}");
+        assert!(text.contains("# paths"), "{text}");
+        assert_eq!(c.language, None);
+        // Last key of the table: the comment stays at the end of the file.
+        fs::write(
+            &path,
+            "scan_paths = []\n# about the language\nlanguage = \"en\"\n",
+        )
+        .unwrap();
+        save_settings(&path, &settings).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("language ="), "{text}");
+        assert!(text.contains("# about the language"), "{text}");
+        assert!(Config::parse(&text).is_ok(), "{text}");
+    }
+
+    #[test]
     fn invalid_settings_are_rejected_before_writing() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("config.toml");
@@ -739,6 +834,7 @@ preset = "team"
             scan_paths: vec![],
             poll_interval_ms: 3000,
             theme: None,
+            language: None,
             projects: vec![(
                 "a".into(),
                 ProjectConfig {

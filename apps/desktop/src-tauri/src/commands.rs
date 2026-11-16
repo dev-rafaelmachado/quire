@@ -69,6 +69,8 @@ pub struct ConfigView {
     pub presets: Vec<String>,
     /// `dark`, `light` or none (dark).
     pub theme: Option<String>,
+    /// UI language as written in `config.toml`; none = the system's (DEB-10).
+    pub language: Option<String>,
     /// One entry per scan path, with the reason when it cannot be scanned (DSC-05).
     pub scan_path_status: Vec<ScanPathStatus>,
     /// Saving is possible: there is a config location and the current file is valid.
@@ -89,6 +91,7 @@ pub struct SettingsInput {
     pub scan_paths: Vec<String>,
     pub poll_interval_ms: u32,
     pub theme: Option<String>,
+    pub language: Option<String>,
     pub projects: Vec<ProjectConfigView>,
 }
 
@@ -118,6 +121,7 @@ fn config_view(state: &AppState) -> ConfigView {
             .collect(),
         presets: config.preset_names().map(str::to_owned).collect(),
         theme: config.theme.map(|t| t.as_str().to_owned()),
+        language: config.language.clone(),
         scan_path_status: config
             .scan_paths
             .iter()
@@ -180,6 +184,7 @@ pub async fn set_config<R: Runtime>(
             .collect(),
         poll_interval_ms: u64::from(settings.poll_interval_ms),
         theme,
+        language: clean(settings.language),
         projects: settings
             .projects
             .into_iter()

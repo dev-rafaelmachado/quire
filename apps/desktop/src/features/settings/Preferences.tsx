@@ -1,7 +1,7 @@
 import { CircleCheck, Plus, TriangleAlert, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTheme } from "../../app/theme";
-import { t } from "../../lib/i18n";
+import { isLocale, t } from "../../lib/i18n";
 import { errorText } from "../../lib/i18n/errors";
 import { asCmdError, type CmdError, commands, type ConfigView, type ProjectSummary } from "../../lib/ipc";
 import { Button, Chip, ErrorDetail, ErrorText, IconButton, Segmented } from "../../ui";
@@ -48,6 +48,7 @@ export function Preferences({ config }: { config: ConfigView }) {
   const [newPath, setNewPath] = useState("");
   const [interval, setIntervalSeconds] = useState(String(config.pollIntervalMs / 1000));
   const [theme, setThemeDraft] = useState<"dark" | "light">(config.theme === "light" ? "light" : "dark");
+  const [language, setLanguage] = useState<string | null>(config.language);
   const [rows, setRows] = useState<ProjectDraft[]>(() => draftProjects(config, projects));
   const [state, setState] = useState<{ kind: "idle" | "saving" | "saved" } | { kind: "error"; error: CmdError }>({ kind: "idle" });
   const editable = config.editable;
@@ -70,6 +71,7 @@ export function Preferences({ config }: { config: ConfigView }) {
         scanPaths: paths,
         pollIntervalMs: Math.round(Number(interval) * 1000),
         theme,
+        language,
         projects: rows.map((r) => ({
           name: r.name,
           preset: r.preset || null,
@@ -197,17 +199,40 @@ export function Preferences({ config }: { config: ConfigView }) {
         </Section>
 
         <Section title={t("prefs.appearance")}>
-          <div className="flex">
+          <div className="flex items-center gap-3 text-[12.5px]">
+            <span aria-hidden="true" className="w-56">
+              {t("prefs.theme")}
+            </span>
             <Segmented
-            label={t("prefs.theme")}
-            value={theme}
-            onChange={setThemeDraft}
-            options={[
-              { value: "dark", label: t("prefs.themeDark") },
-              { value: "light", label: t("prefs.themeLight") },
-            ]}
+              label={t("prefs.theme")}
+              value={theme}
+              onChange={setThemeDraft}
+              options={[
+                { value: "dark", label: t("prefs.themeDark") },
+                { value: "light", label: t("prefs.themeLight") },
+              ]}
             />
           </div>
+          <div className="flex items-center gap-3 text-[12.5px]">
+            <span aria-hidden="true" className="w-56">
+              {t("prefs.language")}
+            </span>
+            <Segmented
+              label={t("prefs.language")}
+              value={isLocale(language) ? language : "system"}
+              onChange={(v) => setLanguage(v === "system" ? null : v)}
+              options={[
+                { value: "system", label: t("prefs.languageSystem") },
+                { value: "pt-BR", label: t("prefs.languagePt") },
+                { value: "en", label: t("prefs.languageEn") },
+              ]}
+            />
+          </div>
+          {language !== null && !isLocale(language) ? (
+            <p role="status" className="m-0 text-[12px] text-warn">
+              {t("prefs.languageUnknown", { value: language })}
+            </p>
+          ) : null}
         </Section>
 
         <div className="flex items-center gap-3 border-t border-line pt-5">

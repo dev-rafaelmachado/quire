@@ -105,6 +105,8 @@ export type ConfigView_Deserialize = {
 	presets: string[],
 	/**  `dark`, `light` or none (dark). */
 	theme?: string | null,
+	/**  UI language as written in `config.toml`; none = the system's (DEB-10). */
+	language?: string | null,
 	/**  One entry per scan path, with the reason when it cannot be scanned (DSC-05). */
 	scanPathStatus: ScanPathStatus_Deserialize[],
 	/**  Saving is possible: there is a config location and the current file is valid. */
@@ -121,6 +123,8 @@ export type ConfigView_Serialize = {
 	presets: string[],
 	/**  `dark`, `light` or none (dark). */
 	theme: string | null,
+	/**  UI language as written in `config.toml`; none = the system's (DEB-10). */
+	language: string | null,
 	/**  One entry per scan path, with the reason when it cannot be scanned (DSC-05). */
 	scanPathStatus: ScanPathStatus_Serialize[],
 	/**  Saving is possible: there is a config location and the current file is valid. */
@@ -511,6 +515,7 @@ export type SettingsInput_Deserialize = {
 	scanPaths: string[],
 	pollIntervalMs: number,
 	theme?: string | null,
+	language?: string | null,
 	projects: ProjectConfigView_Deserialize[],
 };
 
@@ -519,6 +524,7 @@ export type SettingsInput_Serialize = {
 	scanPaths: string[],
 	pollIntervalMs: number,
 	theme: string | null,
+	language: string | null,
 	projects: ProjectConfigView_Serialize[],
 };
 
