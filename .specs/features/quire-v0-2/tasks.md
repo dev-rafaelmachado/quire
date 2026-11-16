@@ -44,7 +44,7 @@ T1 → T27 → T2 → T3 → T4 → T5 → T6 → T7 → T8
 ```
 
 - [x] T1: Catálogo em inglês e erros do backend por código (269a782)
-- [ ] T27: Idioma do sistema, fallback em inglês e seletor nas Preferências
+- [x] T27: Idioma do sistema, fallback em inglês e seletor nas Preferências (bb0a0d0)
 - [ ] T2: Sugestão visível do preset `exban`
 - [ ] T3: Chips de requisito em janela estreita
 - [ ] T4: Recusar `QUIRE_CONFIG` e `QUIRE_INDEX` relativos

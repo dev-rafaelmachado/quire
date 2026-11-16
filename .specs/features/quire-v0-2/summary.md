@@ -1,6 +1,6 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 1/28 tarefas
+**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 2/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -12,7 +12,7 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 <!-- progress:start -->
 | Fase | Repositório | Tarefas |
 |---|---|---|
-| 0: Dívidas da v0.1 | quire | 1/9 |
+| 0: Dívidas da v0.1 | quire | 2/9 |
 | 1: Spikes | quire | 0/3 |
 | 2: Escrita segura no núcleo | quire | 0/5 |
 | 3: Editor | quire | 0/5 |
@@ -20,15 +20,15 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 | 5: Tasks e progresso | quire | 0/2 |
 | 6: Fechamento da v0.2 | quire | 0/1 |
 
-**Total:** 1/28 tarefas
+**Total:** 2/28 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 0, T27 (idioma do sistema e seletor)
-- **Concluídas:** T1
-- **Em andamento:** T27
-- **Próximo passo:** T27, depois T2
+- **Fase / tarefa:** Fase 0, T2 (sugestão do preset exban)
+- **Concluídas:** T1, T27
+- **Em andamento:** T2
+- **Próximo passo:** T2, depois T3
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** nenhum de especificação. Dependem de máquina: T8 e partes de T9, T11 e T27 (autor com WSL ou Windows); T5 depende só do CI do Windows
 - **Arquivos sem commit:** nenhum
@@ -77,3 +77,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · planejamento · **IDs:** T27 (idioma) e T28 (escrita por classe de FS) foram criados sem renumerar as demais tarefas; entram em `T1 → T27 → T2` e `T13 → T28 → T14`. Critérios novos: SAV-11 e DEB-10. Removido: PRG-02. Rastreabilidade conferida: 64 critérios, todos com tarefa; 28 tarefas, todas com critério
 - 2026-11-16 · planejamento · **NÃO VERIFICADO** (novo com as decisões): se `navigator.languages` segue o idioma do sistema no WebKitGTK e no WebView2 (T27); como DrvFs e 9p aparecem no `mountinfo` do WSL2 atual (T11, T28); paridade da ajuda do `clap` com o `tauri-plugin-cli`, fragmento WiX com `PATH` no Tauri 2.12 e código de saída do `.cmd` no PowerShell (T5)
 - 2026-11-16 · T1 · catálogo `en` tipado pela forma do `pt-BR` (`Catalog<T>`: faltar ou sobrar chave não compila; teste confere também os `{parâmetros}`), `t()` lendo o idioma de um store Zustand que a raiz do app assina (troca sem reiniciar; o `SectionView` memoizado do markdown também assina), plurais/números/meses pelo idioma em uso. Erros com código estável: `ScanError::code`, `ConfigError::code`, `ScanPathError.code`, `ScanPathStatus.error` e `ConfigView.error` viraram `CmdError`; códigos de `set_config` ficaram específicos (`poll_interval_range`, `unknown_theme`, `config_*`). A UI mostra a tradução e o texto do backend só num `<details>` (`ErrorText`/`ErrorDetail`). Teste renderiza as Preferências em inglês e confere que nenhum trecho do `pt-BR` aparece. Gate de fase verde (269a782). **Decisão fora do design:** códigos de `set_config` renomeados de `invalid` para códigos específicos (o design só pedia `CmdError.code`)
+- 2026-11-16 · T27 · idioma do sistema com fallback em inglês e seletor (bb0a0d0). `resolveLocale` testado por tabela (14 casos); `language` no `config.toml` lido como texto (valor desconhecido avisa nas Preferências e é regravado igual se o usuário salvar sem mexer). **Bug achado pelo teste e corrigido:** remover uma chave do `config.toml` (`set_or_remove`, também usado por `theme`) apagava o comentário escrito acima dela, que no `toml_edit` pertence ao prefixo da chave; agora o comentário passa para a chave seguinte (ou para o fim da tabela). Testes de vitest fixam `navigator.languages = ["pt-BR"]` num `setupFiles` para não depender do `LANG` da máquina. **Verificado no binário de produção (Linux):** `LANG=en_US.UTF-8` abre em inglês, `pt_BR` em português e `es_ES` em inglês (`/tmp/quire-shots/v0-2/T27-LANG-*.png`); Preferências com as linhas Tema e Idioma em `T27-prefs-dark.png` e `T27-prefs-light.png`. A primeira captura mostrou o seletor esticado e sem rótulo visível; corrigido antes do commit. **Decisão fora do design:** o idioma escolhido vale ao clicar em Salvar (como o tema), e não ao clicar no seletor. **NÃO VERIFICADO:** WebView2 (Windows). **Nota de captura:** o Hyprland daqui passou a usar configuração Lua (0.57.2) e uma janela num workspace especial oculto não pinta (a captura sai vazia); as capturas da v0.2 usam uma saída headless criada com `hyprctl output create headless QUIRESHOT` (sem tela física) e `grim -T` da janela
