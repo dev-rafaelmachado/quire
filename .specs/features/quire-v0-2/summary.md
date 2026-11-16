@@ -1,6 +1,6 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Planejamento · 0 de 7 fases completas · decisões P1–P10 aplicadas em 2026-11-16, aguardando aprovação do autor · 0/28 tarefas
+**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 1/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -12,7 +12,7 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 <!-- progress:start -->
 | Fase | Repositório | Tarefas |
 |---|---|---|
-| 0: Dívidas da v0.1 | quire | 0/9 |
+| 0: Dívidas da v0.1 | quire | 1/9 |
 | 1: Spikes | quire | 0/3 |
 | 2: Escrita segura no núcleo | quire | 0/5 |
 | 3: Editor | quire | 0/5 |
@@ -20,19 +20,19 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 | 5: Tasks e progresso | quire | 0/2 |
 | 6: Fechamento da v0.2 | quire | 0/1 |
 
-**Total:** 0/28 tarefas
+**Total:** 1/28 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** planejamento concluído, com as decisões do autor sobre P1–P10 aplicadas; nenhuma tarefa iniciada
-- **Concluídas:** nenhuma
-- **Em andamento:** nenhuma
-- **Próximo passo:** o autor aprova spec, design e tarefas revisados; depois, T1
+- **Fase / tarefa:** Fase 0, T27 (idioma do sistema e seletor)
+- **Concluídas:** T1
+- **Em andamento:** T27
+- **Próximo passo:** T27, depois T2
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** nenhum de especificação. Dependem de máquina: T8 e partes de T9, T11 e T27 (autor com WSL ou Windows); T5 depende só do CI do Windows
 - **Arquivos sem commit:** nenhum
-- **Branch / worktree:** `docs/v0-2-spec`, rebaseada em `main` (sem push)
+- **Branch / worktree:** `feat/v0-2`, criada de `docs/v0-2-spec` (que ainda não foi mergeada em `main`); sem push
 
 ## Pendências da v0.1 e destino na v0.2
 
@@ -76,3 +76,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · planejamento · **P6 virou regra condicionada ao dado** (SAV-11, TD-22, T28 nova): `\\wsl$`/`\\wsl.localhost`, DrvFs e 9p só aceitam escrita se a T11 registrar rename atômico verificado na classe; **classe sem dado fica somente leitura**. Consequência prática: como o autor não tem Windows, `\\wsl$` visto do Windows deve ficar somente leitura na v0.2, a menos que alguém rode o roteiro da T11 numa máquina Windows
 - 2026-11-16 · planejamento · **IDs:** T27 (idioma) e T28 (escrita por classe de FS) foram criados sem renumerar as demais tarefas; entram em `T1 → T27 → T2` e `T13 → T28 → T14`. Critérios novos: SAV-11 e DEB-10. Removido: PRG-02. Rastreabilidade conferida: 64 critérios, todos com tarefa; 28 tarefas, todas com critério
 - 2026-11-16 · planejamento · **NÃO VERIFICADO** (novo com as decisões): se `navigator.languages` segue o idioma do sistema no WebKitGTK e no WebView2 (T27); como DrvFs e 9p aparecem no `mountinfo` do WSL2 atual (T11, T28); paridade da ajuda do `clap` com o `tauri-plugin-cli`, fragmento WiX com `PATH` no Tauri 2.12 e código de saída do `.cmd` no PowerShell (T5)
+- 2026-11-16 · T1 · catálogo `en` tipado pela forma do `pt-BR` (`Catalog<T>`: faltar ou sobrar chave não compila; teste confere também os `{parâmetros}`), `t()` lendo o idioma de um store Zustand que a raiz do app assina (troca sem reiniciar; o `SectionView` memoizado do markdown também assina), plurais/números/meses pelo idioma em uso. Erros com código estável: `ScanError::code`, `ConfigError::code`, `ScanPathError.code`, `ScanPathStatus.error` e `ConfigView.error` viraram `CmdError`; códigos de `set_config` ficaram específicos (`poll_interval_range`, `unknown_theme`, `config_*`). A UI mostra a tradução e o texto do backend só num `<details>` (`ErrorText`/`ErrorDetail`). Teste renderiza as Preferências em inglês e confere que nenhum trecho do `pt-BR` aparece. Gate de fase verde (269a782). **Decisão fora do design:** códigos de `set_config` renomeados de `invalid` para códigos específicos (o design só pedia `CmdError.code`)
