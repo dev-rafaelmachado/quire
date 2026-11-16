@@ -156,6 +156,7 @@ fn refresh_watcher<R: Runtime>(app: &AppHandle<R>) {
                 .iter()
                 .map(|(p, m)| ScanPathError {
                     path: p.display().to_string(),
+                    code: "watch_fallback".to_owned(),
                     message: m.clone(),
                 })
                 .collect(),
@@ -163,6 +164,7 @@ fn refresh_watcher<R: Runtime>(app: &AppHandle<R>) {
         Err(e) => WatchStatus {
             fallbacks: vec![ScanPathError {
                 path: String::new(),
+                code: "watch_start".to_owned(),
                 message: e.to_string(),
             }],
             ..WatchStatus::default()

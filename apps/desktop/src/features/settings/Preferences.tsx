@@ -2,8 +2,9 @@ import { CircleCheck, Plus, TriangleAlert, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTheme } from "../../app/theme";
 import { t } from "../../lib/i18n";
-import { asCmdError, commands, type ConfigView, type ProjectSummary } from "../../lib/ipc";
-import { Button, Chip, IconButton, Segmented } from "../../ui";
+import { errorText } from "../../lib/i18n/errors";
+import { asCmdError, type CmdError, commands, type ConfigView, type ProjectSummary } from "../../lib/ipc";
+import { Button, Chip, ErrorDetail, ErrorText, IconButton, Segmented } from "../../ui";
 import { useWorkspace } from "../workspace/store";
 
 interface ProjectDraft {
@@ -48,9 +49,9 @@ export function Preferences({ config }: { config: ConfigView }) {
   const [interval, setIntervalSeconds] = useState(String(config.pollIntervalMs / 1000));
   const [theme, setThemeDraft] = useState<"dark" | "light">(config.theme === "light" ? "light" : "dark");
   const [rows, setRows] = useState<ProjectDraft[]>(() => draftProjects(config, projects));
-  const [state, setState] = useState<{ kind: "idle" | "saving" | "saved" } | { kind: "error"; message: string }>({ kind: "idle" });
+  const [state, setState] = useState<{ kind: "idle" | "saving" | "saved" } | { kind: "error"; error: CmdError }>({ kind: "idle" });
   const editable = config.editable;
-  const reason = config.error ?? t("prefs.noConfigDir");
+  const reason = config.error ? errorText(config.error) : t("prefs.noConfigDir");
 
   const statusOf = (path: string) => config.scanPathStatus.find((s) => s.path === path);
   const update = (name: string, patch: Partial<ProjectDraft>) => setRows((r) => r.map((x) => (x.name === name ? { ...x, ...patch } : x)));
@@ -81,7 +82,7 @@ export function Preferences({ config }: { config: ConfigView }) {
       setTheme(theme);
       setState({ kind: "saved" });
     } catch (e) {
-      setState({ kind: "error", message: asCmdError(e).message });
+      setState({ kind: "error", error: asCmdError(e) });
     }
   };
 
@@ -98,6 +99,7 @@ export function Preferences({ config }: { config: ConfigView }) {
         {!editable ? (
           <p role="alert" className="m-0 rounded-[var(--radius-md)] bg-warn-bg px-3 py-2 text-[12.5px] text-warn">
             {t("prefs.readOnly", { reason })}
+            {config.error ? <ErrorDetail error={config.error} /> : null}
           </p>
         ) : null}
 
@@ -114,7 +116,7 @@ export function Preferences({ config }: { config: ConfigView }) {
                     <Chip>{t("prefs.pathUnsaved")}</Chip>
                   ) : status.error ? (
                     <Chip tone="warn" icon={<TriangleAlert aria-hidden="true" className="size-3" />}>
-                      {status.error}
+                      {errorText(status.error)}
                     </Chip>
                   ) : (
                     <Chip tone="ok" icon={<CircleCheck aria-hidden="true" className="size-3" />}>
@@ -222,7 +224,7 @@ export function Preferences({ config }: { config: ConfigView }) {
           ) : null}
           {state.kind === "error" ? (
             <span role="alert" className="text-[12.5px] text-warn">
-              {state.message}
+              <ErrorText error={state.error} />
             </span>
           ) : null}
         </div>

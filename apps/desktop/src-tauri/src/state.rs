@@ -6,11 +6,13 @@ use std::sync::{Mutex, RwLock};
 
 use quire_core::{Config, Index};
 
+use crate::commands::{CmdError, err};
+
 pub struct AppState {
     pub config: RwLock<Config>,
     pub config_path: Option<PathBuf>,
     /// Set when `config.toml` could not be read; the app runs with defaults and shows it.
-    pub config_error: Option<String>,
+    pub config_error: Option<CmdError>,
     pub index_path: PathBuf,
     /// Connection used by queries; reconciliation opens its own (WAL allows both).
     pub index: Mutex<Index>,
@@ -31,7 +33,7 @@ impl AppState {
             .or_else(Config::default_path);
         let (config, config_error) = match config_path.as_deref().map(Config::load) {
             Some(Ok(c)) => (c, None),
-            Some(Err(e)) => (Config::default(), Some(e.to_string())),
+            Some(Err(e)) => (Config::default(), Some(err(e.code(), &e))),
             None => (Config::default(), None),
         };
         let index_path = std::env::var_os("QUIRE_INDEX")
@@ -44,7 +46,7 @@ impl AppState {
     pub fn new(
         config: Config,
         config_path: Option<PathBuf>,
-        config_error: Option<String>,
+        config_error: Option<CmdError>,
         index_path: PathBuf,
     ) -> Result<Self, String> {
         let index = Index::open(&index_path).map_err(|e| e.to_string())?;

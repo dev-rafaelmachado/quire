@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { asCmdError, commands, type GateRun, type TasksView } from "../../lib/ipc";
+import { asCmdError, type CmdError, commands, type GateRun, type TasksView } from "../../lib/ipc";
 import { defaultExpanded, nextTaskId } from "./model";
 
 export type TaskFilter = "all" | "pending";
@@ -11,7 +11,7 @@ interface TasksState {
   selected: string | null;
   expanded: ReadonlySet<string>;
   filter: TaskFilter;
-  error: string | null;
+  error: CmdError | null;
   load: (instanceId: number) => Promise<void>;
   /** Re-reads after a change on disk, keeping selection and expanded phases. */
   reload: () => Promise<void>;
@@ -38,7 +38,7 @@ export const useTasks = create<TasksState>((set, get) => ({
       if (get().instanceId !== instanceId) return;
       set({ view, gates, selected: nextTaskId(view.phases), expanded: defaultExpanded(view.phases) });
     } catch (e) {
-      set({ error: asCmdError(e).message });
+      set({ error: asCmdError(e) });
     }
   },
   reload: async () => {

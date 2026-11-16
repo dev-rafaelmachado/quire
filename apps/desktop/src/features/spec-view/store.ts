@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { asCmdError, commands, type FileContent, type SpecDetail } from "../../lib/ipc";
+import { asCmdError, type CmdError, commands, type FileContent, type SpecDetail } from "../../lib/ipc";
 import { stripHeader } from "../../lib/markdown/header";
 import { ancestry, buildDoc, type Doc, outline, type OutlineEntry, toHast } from "../../lib/markdown/pipeline";
 import { displayed } from "./labels";
@@ -26,7 +26,7 @@ interface SpecViewState {
   active: string | null;
   /** Bumped to ask the view to scroll to `active`. */
   scrollRequest: number;
-  error: string | null;
+  error: CmdError | null;
   /** Instance chosen per spec; lasts for the session (DUP-04). */
   chosen: Readonly<Record<number, number>>;
   /** File to show when the next spec opens (`quire open <file>`). */
@@ -103,7 +103,7 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       if (wanted !== null && (detail.tabs.includes(wanted) || detail.others.includes(wanted))) await get().showFile(wanted);
       else await get().selectTab(detail.tabs[0] ?? OTHERS);
     } catch (e) {
-      set({ error: asCmdError(e).message });
+      set({ error: asCmdError(e) });
     }
   },
   refresh: async () => {
@@ -145,7 +145,7 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       const keep = tab !== null && (tab === OTHERS ? detail.others.length > 0 : detail.tabs.includes(tab));
       await get().selectTab(keep && tab !== null ? tab : (detail.tabs[0] ?? OTHERS));
     } catch (e) {
-      set({ error: asCmdError(e).message });
+      set({ error: asCmdError(e) });
     }
   },
   showFile: async (file) => {
@@ -181,7 +181,7 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       }
       set({ content, doc, outline: doc ? outline(doc) : [] });
     } catch (e) {
-      set({ error: asCmdError(e).message });
+      set({ error: asCmdError(e) });
     }
   },
   toggle: (id) =>

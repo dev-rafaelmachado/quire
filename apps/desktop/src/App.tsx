@@ -14,8 +14,11 @@ import { Sidebar } from "./features/workspace/Sidebar";
 import { findSelected } from "./features/workspace/selection";
 import { useWorkspace } from "./features/workspace/store";
 import { WorkspaceStatus } from "./features/workspace/WorkspaceStatus";
+import { useLocale } from "./lib/i18n";
 
 export function App() {
+  // Subscribing here re-renders the whole tree when the language changes (no restart).
+  useLocale((s) => s.locale);
   const init = useWorkspace((s) => s.init);
   const projects = useWorkspace((s) => s.projects);
   const selectedSpecId = useWorkspace((s) => s.selectedSpecId);

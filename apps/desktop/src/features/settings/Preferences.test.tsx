@@ -12,6 +12,24 @@ vi.mock("../../lib/ipc", () => ({
 const { Preferences } = await import("./Preferences");
 const { useWorkspace } = await import("../workspace/store");
 const { useTheme } = await import("../../app/theme");
+const { setLocale } = await import("../../lib/i18n");
+const { ptBR } = await import("../../lib/i18n/pt-BR");
+const { en } = await import("../../lib/i18n/en");
+
+/** pt-BR strings that differ from English and are long enough to be recognized in a page. */
+function portugueseOnly(): string[] {
+  const out: string[] = [];
+  const walk = (pt: unknown, english: unknown) => {
+    if (typeof pt === "string") {
+      const fixed = pt.split(/\{\w+\}/).map((p) => p.trim()).filter((p) => p.length >= 6);
+      if (pt !== english) out.push(...fixed.filter((p) => typeof english !== "string" || !english.includes(p)));
+      return;
+    }
+    for (const [k, v] of Object.entries(pt as Record<string, unknown>)) walk(v, (english as Record<string, unknown>)[k]);
+  };
+  walk(ptBR, en);
+  return out;
+}
 
 const config: ConfigView = {
   path: "/home/dev/.config/quire/config.toml",
@@ -23,7 +41,7 @@ const config: ConfigView = {
   theme: null,
   scanPathStatus: [
     { path: "/ws/projects", error: null },
-    { path: "/missing", error: "path does not exist: /missing" },
+    { path: "/missing", error: { code: "path_not_found", message: "path does not exist: /missing" } },
   ],
   editable: true,
 };
@@ -33,12 +51,15 @@ beforeEach(() => {
   useWorkspace.setState({ projects: [], config });
   useTheme.getState().setTheme("dark");
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLocale("pt-BR");
+});
 
 describe("preferences", () => {
   it("shows each scan path with its status and the reason when invalid (DSC-05)", () => {
     render(<Preferences config={config} />);
-    expect(screen.getByText("path does not exist: /missing")).toBeTruthy();
+    expect(screen.getByText("a pasta não existe")).toBeTruthy();
     expect(screen.getByText("ok")).toBeTruthy();
   });
 
@@ -64,8 +85,19 @@ describe("preferences", () => {
   });
 
   it("is read-only when config.toml cannot be saved", () => {
-    render(<Preferences config={{ ...config, editable: false, error: "config.toml line 2, column 1: bad" }} />);
+    render(<Preferences config={{ ...config, editable: false, error: { code: "config_parse", message: "config.toml line 2, column 1: bad" } }} />);
+    expect(screen.getByRole("alert").textContent).toContain("config.toml com erro de sintaxe");
     expect(screen.getByRole("alert").textContent).toContain("line 2");
     expect((screen.getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows no Portuguese text when the language is English (DEB-01)", () => {
+    setLocale("en");
+    render(<Preferences config={{ ...config, editable: false, error: { code: "config_parse", message: "line 2" } }} />);
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Scan folders");
+    expect(text).toContain("syntax error in config.toml");
+    expect(portugueseOnly().length).toBeGreaterThan(100);
+    expect(portugueseOnly().filter((p) => text.includes(p))).toEqual([]);
   });
 });

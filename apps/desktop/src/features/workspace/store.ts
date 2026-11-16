@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { applyConfiguredTheme } from "../../app/theme";
-import { asCmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type WatchStatus } from "../../lib/ipc";
+import { asCmdError, type CmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type WatchStatus } from "../../lib/ipc";
 import type { StatusFilter } from "./model";
 
 interface WorkspaceState {
   projects: ProjectSummary[];
   /** The first list (from the cache) arrived. */
   loaded: boolean;
-  error: string | null;
+  error: CmdError | null;
   config: ConfigView | null;
   scan: ScanProgress | null;
   /** File watcher state for the status bar (WAT-03). */
@@ -84,14 +84,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         }
       }
     } catch (e) {
-      set({ loaded: true, error: asCmdError(e).message });
+      set({ loaded: true, error: asCmdError(e) });
     }
   },
   rescan: async () => {
     try {
       await commands.startScan();
     } catch (e) {
-      set({ error: asCmdError(e).message });
+      set({ error: asCmdError(e) });
     }
   },
   init: () => {
@@ -115,7 +115,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         applyConfiguredTheme(config.theme);
         set({ config, watch: await commands.getWatchStatus() });
       } catch (e) {
-        set({ error: asCmdError(e).message });
+        set({ error: asCmdError(e) });
       }
       await get().reload();
       await get().rescan();

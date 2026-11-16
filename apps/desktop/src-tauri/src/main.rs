@@ -498,8 +498,9 @@ mod tests {
         assert_eq!(saved["pollIntervalMs"], 2000);
         let status = saved["scanPathStatus"].as_array().unwrap();
         assert_eq!(status[0]["error"], Value::Null);
+        assert_eq!(status[1]["error"]["code"], "path_not_found", "{status:?}");
         assert!(
-            status[1]["error"]
+            status[1]["error"]["message"]
                 .as_str()
                 .unwrap()
                 .contains("does not exist"),
@@ -531,14 +532,14 @@ mod tests {
             "set_config",
             json!({ "settings": { "scanPaths": [], "pollIntervalMs": 10, "theme": null, "projects": [] } }),
         );
-        assert_eq!(bad.unwrap_err()["code"], "invalid");
+        assert_eq!(bad.unwrap_err()["code"], "poll_interval_range");
         let bad_preset = invoke(
             &webview,
             "set_config",
             json!({ "settings": { "scanPaths": [], "pollIntervalMs": 3000, "theme": null,
                 "projects": [{ "name": "x", "preset": "nope", "alias": null, "issueUrlBase": null }] } }),
         );
-        assert_eq!(bad_preset.unwrap_err()["code"], "invalid");
+        assert_eq!(bad_preset.unwrap_err()["code"], "config_invalid");
         assert_eq!(
             std::fs::read_to_string(tmp.path().join("quire.toml")).unwrap(),
             text,

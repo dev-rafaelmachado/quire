@@ -84,6 +84,10 @@ export type CliOpen_Serialize =
 /**  The key matches specs in more than one place: let the user pick (CLI-02). */
 { kind: "pick"; query: string; specIds: number[] } | { kind: "notFound"; query: string };
 
+/**
+ *  Error of a command, or a problem shown in a view: `code` is stable and translated by the
+ *  UI (DEB-02); `message` is the backend detail, in English, shown only as detail.
+ */
 export type CmdError = {
 	code: string,
 	message: string,
@@ -94,7 +98,7 @@ export type ConfigView = ConfigView_Serialize | ConfigView_Deserialize;
 export type ConfigView_Deserialize = {
 	path?: string | null,
 	/**  Why `config.toml` was ignored, if it was. */
-	error?: string | null,
+	error?: CmdError | null,
 	scanPaths: string[],
 	pollIntervalMs: number,
 	projects: ProjectConfigView_Deserialize[],
@@ -110,7 +114,7 @@ export type ConfigView_Deserialize = {
 export type ConfigView_Serialize = {
 	path: string | null,
 	/**  Why `config.toml` was ignored, if it was. */
-	error: string | null,
+	error: CmdError | null,
 	scanPaths: string[],
 	pollIntervalMs: number,
 	projects: ProjectConfigView_Serialize[],
@@ -455,6 +459,8 @@ export type ProjectSummary_Serialize = {
 
 export type ScanPathError = {
 	path: string,
+	/**  Stable code the UI translates (DEB-02); `message` is the backend detail. */
+	code: string,
 	message: string,
 };
 
@@ -462,12 +468,12 @@ export type ScanPathStatus = ScanPathStatus_Serialize | ScanPathStatus_Deseriali
 
 export type ScanPathStatus_Deserialize = {
 	path: string,
-	error?: string | null,
+	error?: CmdError | null,
 };
 
 export type ScanPathStatus_Serialize = {
 	path: string,
-	error: string | null,
+	error: CmdError | null,
 };
 
 export type ScanPhase = "scanning" | "indexing" | "done" | "failed";

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { t } from "../../lib/i18n";
 import { Outline } from "../../lib/markdown/Outline";
-import { cx } from "../../ui";
+import { cx, ErrorText } from "../../ui";
 import { GatesPanel } from "../logs-view/GatesPanel";
 import { LessonsAside, LessonsPanel } from "../logs-view/Lessons";
 import { useLogs } from "../logs-view/store";
@@ -137,7 +137,7 @@ export function SpecView() {
         <div className="px-10 pt-9 pb-24">
           {error ? (
             <p role="alert" className="m-0 text-warn">
-              {error}
+              <ErrorText error={error} />
             </p>
           ) : null}
           {content ? <FileView content={content} doc={doc} collapsed={collapsed} onToggle={toggle} /> : null}

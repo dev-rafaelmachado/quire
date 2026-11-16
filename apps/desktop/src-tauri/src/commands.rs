@@ -25,14 +25,16 @@ use crate::state::AppState;
 /// Files above this size open with a warning and without syntax highlighting.
 pub const LARGE_FILE_BYTES: u64 = 2 * 1024 * 1024;
 
-#[derive(Debug, Clone, Serialize, Type)]
+/// Error of a command, or a problem shown in a view: `code` is stable and translated by the
+/// UI (DEB-02); `message` is the backend detail, in English, shown only as detail.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CmdError {
     pub code: String,
     pub message: String,
 }
 
-fn err(code: &str, message: impl ToString) -> CmdError {
+pub(crate) fn err(code: &str, message: impl ToString) -> CmdError {
     CmdError {
         code: code.to_owned(),
         message: message.to_string(),
@@ -60,7 +62,7 @@ pub struct ProjectConfigView {
 pub struct ConfigView {
     pub path: Option<String>,
     /// Why `config.toml` was ignored, if it was.
-    pub error: Option<String>,
+    pub error: Option<CmdError>,
     pub scan_paths: Vec<String>,
     pub poll_interval_ms: u32,
     pub projects: Vec<ProjectConfigView>,
@@ -77,7 +79,7 @@ pub struct ConfigView {
 #[serde(rename_all = "camelCase")]
 pub struct ScanPathStatus {
     pub path: String,
-    pub error: Option<String>,
+    pub error: Option<CmdError>,
 }
 
 /// What the preferences screen saves (T23).
@@ -123,7 +125,7 @@ fn config_view(state: &AppState) -> ConfigView {
                 path: p.display().to_string(),
                 error: quire_core::scan::check_scan_path(p)
                     .err()
-                    .map(|e| e.to_string()),
+                    .map(|e| err(e.code(), e)),
             })
             .collect(),
         editable: state.config_path.is_some() && state.config_error.is_none(),
@@ -149,7 +151,7 @@ pub async fn set_config<R: Runtime>(
     if let Some(e) = &state.config_error {
         return Err(err(
             "config_invalid",
-            format!("fix config.toml by hand first: {e}"),
+            format!("fix config.toml by hand first: {}", e.message),
         ));
     }
     let path = state
@@ -158,7 +160,7 @@ pub async fn set_config<R: Runtime>(
         .ok_or_else(|| err("no_config_dir", "no configuration directory"))?;
     if !(500..=60_000).contains(&settings.poll_interval_ms) {
         return Err(err(
-            "invalid",
+            "poll_interval_range",
             "the polling interval must be between 0.5 and 60 seconds",
         ));
     }
@@ -166,7 +168,7 @@ pub async fn set_config<R: Runtime>(
         None => None,
         Some("dark") => Some(Theme::Dark),
         Some("light") => Some(Theme::Light),
-        Some(other) => return Err(err("invalid", format!("unknown theme {other}"))),
+        Some(other) => return Err(err("unknown_theme", format!("unknown theme {other}"))),
     };
     let clean = |v: Option<String>| v.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
     let next = Settings {
@@ -191,7 +193,7 @@ pub async fn set_config<R: Runtime>(
             })
             .collect(),
     };
-    let config = save_settings(&path, &next).map_err(|e| err("invalid", e))?;
+    let config = save_settings(&path, &next).map_err(|e| err(e.code(), &e))?;
     *state
         .config
         .write()
@@ -264,6 +266,7 @@ pub(crate) fn run_scan<R: Runtime>(app: &AppHandle<R>) {
                 IndexEvent::PathError { path, error } => {
                     progress.errors.push(ScanPathError {
                         path: path.display().to_string(),
+                        code: error.code().to_owned(),
                         message: error.to_string(),
                     });
                     let _ = progress.emit(app);

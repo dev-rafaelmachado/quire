@@ -56,7 +56,7 @@ beforeEach(() => {
     collapsed: {},
     selectedSpecId: null,
     config: { path: null, error: null, scanPaths: ["/ws"], pollIntervalMs: 3000, projects: [], presets: [], theme: null, scanPathStatus: [], editable: true },
-    scan: { phase: "done", found: 2, processed: 2, total: 2, errors: [{ path: "/missing", message: "path does not exist: /missing" }], message: null },
+    scan: { phase: "done", found: 2, processed: 2, total: 2, errors: [{ path: "/missing", code: "path_not_found", message: "path does not exist: /missing" }], message: null },
   });
 });
 afterEach(cleanup);
@@ -85,7 +85,7 @@ describe("Sidebar", () => {
 
   it("shows scan path errors with the reason (DSC-05)", () => {
     render(<Sidebar />);
-    expect(screen.getByText("/missing: path does not exist: /missing")).toBeTruthy();
+    expect(screen.getByText("/missing: a pasta não existe")).toBeTruthy();
     expect(screen.getByText("1 projeto · 1 worktree extra · 2 specs")).toBeTruthy();
   });
 
