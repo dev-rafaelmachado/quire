@@ -260,6 +260,7 @@ export const ptBR = {
     config_invalid: "config.toml com valor inválido",
     config_io: "não foi possível ler ou gravar o config.toml",
     no_config_dir: "não há diretório de configuração neste sistema",
+    config_env_relative: "QUIRE_CONFIG precisa ser um caminho absoluto (por exemplo, \"$PWD/fixtures/quire.toml\"); nada foi lido nem será gravado",
     poll_interval_range: "o intervalo do polling deve ficar entre 0,5 e 60 segundos",
     unknown_theme: "tema desconhecido",
     scan: "não foi possível iniciar a varredura",

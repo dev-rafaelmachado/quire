@@ -28,18 +28,41 @@ impl AppState {
     /// locations (A2), which is how the fixtures and tests run.
     #[cfg_attr(test, allow(dead_code))]
     pub fn load() -> Result<Self, String> {
-        let config_path = std::env::var_os("QUIRE_CONFIG")
-            .map(PathBuf::from)
-            .or_else(Config::default_path);
-        let (config, config_error) = match config_path.as_deref().map(Config::load) {
-            Some(Ok(c)) => (c, None),
-            Some(Err(e)) => (Config::default(), Some(err(e.code(), &e))),
-            None => (Config::default(), None),
+        Self::from_env(
+            std::env::var_os("QUIRE_CONFIG"),
+            std::env::var_os("QUIRE_INDEX"),
+        )
+    }
+
+    /// `load` with the variables given (TD-21): a relative `QUIRE_CONFIG` leaves the config
+    /// unreadable and not editable, so nothing is ever written next to the working directory
+    /// (which varies: `tauri dev` runs in `src-tauri`); a relative `QUIRE_INDEX`, or one inside
+    /// a `.specs` folder the watcher follows, stops the start before any file is created.
+    pub fn from_env(
+        config_var: Option<std::ffi::OsString>,
+        index_var: Option<std::ffi::OsString>,
+    ) -> Result<Self, String> {
+        let (config_path, refused) = match config_var.map(PathBuf::from) {
+            Some(p) if !p.is_absolute() => (
+                None,
+                Some(err(
+                    "config_env_relative",
+                    format!("QUIRE_CONFIG must be an absolute path, got {}", p.display()),
+                )),
+            ),
+            Some(p) => (Some(p), None),
+            None => (Config::default_path(), None),
         };
-        let index_path = std::env::var_os("QUIRE_INDEX")
-            .map(PathBuf::from)
-            .or_else(Index::default_path)
-            .ok_or("no data directory for the index cache")?;
+        let (config, config_error) = match (refused, config_path.as_deref().map(Config::load)) {
+            (Some(e), _) => (Config::default(), Some(e)),
+            (None, Some(Ok(c))) => (c, None),
+            (None, Some(Err(e))) => (Config::default(), Some(err(e.code(), &e))),
+            (None, None) => (Config::default(), None),
+        };
+        let index_path = match index_var.map(PathBuf::from) {
+            Some(p) => check_index_path(p)?,
+            None => Index::default_path().ok_or("no data directory for the index cache")?,
+        };
         Self::new(config, config_path, config_error, index_path)
     }
 
@@ -61,4 +84,22 @@ impl AppState {
             cli: crate::cli_delivery::CliState::default(),
         })
     }
+}
+
+/// Refuses an index path that is relative or inside a `.specs` folder (TD-21): writing the
+/// cache there would make the watcher report the app's own writes.
+pub fn check_index_path(path: PathBuf) -> Result<PathBuf, String> {
+    if !path.is_absolute() {
+        return Err(format!(
+            "QUIRE_INDEX must be an absolute path, got {}",
+            path.display()
+        ));
+    }
+    if path.components().any(|c| c.as_os_str() == ".specs") {
+        return Err(format!(
+            "QUIRE_INDEX must not be inside a .specs folder: {}",
+            path.display()
+        ));
+    }
+    Ok(path)
 }

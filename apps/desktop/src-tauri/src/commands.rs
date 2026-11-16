@@ -153,9 +153,10 @@ pub async fn set_config<R: Runtime>(
 ) -> Result<ConfigView, CmdError> {
     use quire_core::config::{ProjectConfig, Settings, Theme, save_settings};
     if let Some(e) = &state.config_error {
+        // Same code as the reason it is not editable, so the UI says what to fix.
         return Err(err(
-            "config_invalid",
-            format!("fix config.toml by hand first: {}", e.message),
+            &e.code,
+            format!("fix this first, by hand: {}", e.message),
         ));
     }
     let path = state

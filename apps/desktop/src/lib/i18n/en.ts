@@ -262,6 +262,7 @@ export const en: Catalog = {
     config_invalid: "invalid value in config.toml",
     config_io: "could not read or write config.toml",
     no_config_dir: "there is no configuration directory on this system",
+    config_env_relative: "QUIRE_CONFIG must be an absolute path (for example, \"$PWD/fixtures/quire.toml\"); nothing was read and nothing will be written",
     poll_interval_range: "the polling interval must be between 0.5 and 60 seconds",
     unknown_theme: "unknown theme",
     scan: "could not start the scan",

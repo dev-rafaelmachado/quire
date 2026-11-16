@@ -221,6 +221,80 @@ mod tests {
         (app, webview, tmp)
     }
 
+    fn app_with_state(
+        state: state::AppState,
+    ) -> (tauri::App<MockRuntime>, WebviewWindow<MockRuntime>) {
+        let builder = specta_builder();
+        let app = mock_builder()
+            .plugin(tauri_plugin_cli::init())
+            .manage(state)
+            .invoke_handler(builder.invoke_handler())
+            .build(context_with_cli())
+            .unwrap();
+        builder.mount_events(&app);
+        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        (app, webview)
+    }
+
+    #[test]
+    fn relative_env_paths_are_refused_and_nothing_is_written() {
+        // DEB-05, TD-21. Names unique to this test, relative to the working directory.
+        let rel_dir = format!("quire-t4-{}", std::process::id());
+        let rel_config = PathBuf::from(&rel_dir).join("quire.toml");
+        let tmp = tempfile::tempdir().unwrap();
+        let index = tmp.path().join("index.sqlite");
+
+        let state = state::AppState::from_env(
+            Some(rel_config.clone().into_os_string()),
+            Some(index.clone().into_os_string()),
+        )
+        .unwrap();
+        let (_app, webview) = app_with_state(state);
+        let view = invoke(&webview, "get_config", json!({})).unwrap();
+        assert_eq!(view["error"]["code"], "config_env_relative", "{view}");
+        assert_eq!(view["editable"], false);
+        assert_eq!(view["path"], Value::Null);
+        let saved = invoke(
+            &webview,
+            "set_config",
+            json!({ "settings": { "scanPaths": ["x"], "pollIntervalMs": 3000, "theme": null, "language": null, "projects": [] } }),
+        );
+        assert_eq!(saved.unwrap_err()["code"], "config_env_relative");
+        assert!(
+            !Path::new(&rel_dir).exists(),
+            "nothing may be created relative to the cwd"
+        );
+
+        // Index: relative, or inside a watched .specs folder, stops the start.
+        let rel_index = PathBuf::from(&rel_dir).join("index.sqlite");
+        let err = state::AppState::from_env(None, Some(rel_index.into_os_string()))
+            .err()
+            .unwrap();
+        assert!(err.contains("absolute"), "{err}");
+        let inside = tmp.path().join(".specs").join("index.sqlite");
+        let err = state::AppState::from_env(None, Some(inside.clone().into_os_string()))
+            .err()
+            .unwrap();
+        assert!(err.contains(".specs"), "{err}");
+        assert!(!Path::new(&rel_dir).exists());
+        assert!(!inside.exists() && !tmp.path().join(".specs").exists());
+
+        // Absolute paths work as before.
+        let cfg = tmp.path().join("quire.toml");
+        std::fs::write(&cfg, "scan_paths = []\n").unwrap();
+        let state = state::AppState::from_env(
+            Some(cfg.into_os_string()),
+            Some(tmp.path().join("ok.sqlite").into_os_string()),
+        )
+        .unwrap();
+        let (_app, webview) = app_with_state(state);
+        let view = invoke(&webview, "get_config", json!({})).unwrap();
+        assert_eq!(view["error"], Value::Null);
+        assert_eq!(view["editable"], true);
+    }
+
     fn invoke(
         webview: &WebviewWindow<MockRuntime>,
         cmd: &str,
