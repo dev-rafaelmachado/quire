@@ -12,6 +12,7 @@ pub mod model;
 pub mod parse;
 pub mod preset;
 pub mod scan;
+pub mod search;
 pub mod tasks_edit;
 pub mod watch;
 pub mod write;
