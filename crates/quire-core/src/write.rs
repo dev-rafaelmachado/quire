@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::fingerprint::Fingerprint;
+use crate::fs_kind::FsClass;
 
 /// Files above this size are not editable (A8, confirmed by the T9 spike).
 pub const EDIT_LIMIT_BYTES: usize = 2 * 1024 * 1024;
@@ -237,6 +238,10 @@ pub(crate) trait Fs {
     fn sync_dir(&self, dir: &Path) -> std::io::Result<()>;
     /// Whether `ours` (just created by this process) and `theirs` have the same owner.
     fn same_owner(&self, ours: &Path, theirs: &Path) -> std::io::Result<bool>;
+    /// The kind of file system holding `path` (SAV-11).
+    fn fs_class(&self, path: &Path) -> FsClass {
+        crate::fs_kind::classify(path)
+    }
 }
 
 pub(crate) struct RealFs;
@@ -431,7 +436,11 @@ pub(crate) fn save_with(
         .map(|n| n.to_string_lossy().into_owned())
         .ok_or_else(|| WriteError::Refused(format!("{} has no file name", dest.display())))?;
 
-    // 2. Permissions of the original.
+    // 2. File system class (SAV-11) and permissions of the original.
+    let class = fs_ops.fs_class(&dest);
+    if !crate::fs_kind::writable(class) {
+        return Err(WriteError::UnreliableFs(class.as_str().to_owned()));
+    }
     let original = match fs::metadata(&dest) {
         Ok(m) => Some(m),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
@@ -1055,6 +1064,72 @@ mod tests {
             }
             RealFs.same_owner(ours, theirs)
         }
+    }
+
+    /// The real file system, seen as another class (SAV-11).
+    struct OnClass(FsClass);
+    impl Fs for OnClass {
+        fn create_new(&self, path: &Path) -> std::io::Result<File> {
+            RealFs.create_new(path)
+        }
+        fn write_all(&self, file: &mut File, bytes: &[u8]) -> std::io::Result<()> {
+            RealFs.write_all(file, bytes)
+        }
+        fn set_permissions(&self, path: &Path, perm: fs::Permissions) -> std::io::Result<()> {
+            RealFs.set_permissions(path, perm)
+        }
+        fn sync(&self, file: &File) -> std::io::Result<()> {
+            RealFs.sync(file)
+        }
+        fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()> {
+            RealFs.rename(from, to)
+        }
+        fn hard_link(&self, from: &Path, to: &Path) -> std::io::Result<()> {
+            RealFs.hard_link(from, to)
+        }
+        fn sync_dir(&self, dir: &Path) -> std::io::Result<()> {
+            RealFs.sync_dir(dir)
+        }
+        fn same_owner(&self, ours: &Path, theirs: &Path) -> std::io::Result<bool> {
+            RealFs.same_owner(ours, theirs)
+        }
+        fn fs_class(&self, _: &Path) -> FsClass {
+            self.0
+        }
+    }
+
+    #[test]
+    fn writes_on_unverified_file_systems_are_refused_by_the_core() {
+        let d = tmpdir();
+        let f = d.path().join("spec.md");
+        fs::write(&f, b"keep").unwrap();
+        for class in [FsClass::WslUnc, FsClass::DrvFs, FsClass::NineP] {
+            for expect in [Expect::Existing, Expect::Absent] {
+                let target = if expect == Expect::Absent {
+                    d.path().join("copy.md")
+                } else {
+                    f.clone()
+                };
+                let r = save_with(&OnClass(class), &target, b"new", expect, &NoGuard);
+                assert_eq!(
+                    r,
+                    Err(WriteError::UnreliableFs(class.as_str().to_owned())),
+                    "{class:?}"
+                );
+            }
+        }
+        assert_eq!(fs::read(&f).unwrap(), b"keep");
+        assert!(!d.path().join("copy.md").exists());
+        assert!(leftovers(d.path()).is_empty());
+        save_with(
+            &OnClass(FsClass::Local),
+            &f,
+            b"new",
+            Expect::Existing,
+            &NoGuard,
+        )
+        .unwrap();
+        assert_eq!(fs::read(&f).unwrap(), b"new");
     }
 
     #[test]

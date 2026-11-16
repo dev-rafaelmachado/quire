@@ -5,6 +5,7 @@
 pub mod config;
 pub mod error;
 pub mod fingerprint;
+pub mod fs_kind;
 pub mod git;
 pub mod index;
 pub mod model;
