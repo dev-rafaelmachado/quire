@@ -171,6 +171,12 @@ fn patterns() -> &'static Patterns {
     })
 }
 
+/// Byte offset, within `line`, of the character between the brackets of a task line
+/// (`- [ ] T1: …`), or `None` when the line is not a task line (CHK-02).
+pub fn checkbox_offset(line: &str) -> Option<usize> {
+    patterns().task.captures(line)?.get(1).map(|m| m.start())
+}
+
 /// Last balanced `( … )` group of `s`: the text before it and the text inside.
 fn trailing_group(s: &str) -> Option<(&str, &str)> {
     let s = s.trim_end();
