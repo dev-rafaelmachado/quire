@@ -1,6 +1,6 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 6/28 tarefas
+**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 7/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -13,26 +13,26 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 | Fase | Repositório | Tarefas |
 |---|---|---|
 | 0: Dívidas da v0.1 | quire | 5/9 |
-| 1: Spikes | quire | 1/3 |
+| 1: Spikes | quire | 2/3 |
 | 2: Escrita segura no núcleo | quire | 0/5 |
 | 3: Editor | quire | 0/5 |
 | 4: Busca e command palette | quire | 0/3 |
 | 5: Tasks e progresso | quire | 0/2 |
 | 6: Fechamento da v0.2 | quire | 0/1 |
 
-**Total:** 6/28 tarefas
+**Total:** 7/28 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 1, T11 (spike de rename atômico)
-- **Concluídas:** T1, T27, T2, T4, T7
-- **Em andamento:** T11
+- **Fase / tarefa:** Fase 2, T12 (pipeline de escrita atômica)
+- **Concluídas:** T1, T27, T2, T4, T7, T10, T11
+- **Em andamento:** T12
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
 - **Aguardando decisão do autor:** T6 (orçamento de memória do modo Dividir: ≤ 456 MB, ver "Medições")
-- **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`)
-- **NÃO VERIFICADO (depende de ambiente que não há aqui):** teclas mortas, composição e IME no Wayland com teclado pt-BR, e o editor no WebView2 (T9: roteiro manual em `apps/desktop/src/spike-editor/README.md`); idioma pelo sistema no WebView2 (T27); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
-- **Próximo passo:** T11, depois T12
+- **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`); T11 (passo "rename spike (T11)" em ext4 e NTFS: leia o log e preencha as linhas da tabela)
+- **NÃO VERIFICADO (depende de ambiente que não há aqui):** teclas mortas, composição e IME no Wayland com teclado pt-BR, e o editor no WebView2 (T9: roteiro manual em `apps/desktop/src/spike-editor/README.md`); idioma pelo sistema no WebView2 (T27); rename atômico em DrvFs, 9p e `\\wsl$` (T11: as três classes ficam somente leitura até alguém medir); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
+- **Próximo passo:** T12, depois T13
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** T8 (precisa do autor numa máquina com WSL: spike T2 da v0.1 no WSLg e T3 em WSL2 ext4, DrvFs e `\\wsl$`; a pasta `apps/desktop/src/spike/` só sai depois disso). Também dependem de máquina partes de T9 (teclas mortas/IME com o autor; WebView2) e T11 (WSL, DrvFs, 9p, `\\wsl$`)
 - **Arquivos sem commit:** nenhum
@@ -127,6 +127,26 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 
 **Decisão:** uma linha por seção (o resultado já leva à seção, SRC-06) e documentos deduplicados por hash do conteúdo. O custo das consultas comuns vem de ordenar por `bm25` e montar o `snippet` das 200 primeiras, e fica a 1/5 da meta. **SRC-08 ajustado na spec:** p95 ≤ 100 ms confirmado; orçamento do índice FTS ≤ 2× o texto markdown indexado (medido 1,55×).
 
+### T11: semântica do rename atômico (SAV-01, SAV-04, SAV-05, SAV-08, SAV-11)
+
+**Como:** `cargo run --release -p quire-core --example rename_spike -- <pasta>` (18bcfc6). Em cada sistema de arquivos: 400 trocas de um arquivo de 256 KB por temporário oculto + `sync_all` + `rename` + fsync da pasta, com uma thread lendo o arquivo inteiro em laço; depois modo, alvo somente leitura, link simbólico, arquivo segurado aberto e eventos do `notify`.
+
+| Sistema de arquivos | Onde | Leituras concorrentes / ruins | Modo depois do rename | Alvo somente leitura | Link simbólico | Arquivo aberto | Eventos |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| btrfs (`/home`, zstd) | esta máquina | 79.877 / **0** (2,33 ms por troca) | 0640 → 0644: **não preserva** | rename **funciona** por cima | **vira arquivo comum** | rename funciona; o handle antigo lê o conteúdo antigo | Create/Modify do `.tmp` oculto, depois `Name(To)` do nome final |
+| tmpfs (`/tmp`) | esta máquina | 508 / **0** (0,05 ms por troca) | idem | idem | idem | idem | idem |
+| ext4 | CI Linux (`ubuntu-latest`) | **NÃO VERIFICADO** (passo do `ci.yml`, roda depois do push) | | | | | |
+| NTFS | CI Windows | **NÃO VERIFICADO** (idem; inclui `FILE_SHARE_DELETE`) | | | | | |
+| DrvFs (`/mnt/c` no WSL) | máquina do autor | **NÃO VERIFICADO** (sem WSL aqui) | | | | | |
+| 9p (WSL ↔ Windows) | máquina do autor | **NÃO VERIFICADO** | | | | | |
+| `\\wsl$` / `\\wsl.localhost` (Windows → WSL) | Windows com WSL | **NÃO VERIFICADO** | | | | | |
+
+**`mountinfo` observado:** btrfs `61 43 0:37 /@home /home rw,noatime shared:191 - btrfs /dev/nvme0n1p2 rw,compress=zstd:1,…`; tmpfs `167 43 0:60 / /tmp rw,noatime shared:209 - tmpfs tmpfs rw,inode64,huge=advise`. Nenhuma linha de 9p ou drvfs foi observada (sem WSL).
+
+**O que confirma do design (TD-12):** o rename por cima não preserva o modo (passo 5 copia), não recusa alvo somente leitura no Unix (passo 2 precisa recusar antes) e troca um link simbólico por arquivo comum (passo 1 precisa resolver o link). O temporário oculto gera eventos com o próprio nome, que o watcher já ignora (`watch::transient`); o nome final chega como `Name(To)`, e a classificação por estado em disco pega a mudança.
+
+**Decisão da P6 (SAV-11, TD-22), tirada do dado:** nenhuma das classes `WslUnc`, `DrvFs` e `NineP` foi medida, então **as três ficam somente leitura** (`VERIFIED_ATOMIC` vazia). Para liberar uma classe, rode o exemplo num caminho dela e registre aqui a linha da tabela.
+
 ## Journal
 
 - 2026-11-16 · planejamento · spec, design e tarefas da v0.2 escritos na branch `docs/v0-2-spec`. Escopo do pedido do autor: edição com preview (CodeMirror 6), escrita segura, conflito com agentes, busca full-text (FTS5), command palette, checkbox opt-in, progresso x/y, edição com várias instâncias, Fase 0 de dívidas e três spikes antes das features
@@ -149,3 +169,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · T8 · **bloqueada por ambiente:** não há WSL nesta máquina, e as rodadas pendentes (spike T2 da v0.1 no WSLg; T3 em WSL2 ext4, DrvFs `/mnt/c` e `\\\\wsl$` a partir do Windows) precisam do autor. A remoção de `apps/desktop/src/spike/` espera essas rodadas (DEB-09). Nada foi inferido. Sigo para a Fase 1, como o `tasks.md` permite para tarefas que dependem de máquina específica
 - 2026-11-16 · T9 · spike do CodeMirror 6 (b2cc963). Números em "Medições": latência por tecla presa ao frame (p95 17–18 ms em 40 KB, 500 KB e 2 MB; meta ≤ 50 ms), montar ≤ 45 ms, chunk de 110 KB gzip. **Decisão (registrada):** CodeMirror confirmado, limite de edição A8 = 2 MB, orçamento do chunk ≤ 120 KB gzip. **Decisão fora do design:** o design citava `@codemirror/lang-markdown`; ele puxa os parsers de HTML, CSS e JavaScript (+74 KB gzip) só para realçar HTML embutido e blocos de código. Uso a linguagem montada direto sobre `@lezer/markdown` com GFM (`lean.ts`); o TD-11 (CodeMirror por import dinâmico) não muda. **NÃO VERIFICADO:** teclas mortas e IME (roteiro do autor no README do spike, repetido no app real na T16) e WebView2. A tarefa fica sem `[x]` até o roteiro manual; as fases seguintes seguem com os números medidos, já que nada falhou
 - 2026-11-16 · T10 · spike do FTS5 (df7e184), números em "Medições": 300 specs (10,9 MB de texto) indexadas em 255 ms, banco de 16,9 MB, reindexar um arquivo em 4,4 ms, consultas comuns com p95 ~20 ms e raras < 0,4 ms; `remove_diacritics 2` acha `ação` com `acao`; cópias idênticas não geram linhas; sintaxe do FTS digitada pelo usuário nunca dá erro com a consulta construída (TD-16). **Decisão:** uma linha por seção, deduplicação por hash. **SRC-08 ajustado na spec** com o orçamento medido (≤ 2× o texto indexado). Ajuste feito durante o spike: a limpeza de documentos órfãos roda uma vez por reconciliação, não por arquivo (por arquivo ficava quadrático)
+- 2026-11-16 · T11 · spike de rename (18bcfc6), tabela em "Medições". btrfs e tmpfs: 0 leituras ruins em 400 trocas com leitor concorrente; o rename não preserva o modo, passa por cima de alvo somente leitura e troca o link por arquivo comum, tudo já previsto nos passos 1, 2 e 5 do TD-12. ext4 e NTFS rodam no CI (passo "rename spike (T11)", `continue-on-error`), **NÃO VERIFICADOS** até o push. **Decisão da P6 pelo dado:** `\\\\wsl$`, DrvFs e 9p não foram medidos (sem WSL nem Windows aqui), então ficam **somente leitura** na v0.2 (`VERIFIED_ATOMIC` vazia na T28), o padrão conservador da spec
