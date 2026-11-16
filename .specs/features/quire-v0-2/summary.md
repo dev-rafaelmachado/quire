@@ -25,16 +25,16 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 0, T8 (rodadas no WSL e remoção do spike)
+- **Fase / tarefa:** Fase 1, T9 (spike do CodeMirror 6)
 - **Concluídas:** T1, T27, T2, T4, T7
-- **Em andamento:** T8
+- **Em andamento:** T9
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
 - **Aguardando decisão do autor:** T6 (orçamento de memória do modo Dividir: ≤ 456 MB, ver "Medições")
 - **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`)
 - **NÃO VERIFICADO (depende de ambiente que não há aqui):** idioma pelo sistema no WebView2 (T27); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
-- **Próximo passo:** T8, depois T9
+- **Próximo passo:** T9, depois T10
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
-- **Bloqueios:** nenhum de especificação. Dependem de máquina: T8 e partes de T9, T11 e T27 (autor com WSL ou Windows); T5 depende só do CI do Windows
+- **Bloqueios:** T8 (precisa do autor numa máquina com WSL: spike T2 da v0.1 no WSLg e T3 em WSL2 ext4, DrvFs e `\\wsl$`; a pasta `apps/desktop/src/spike/` só sai depois disso). Também dependem de máquina partes de T9 (teclas mortas/IME com o autor; WebView2) e T11 (WSL, DrvFs, 9p, `\\wsl$`)
 - **Arquivos sem commit:** nenhum
 - **Branch / worktree:** `feat/v0-2`, criada de `docs/v0-2-spec` (que ainda não foi mergeada em `main`); sem push
 
@@ -103,3 +103,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · T5 · binário auxiliar de console do Windows (a69fae3); gate verde, **aguardando CI do Windows**. Crate `quire-cli` (sem Tauri, sem `unsafe`): monta o `clap` a partir do `plugins.cli` do `tauri.conf.json` embutido, do mesmo jeito que o `tauri-plugin-cli` 2.5. **Dois detalhes achados pelo teste de paridade:** (1) o `Config::long_description()` do plugin devolve a própria descrição, o que liga o layout longo do `--help`; o auxiliar faz o mesmo de propósito; (2) o `clap` usa o `argv[0]` como nome, e o auxiliar se apresentava como `quire-cli`; agora usa sempre `quire`. Teste de paridade no shell (10 linhas de comando: ajuda, ajuda do subcomando, `help open`, flag inválida, `open` sem alvo, alvo a mais e as chamadas válidas) e diff dos binários reais no Linux: saída e código iguais. Chamada válida: inicia o `quire.exe` vizinho com `DETACHED_PROCESS` (API segura de `CommandExt`) e sai com 0; sem o app ao lado, mensagem e código 1. Empacotamento só no Windows: `tauri.windows.conf.json` com `externalBin` e o fragmento WiX `wix/quire-cli.wxs` (`bin\\quire.cmd` + `PATH` do sistema só com `bin`); `scripts/stage-quire-cli.sh` prepara o binário antes do `tauri build` (CI, release e CONTRIBUTING). `.gitattributes` força CRLF em `*.cmd`. `ci.yml`: passo que testa o `quire.cmd` em PowerShell e `cmd` (ajuda, versão, códigos 2 e 1) e job `msi` que gera, instala com `msiexec /qn` e roda `quire --version` pelo `PATH`; `actionlint` 1.7.12 limpo. `.deb` com a mesma lista de arquivos de antes. **NÃO VERIFICADO (sem Windows):** tudo que só roda no Windows, listado em Onde parou
 - 2026-11-16 · T6 · memória medida no binário de produção (f945633, `scripts/pss-tree.py`): app vazio 257–258 MB, spec de 40 KB no modo Ler 395–447 MB (mediana 396), tabela em "Medições". Orçamento proposto para o modo Dividir: mediana ≤ 456 MB (base + 60 MB), **aguardando aprovação do autor**; a tarefa fica sem `[x]` só por isso. A medição usa uma saída headless do Hyprland em vez de janela visível; o efeito disso no PSS não foi medido separadamente. Captura de conferência: `/tmp/quire-shots/v0-2/T6-40kb-read.png`
 - 2026-11-16 · T7 · verificado em 2026-11-16 na API do crates.io: não existe versão estável. Mais recentes: `tauri-specta` 2.0.0-rc.29 (2026-11-13), `specta` 2.0.0-rc.28 (2026-11-05), `specta-typescript` 0.0.15 (2026-11-05), exatamente as versões já fixadas. **Decisão:** manter `=2.0.0-rc.29` / `=2.0.0-rc.28` / `0.0.15` fixadas (TD-07 da v0.1 continua); o teste `bindings_are_up_to_date` segue protegendo contra mudança silenciosa. Reverificar antes da tag da v0.2
+- 2026-11-16 · T8 · **bloqueada por ambiente:** não há WSL nesta máquina, e as rodadas pendentes (spike T2 da v0.1 no WSLg; T3 em WSL2 ext4, DrvFs `/mnt/c` e `\\\\wsl$` a partir do Windows) precisam do autor. A remoção de `apps/desktop/src/spike/` espera essas rodadas (DEB-09). Nada foi inferido. Sigo para a Fase 1, como o `tasks.md` permite para tarefas que dependem de máquina específica
