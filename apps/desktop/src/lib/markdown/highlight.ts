@@ -77,14 +77,36 @@ function loadLang(hl: HighlighterCore, lang: string): Promise<string | null> {
 }
 
 /** HTML for a code block, or null when the language is unknown. Output is escaped by Shiki. */
+// Results by source (T17): the live preview re-renders on every pause in typing, and a block
+// that did not change must not be highlighted again.
+const CACHE_LIMIT = 400;
+const cache = new Map<string, string | null>();
+
+function remember<V>(map: Map<string, V>, key: string, value: V): V {
+  if (map.size >= CACHE_LIMIT) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
+  }
+  map.set(key, value);
+  return value;
+}
+
+/** The highlighted HTML already computed for this source, if any. */
+export function cachedHighlight(code: string, lang: string): string | null | undefined {
+  return cache.get(`${lang}\u0000${code}`);
+}
+
 export async function highlight(code: string, lang: string): Promise<string | null> {
+  const key = `${lang}\u0000${code}`;
+  if (cache.has(key)) return cache.get(key) ?? null;
   if (!canHighlight(lang)) return null;
   const hl = await getHighlighter();
   const id = await loadLang(hl, lang);
   if (!id) return null;
-  return hl.codeToHtml(code, {
+  const html = hl.codeToHtml(code, {
     lang: id,
     themes: { dark: "github-dark", light: "github-light" },
     defaultColor: false,
   });
+  return remember(cache, key, html);
 }

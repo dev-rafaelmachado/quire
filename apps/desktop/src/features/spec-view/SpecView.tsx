@@ -10,7 +10,7 @@ import { TasksPanel } from "../tasks-view/TasksPanel";
 import { useTasks } from "../tasks-view/store";
 import { EditBar } from "../editor/EditBar";
 import { EditorPane } from "../editor/EditorPane";
-import { PreviewPane } from "../editor/PreviewPane";
+import { SplitView } from "../editor/SplitView";
 import { useEditor } from "../editor/store";
 import { FileView } from "./FileView";
 import { displayed } from "./labels";
@@ -144,10 +144,7 @@ export function SpecView() {
           {mode === "edit" ? (
             <EditorPane />
           ) : (
-            <div className="grid h-full grid-cols-2">
-              <EditorPane />
-              <PreviewPane name={file} text={buffer.savedText} header={detail.headerFiles.includes(file)} />
-            </div>
+            <SplitView key={file} name={file} header={detail.headerFiles.includes(file)} />
           )}
         </div>
       </>

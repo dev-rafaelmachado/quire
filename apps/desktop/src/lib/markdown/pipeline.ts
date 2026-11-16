@@ -8,8 +8,17 @@ import { unified } from "unified";
 
 const processor = unified().use(remarkParse).use(remarkGfm).use(remarkRehype);
 
-export function toHast(md: string): Root {
-  return processor.runSync(processor.parse(md));
+/** Markdown to hast. Each top-level element gets `data-line`, its first line in the source
+ *  (mapped through `mapLine` when the text shown is not the file's, e.g. without the header),
+ *  which the split view uses to align editor and preview (EDT-04). */
+export function toHast(md: string, mapLine: (line: number) => number = (l) => l): Root {
+  const root = processor.runSync(processor.parse(md));
+  for (const node of root.children) {
+    if (node.type === "element" && node.position) {
+      node.properties = { ...node.properties, dataLine: mapLine(node.position.start.line) };
+    }
+  }
+  return root;
 }
 
 export function textOf(node: RootContent | ElementContent | Root): string {

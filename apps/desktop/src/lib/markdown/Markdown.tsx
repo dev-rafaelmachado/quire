@@ -92,7 +92,7 @@ const SectionView = memo(function SectionView({
     ) : null;
   return (
     <section className="md-section" data-collapsed={closed || undefined}>
-      <Tag id={section.id} className="md-heading">
+      <Tag id={section.id} className="md-heading" data-line={section.heading.properties["dataLine"] as number | undefined}>
         {toggle}
         {heading}
       </Tag>

@@ -13,7 +13,7 @@ export function currentEditor(): EditorHandle | null {
 
 /** CodeMirror for the buffer of the center column, loaded on first use (EDT-02). One editor
  *  per file: switching files mounts a new one with its own in-memory history (EDT-07). */
-export function EditorPane({ onChange }: { onChange?: () => void }) {
+export function EditorPane({ onChange, onReady }: { onChange?: () => void; onReady?: (h: EditorHandle | null) => void }) {
   const buffer = useEditor((s) => s.buffer);
   const savedVersion = useEditor((s) => s.savedVersion);
   const host = useRef<HTMLDivElement>(null);
@@ -23,6 +23,8 @@ export function EditorPane({ onChange }: { onChange?: () => void }) {
   const key = buffer ? `${buffer.instanceId}\u0000${buffer.name}` : "";
   const changeRef = useRef(onChange);
   changeRef.current = onChange;
+  const readyRef = useRef(onReady);
+  readyRef.current = onReady;
 
   useEffect(() => {
     const el = host.current;
@@ -43,14 +45,17 @@ export function EditorPane({ onChange }: { onChange?: () => void }) {
       current = h;
       useEditor.getState().setGetText(h.getText);
       setReady(true);
+      readyRef.current?.(h);
       h.focus();
-      if (new URLSearchParams(window.location.search).get("bench") === "type") {
+      const bench = new URLSearchParams(window.location.search).get("bench");
+      if (bench === "type" || bench === "preview") {
         const t0 = performance.now();
         void typingBenchmark(h.view, (r) => setWindowTitle(`${r} open=${(t0 - mountedAt).toFixed(0)}`));
       }
     });
     return () => {
       cancelled = true;
+      readyRef.current?.(null);
       handle.current?.destroy();
       if (current === handle.current) current = null;
       handle.current = null;
