@@ -136,7 +136,7 @@ Registradas em 2026-11-16, sobre as perguntas P1 a P10 do primeiro rascunho dest
 5. QUANDO o usuário filtra por projeto ou por arquivo (spec, design, tasks…) ou restringe à spec aberta ENTÃO o sistema DEVE aplicar os filtros na consulta. <!-- SRC-05 -->
 6. QUANDO o usuário abre um resultado ENTÃO o sistema DEVE abrir a spec na instância do resultado, na aba do arquivo, rolada até a seção, com as ocorrências destacadas no texto renderizado. <!-- SRC-06 -->
 7. QUANDO a consulta contém caracteres de sintaxe do FTS (`"`, `*`, `-`, `:`, `(`, `AND`, `NEAR`) ou está vazia ENTÃO o sistema NÃO DEVE dar erro: os termos são tratados como texto. <!-- SRC-07 -->
-8. QUANDO há cerca de 300 specs indexadas ENTÃO uma consulta DEVE responder em p95 ≤ 100 ms, e o índice DEVE caber no orçamento definido no spike T10. <!-- SRC-08 -->
+8. QUANDO há cerca de 300 specs indexadas ENTÃO uma consulta DEVE responder em p95 ≤ 100 ms, e as tabelas de busca DEVEM ocupar no máximo 2× o tamanho do texto markdown indexado (orçamento do spike T10, que mediu 1,55×). <!-- SRC-08 -->
 
 ### P1: Command palette ⭐ MVP
 

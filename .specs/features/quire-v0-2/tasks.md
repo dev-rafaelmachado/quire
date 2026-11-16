@@ -60,7 +60,7 @@ T9 → T10 → T11
 ```
 
 - [ ] T9: Spike do CodeMirror 6 no WebKitGTK (teclas mortas, IME, bundle, arquivo grande) (b2cc963) (medido; teclas mortas e IME aguardando o roteiro manual do autor)
-- [ ] T10: Spike do FTS5 com ~300 specs
+- [x] T10: Spike do FTS5 com ~300 specs (df7e184)
 - [ ] T11: Spike da semântica de rename atômico (btrfs/ext4/tmpfs, NTFS, DrvFs, 9p, `\\wsl$`)
 
 ### Fase 2: Escrita segura no núcleo

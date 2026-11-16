@@ -1,6 +1,6 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 5/28 tarefas
+**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 6/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -13,26 +13,26 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 | Fase | Repositório | Tarefas |
 |---|---|---|
 | 0: Dívidas da v0.1 | quire | 5/9 |
-| 1: Spikes | quire | 0/3 |
+| 1: Spikes | quire | 1/3 |
 | 2: Escrita segura no núcleo | quire | 0/5 |
 | 3: Editor | quire | 0/5 |
 | 4: Busca e command palette | quire | 0/3 |
 | 5: Tasks e progresso | quire | 0/2 |
 | 6: Fechamento da v0.2 | quire | 0/1 |
 
-**Total:** 5/28 tarefas
+**Total:** 6/28 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 1, T10 (spike do FTS5)
+- **Fase / tarefa:** Fase 1, T11 (spike de rename atômico)
 - **Concluídas:** T1, T27, T2, T4, T7
-- **Em andamento:** T10
+- **Em andamento:** T11
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
 - **Aguardando decisão do autor:** T6 (orçamento de memória do modo Dividir: ≤ 456 MB, ver "Medições")
 - **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`)
 - **NÃO VERIFICADO (depende de ambiente que não há aqui):** teclas mortas, composição e IME no Wayland com teclado pt-BR, e o editor no WebView2 (T9: roteiro manual em `apps/desktop/src/spike-editor/README.md`); idioma pelo sistema no WebView2 (T27); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
-- **Próximo passo:** T10, depois T11
+- **Próximo passo:** T11, depois T12
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** T8 (precisa do autor numa máquina com WSL: spike T2 da v0.1 no WSLg e T3 em WSL2 ext4, DrvFs e `\\wsl$`; a pasta `apps/desktop/src/spike/` só sai depois disso). Também dependem de máquina partes de T9 (teclas mortas/IME com o autor; WebView2) e T11 (WSL, DrvFs, 9p, `\\wsl$`)
 - **Arquivos sem commit:** nenhum
@@ -107,6 +107,26 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 
 **Decisão:** CodeMirror 6 confirmado pelos números (TD-11), com a linguagem markdown enxuta (`@lezer/markdown` + GFM, sem sub-linguagens) e orçamento do chunk do editor de **≤ 120 KB gzip**. O limite de edição (A8) fica em **2 MB** (`LARGE_FILE_BYTES`), porque o editor monta e digita igual a 40 KB nesse tamanho; o gargalo de arquivo grande continua sendo o preview, que já fica sem realce acima de 2 MB. **NÃO VERIFICADO:** teclas mortas, composição e IME (ibus, fcitx5) no Wayland com teclado pt-BR, e o WebView2 do Windows: o roteiro manual está no `README.md` do spike e é do autor; um teste automático por teclado virtual exigiria tirar o foco da sessão do autor, o que não fiz.
 
+### T10: FTS5 com ~300 specs (SRC-03, SRC-08)
+
+**Como:** `cargo run --release -p quire-core --example fts_spike` (df7e184), SQLite embutido do `rusqlite` 0.42, banco temporário. Corpus sintético em pt-BR com acentos: 300 specs × 7 arquivos (spec, design, tasks, summary, validation, research, notes; 1,5 a 9 KB cada), **10,9 MB de texto**, maior que uma spec típica das fixtures (de propósito, para errar para cima). Esquema do design: `fts_docs` por hash, `file_docs`, `fts(heading, body, doc_id, line)` com `unicode61 remove_diacritics 2`, uma linha por seção (títulos fora de blocos de código). 30 repetições por consulta.
+
+| Medida | Resultado |
+| --- | --- |
+| Indexação completa (2.100 arquivos, 16.783 seções, uma transação) | 255 ms |
+| Tamanho do banco depois de `VACUUM` | 16,9 MB (1,55× o texto) |
+| Reindexar 1 arquivo alterado (+ remoção das seções antigas) | 4,4 ms |
+| 3 cópias idênticas de uma spec em outras worktrees | 0 linhas novas no FTS |
+| Termo raro (`zircônio`, 1 resultado) | p50 0,28 ms, p95 0,36 ms |
+| `zirconio` (sem acento) acha `zircônio` | sim, 1 resultado, mesmo trecho |
+| `acao` × `ação` | os dois acham as mesmas 200 seções |
+| Termo comum (`acao`, limite de 200) | p50 20,0 ms, p95 20,6 ms |
+| Prefixo (`tare`) | p50 19,0 ms, p95 19,8 ms |
+| Dois termos (`revisão índice`) | p50 18,6 ms, p95 19,2 ms |
+| `"aspas`, `a -b`, `NEAR(x y)`, `col:valor`, `*`, `AND`, `(`, só espaços, vazio | nenhum erro; 0 resultados |
+
+**Decisão:** uma linha por seção (o resultado já leva à seção, SRC-06) e documentos deduplicados por hash do conteúdo. O custo das consultas comuns vem de ordenar por `bm25` e montar o `snippet` das 200 primeiras, e fica a 1/5 da meta. **SRC-08 ajustado na spec:** p95 ≤ 100 ms confirmado; orçamento do índice FTS ≤ 2× o texto markdown indexado (medido 1,55×).
+
 ## Journal
 
 - 2026-11-16 · planejamento · spec, design e tarefas da v0.2 escritos na branch `docs/v0-2-spec`. Escopo do pedido do autor: edição com preview (CodeMirror 6), escrita segura, conflito com agentes, busca full-text (FTS5), command palette, checkbox opt-in, progresso x/y, edição com várias instâncias, Fase 0 de dívidas e três spikes antes das features
@@ -128,3 +148,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · T7 · verificado em 2026-11-16 na API do crates.io: não existe versão estável. Mais recentes: `tauri-specta` 2.0.0-rc.29 (2026-11-13), `specta` 2.0.0-rc.28 (2026-11-05), `specta-typescript` 0.0.15 (2026-11-05), exatamente as versões já fixadas. **Decisão:** manter `=2.0.0-rc.29` / `=2.0.0-rc.28` / `0.0.15` fixadas (TD-07 da v0.1 continua); o teste `bindings_are_up_to_date` segue protegendo contra mudança silenciosa. Reverificar antes da tag da v0.2
 - 2026-11-16 · T8 · **bloqueada por ambiente:** não há WSL nesta máquina, e as rodadas pendentes (spike T2 da v0.1 no WSLg; T3 em WSL2 ext4, DrvFs `/mnt/c` e `\\\\wsl$` a partir do Windows) precisam do autor. A remoção de `apps/desktop/src/spike/` espera essas rodadas (DEB-09). Nada foi inferido. Sigo para a Fase 1, como o `tasks.md` permite para tarefas que dependem de máquina específica
 - 2026-11-16 · T9 · spike do CodeMirror 6 (b2cc963). Números em "Medições": latência por tecla presa ao frame (p95 17–18 ms em 40 KB, 500 KB e 2 MB; meta ≤ 50 ms), montar ≤ 45 ms, chunk de 110 KB gzip. **Decisão (registrada):** CodeMirror confirmado, limite de edição A8 = 2 MB, orçamento do chunk ≤ 120 KB gzip. **Decisão fora do design:** o design citava `@codemirror/lang-markdown`; ele puxa os parsers de HTML, CSS e JavaScript (+74 KB gzip) só para realçar HTML embutido e blocos de código. Uso a linguagem montada direto sobre `@lezer/markdown` com GFM (`lean.ts`); o TD-11 (CodeMirror por import dinâmico) não muda. **NÃO VERIFICADO:** teclas mortas e IME (roteiro do autor no README do spike, repetido no app real na T16) e WebView2. A tarefa fica sem `[x]` até o roteiro manual; as fases seguintes seguem com os números medidos, já que nada falhou
+- 2026-11-16 · T10 · spike do FTS5 (df7e184), números em "Medições": 300 specs (10,9 MB de texto) indexadas em 255 ms, banco de 16,9 MB, reindexar um arquivo em 4,4 ms, consultas comuns com p95 ~20 ms e raras < 0,4 ms; `remove_diacritics 2` acha `ação` com `acao`; cópias idênticas não geram linhas; sintaxe do FTS digitada pelo usuário nunca dá erro com a consulta construída (TD-16). **Decisão:** uma linha por seção, deduplicação por hash. **SRC-08 ajustado na spec** com o orçamento medido (≤ 2× o texto indexado). Ajuste feito durante o spike: a limpeza de documentos órfãos roda uma vez por reconciliação, não por arquivo (por arquivo ficava quadrático)
