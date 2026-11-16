@@ -104,7 +104,7 @@ T24 → T25
 ```
 
 - [ ] T24: Checkbox opt-in do `tasks.md` (7630b8a) (gate passou, aguardando revisão visual)
-- [ ] T25: Progresso atualizado pela própria escrita
+- [x] T25: Progresso atualizado pela própria escrita (12e15f8)
 
 ### Fase 6: Fechamento da v0.2
 
