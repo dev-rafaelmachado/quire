@@ -99,6 +99,9 @@ jobs:
           # Without quire.exe next to it, a valid call explains and exits 1 (no window).
           cmd /c "`"$cmdFile`" . 2>nul"
           if ($LASTEXITCODE -ne 1) { throw "cmd . without the app exited $LASTEXITCODE" }
+          Write-Output "pwsh and cmd: --help, --version ($version) exit 0; --bogus exit 2; '.' without the app exit 1"
+          # The runner ends a pwsh step with the last native exit code (1, expected above).
+          exit 0
 
   # DEB-06, TD-20: the MSI installs quire-cli.exe and bin\quire.cmd and puts only bin on the
   # PATH; `quire --version` must answer in a fresh shell after a silent install.

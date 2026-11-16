@@ -218,8 +218,8 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | btrfs (`/home`, zstd) | esta máquina | 79.877 / **0** (2,33 ms por troca) | 0640 → 0644: **não preserva** | rename **funciona** por cima | **vira arquivo comum** | rename funciona; o handle antigo lê o conteúdo antigo | Create/Modify do `.tmp` oculto, depois `Name(To)` do nome final |
 | tmpfs (`/tmp`) | esta máquina | 508 / **0** (0,05 ms por troca) | idem | idem | idem | idem | idem |
-| ext4 | CI Linux (`ubuntu-latest`) | **NÃO VERIFICADO** (passo do `ci.yml`, roda depois do push) | | | | | |
-| NTFS | CI Windows | **NÃO VERIFICADO** (idem; inclui `FILE_SHARE_DELETE`) | | | | | |
+| ext4 | CI Linux (`ubuntu-latest`, execução 43918947916) | 9.755 / **0** (0,36 ms por troca) | 0640 → 0644: **não preserva** | rename **funciona** por cima | **vira arquivo comum** | rename funciona; o handle antigo lê o conteúdo antigo | iguais aos do btrfs |
+| NTFS | CI Windows (`windows-latest`, execução 43918947916) | 9.464 / **0** (1,06 ms por troca) | não se aplica (atributo) | rename **falha** com "Access is denied" (erro 5); o pipeline recusa antes de qualquer forma | não medido (o runner não cria link) | sem `FILE_SHARE_DELETE`: rename **falha** com erro 5 (o retry de até 1 s trata 5, 32 e 33); com `FILE_SHARE_DELETE`: funciona | `Create`/`Modify` do `.tmp`, `Remove` do nome final, `Name(From)` do `.tmp`, `Name(To)` do nome final |
 | DrvFs (`/mnt/c` no WSL) | máquina do autor | **NÃO VERIFICADO** (sem WSL aqui) | | | | | |
 | 9p (WSL ↔ Windows) | máquina do autor | **NÃO VERIFICADO** | | | | | |
 | `\\wsl$` / `\\wsl.localhost` (Windows → WSL) | Windows com WSL | **NÃO VERIFICADO** | | | | | |
