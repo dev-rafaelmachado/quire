@@ -48,6 +48,13 @@ fn start(root: &Path, poll: bool) -> (SpecWatcher, mpsc::Receiver<Vec<WatchEvent
     (w, rx)
 }
 
+/// Raw events the watcher received and the batches it reported, for failure messages: the
+/// event kinds and paths differ between OSes, and this is the data to look at when a run on
+/// another OS fails.
+fn raw(w: &SpecWatcher) -> String {
+    format!("\nraw events:\n  {}", w.raw_events().join("\n  "))
+}
+
 /// Collects batches until `pred` matches or `timeout` passes; returns everything seen.
 fn collect_until(
     rx: &mpsc::Receiver<Vec<WatchEvent>>,
@@ -71,21 +78,25 @@ fn collect_until(
 fn editing_a_file_reports_its_spec_within_two_seconds() {
     let tmp = tempfile::tempdir().unwrap();
     let root = repo(tmp.path());
-    let (_w, rx) = start(&root, false);
+    let (w, rx) = start(&root, false);
     let spec = root.join(".specs/features/acme-1-x");
     fs::write(spec.join("spec.md"), "# x\n\nedited\n").unwrap();
     let (seen, took) = collect_until(&rx, Duration::from_secs(2), |s| {
         s.contains(&WatchEvent::SpecChanged(spec.clone()))
     });
-    assert!(seen.contains(&WatchEvent::SpecChanged(spec)), "{seen:?}");
-    assert!(took < Duration::from_secs(2), "{took:?}");
+    assert!(
+        seen.contains(&WatchEvent::SpecChanged(spec)),
+        "{seen:?}{}",
+        raw(&w)
+    );
+    assert!(took < Duration::from_secs(2), "{took:?}{}", raw(&w));
 }
 
 #[test]
 fn a_folder_created_with_its_files_is_a_list_change() {
     let tmp = tempfile::tempdir().unwrap();
     let root = repo(tmp.path());
-    let (_w, rx) = start(&root, false);
+    let (w, rx) = start(&root, false);
     let new = root.join(".specs/features/acme-2-new");
     fs::create_dir(&new).unwrap();
     fs::write(new.join("spec.md"), "# new\n").unwrap();
@@ -94,7 +105,8 @@ fn a_folder_created_with_its_files_is_a_list_change() {
     });
     assert!(
         seen.contains(&WatchEvent::ListChanged(root.clone())),
-        "{seen:?}"
+        "{seen:?}{}",
+        raw(&w)
     );
 }
 
@@ -102,15 +114,20 @@ fn a_folder_created_with_its_files_is_a_list_change() {
 fn atomic_save_is_a_change_not_a_removal() {
     let tmp = tempfile::tempdir().unwrap();
     let root = repo(tmp.path());
-    let (_w, rx) = start(&root, false);
+    let (w, rx) = start(&root, false);
     let spec = root.join(".specs/features/acme-1-x");
     fs::write(spec.join(".spec.md.tmp"), "# x\n\nsaved\n").unwrap();
     fs::rename(spec.join(".spec.md.tmp"), spec.join("spec.md")).unwrap();
     let (seen, _) = collect_until(&rx, Duration::from_millis(800), |_| false);
-    assert!(seen.contains(&WatchEvent::SpecChanged(spec)), "{seen:?}");
+    assert!(
+        seen.contains(&WatchEvent::SpecChanged(spec)),
+        "{seen:?}{}",
+        raw(&w)
+    );
     assert!(
         !seen.contains(&WatchEvent::ListChanged(root)),
-        "a save must not look like a folder change: {seen:?}"
+        "a save must not look like a folder change: {seen:?}{}",
+        raw(&w)
     );
 }
 
@@ -118,15 +135,19 @@ fn atomic_save_is_a_change_not_a_removal() {
 fn files_outside_specs_are_ignored_and_removals_are_list_changes() {
     let tmp = tempfile::tempdir().unwrap();
     let root = repo(tmp.path());
-    let (_w, rx) = start(&root, false);
+    let (w, rx) = start(&root, false);
     fs::write(root.join("README.md"), "noise\n").unwrap();
     let (seen, _) = collect_until(&rx, Duration::from_millis(600), |_| false);
-    assert!(seen.is_empty(), "{seen:?}");
+    assert!(seen.is_empty(), "{seen:?}{}", raw(&w));
     fs::remove_dir_all(root.join(".specs/features/acme-1-x")).unwrap();
     let (seen, _) = collect_until(&rx, Duration::from_secs(2), |s| {
         s.contains(&WatchEvent::ListChanged(root.clone()))
     });
-    assert!(seen.contains(&WatchEvent::ListChanged(root)), "{seen:?}");
+    assert!(
+        seen.contains(&WatchEvent::ListChanged(root)),
+        "{seen:?}{}",
+        raw(&w)
+    );
 }
 
 #[test]
@@ -141,8 +162,12 @@ fn polling_picks_up_changes_within_the_interval() {
     let (seen, took) = collect_until(&rx, Duration::from_secs(3), |s| {
         s.contains(&WatchEvent::SpecChanged(spec.clone()))
     });
-    assert!(seen.contains(&WatchEvent::SpecChanged(spec)), "{seen:?}");
-    assert!(took < Duration::from_secs(2), "{took:?}");
+    assert!(
+        seen.contains(&WatchEvent::SpecChanged(spec)),
+        "{seen:?}{}",
+        raw(&w)
+    );
+    assert!(took < Duration::from_secs(2), "{took:?}{}", raw(&w));
 }
 
 #[test]
