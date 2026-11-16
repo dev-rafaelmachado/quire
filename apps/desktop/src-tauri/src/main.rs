@@ -642,6 +642,141 @@ mod tests {
         }
     }
 
+    /// The default instance of bill-40-refunds (the text format cases of T26).
+    fn bill_40(webview: &WebviewWindow<MockRuntime>) -> (Value, PathBuf) {
+        let list = invoke(webview, "list_projects", json!({})).unwrap();
+        let spec = list[0]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "bill-40-refunds")
+            .unwrap()
+            .clone();
+        let inst = &spec["instances"][spec["defaultIndex"].as_u64().unwrap() as usize];
+        (
+            inst["id"].clone(),
+            PathBuf::from(inst["path"].as_str().unwrap()),
+        )
+    }
+
+    /// Opens `name`, appends a line through the editor's text and saves; returns the bytes
+    /// before and after.
+    fn append_and_save(
+        webview: &WebviewWindow<MockRuntime>,
+        instance_id: &Value,
+        dir: &Path,
+        name: &str,
+        confirm_mixed: bool,
+    ) -> (Vec<u8>, Result<Value, Value>) {
+        let before = std::fs::read(dir.join(name)).unwrap();
+        let file = invoke(
+            webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_id, "name": name }),
+        )
+        .unwrap();
+        let text = file["text"].as_str().unwrap();
+        let edited = if text.ends_with('\n') {
+            format!("{text}Linha nova.\n")
+        } else {
+            format!("{text}\nLinha nova.")
+        };
+        let r = invoke(
+            webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": name, "text": edited, "format": file["format"],
+            "base": file["fingerprint"], "confirmMixed": confirm_mixed } }),
+        );
+        (before, r)
+    }
+
+    #[test]
+    fn text_formats_survive_a_save_byte_for_byte() {
+        // T26 fixtures, through the IPC: BOM + CRLF, no final newline, mixed line endings.
+        let (app, webview, _tmp) = app_on_fixtures("formats");
+        scan_and_wait(&app, &webview);
+        let (id, dir) = bill_40(&webview);
+
+        let (before, r) = append_and_save(&webview, &id, &dir, "formato-crlf-bom.md", false);
+        r.unwrap();
+        let mut expected = before.clone();
+        expected.extend_from_slice(b"Linha nova.\r\n");
+        assert_eq!(
+            std::fs::read(dir.join("formato-crlf-bom.md")).unwrap(),
+            expected
+        );
+
+        let (before, r) = append_and_save(&webview, &id, &dir, "formato-sem-newline.md", false);
+        r.unwrap();
+        let mut expected = before.clone();
+        expected.extend_from_slice(b"\nLinha nova.");
+        assert_eq!(
+            std::fs::read(dir.join("formato-sem-newline.md")).unwrap(),
+            expected
+        );
+
+        // Mixed: refused until confirmed, then normalized to the most used (CRLF here).
+        let (before, r) = append_and_save(&webview, &id, &dir, "formato-misto.md", false);
+        assert_eq!(r.unwrap_err()["code"], "write_mixed_eol");
+        assert_eq!(std::fs::read(dir.join("formato-misto.md")).unwrap(), before);
+        let (_, r) = append_and_save(&webview, &id, &dir, "formato-misto.md", true);
+        r.unwrap();
+        let after =
+            String::from_utf8(std::fs::read(dir.join("formato-misto.md")).unwrap()).unwrap();
+        assert!(!after.replace("\r\n", "").contains('\n'), "{after:?}");
+        assert!(after.ends_with("Linha nova.\r\n"));
+
+        #[cfg(unix)]
+        {
+            // The link stays a link and its target gets the content (SAV-05).
+            let link = dir.join("formato-link.md");
+            let target = std::fs::canonicalize(&link).unwrap();
+            let (_, r) = append_and_save(&webview, &id, &dir, "formato-link.md", false);
+            r.unwrap();
+            assert!(
+                std::fs::symlink_metadata(&link)
+                    .unwrap()
+                    .file_type()
+                    .is_symlink()
+            );
+            assert!(
+                std::fs::read_to_string(&target)
+                    .unwrap()
+                    .ends_with("Linha nova.\n")
+            );
+            // Read-only: refused, untouched, and the copy works (SAV-04).
+            let ro = dir.join("formato-somente-leitura.md");
+            let before = std::fs::read(&ro).unwrap();
+            let f = invoke(
+                &webview,
+                "open_for_edit",
+                json!({ "instanceId": id, "name": "formato-somente-leitura.md" }),
+            )
+            .unwrap();
+            assert_eq!(f["readOnly"], true);
+            let (_, r) = append_and_save(&webview, &id, &dir, "formato-somente-leitura.md", false);
+            assert_eq!(r.unwrap_err()["code"], "write_read_only");
+            assert_eq!(std::fs::read(&ro).unwrap(), before);
+            let copy = invoke(
+                &webview,
+                "save_copy",
+                json!({ "instanceId": id, "name": "formato-somente-leitura.md",
+                "text": "cópia", "format": f["format"], "stamp": "20261116-150000" }),
+            )
+            .unwrap();
+            assert!(dir.join(copy["name"].as_str().unwrap()).exists());
+        }
+        // No temporary file is left anywhere in the folder.
+        assert!(
+            std::fs::read_dir(&dir).unwrap().all(|e| !e
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".tmp"))
+        );
+    }
+
     #[test]
     fn checkbox_and_progress_without_the_watcher() {
         // Polling every 60 s: within this test, only the write itself can update the list.
