@@ -81,7 +81,7 @@ T12 → T13 → T28 → T14 → T15
 T16 → T17 → T18 → T19 → T20
 ```
 
-- [ ] T16: Editor CodeMirror e modos Ler, Editar e Dividir
+- [ ] T16: Editor CodeMirror e modos Ler, Editar e Dividir (c5eba1d) (gate passou, aguardando revisão visual)
 - [ ] T17: Preview ao vivo e rolagem sincronizada
 - [ ] T18: Guarda de alterações não salvas
 - [ ] T19: Conflito: diálogo, diff, mudança no disco e supressão da própria escrita
