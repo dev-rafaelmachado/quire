@@ -3,7 +3,7 @@
      calls the console helper quire-cli.exe (bundle.externalBin, next to quire.exe), and adds
      only the bin folder to the system PATH, so `quire` never resolves to the GUI quire.exe.
      Referenced from tauri.bundle-windows.conf.json (fragmentPaths and componentRefs), which
-     is passed only to the bundling build: tauri build --config <that file>. -->
+     is passed only to the bundling build (the config option of tauri build). -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <DirectoryRef Id="INSTALLDIR">
