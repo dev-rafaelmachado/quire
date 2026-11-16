@@ -7,7 +7,13 @@ import { useWorkspace } from "../workspace/store";
 import { displayed, worktreeName } from "./labels";
 import { useSpecView } from "./store";
 
-const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+/** Comparable form of a path: `/` separators, no trailing one, no Windows `\\?\` prefix. */
+const norm = (p: string) =>
+  p
+    .replace(/\\/g, "/")
+    .replace(/^\/\/\?\/UNC\//, "//")
+    .replace(/^\/\/\?\//, "")
+    .replace(/\/+$/, "");
 
 /** Whether a `spec://changed` batch touches the instance on screen. */
 export function affects(dirs: readonly string[], detail: SpecDetail | null): boolean {

@@ -40,6 +40,11 @@ describe("live updates", () => {
     expect(affects(["/ws/a/.specs/features/x/"], detail(a))).toBe(true);
     expect(affects(["/ws/b/.specs/features/x"], detail(a))).toBe(false);
     expect(affects(["/ws/a/.specs/features/x"], null)).toBe(false);
+    // Windows: the event may carry the verbatim prefix and `\` where the index does not.
+    const w = inst(3, "C:\\ws\\a\\.specs\\features\\x");
+    expect(affects(["\\\\?\\C:\\ws\\a\\.specs\\features\\x"], detail(w))).toBe(true);
+    expect(affects(["C:/ws/a/.specs/features/x"], detail(w))).toBe(true);
+    expect(affects(["\\\\?\\C:\\ws\\b\\.specs\\features\\x"], detail(w))).toBe(false);
   });
 
   it("falls back to another instance, or reports the spec gone (WAT-04)", () => {

@@ -94,6 +94,16 @@ pub fn request_scan<R: Runtime>(app: &AppHandle<R>, changed: Vec<PathBuf>) -> st
     Ok(())
 }
 
+/// Raw events of the running watcher and the batches made of them (diagnostics).
+#[cfg(test)]
+pub fn raw_events<R: Runtime>(app: &AppHandle<R>) -> Vec<String> {
+    let state = app.state::<AppState>();
+    lock(&state.live.watcher)
+        .as_ref()
+        .map(|(_, _, w)| w.raw_events())
+        .unwrap_or_default()
+}
+
 /// Watches the repositories currently in the index; restarts only when the targets change.
 fn refresh_watcher<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<AppState>();

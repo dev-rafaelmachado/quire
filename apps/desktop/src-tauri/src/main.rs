@@ -259,10 +259,24 @@ mod tests {
         }
     }
 
-    fn wait_for(what: &str, timeout: Duration, mut check: impl FnMut() -> bool) -> Duration {
+    fn wait_for(what: &str, timeout: Duration, check: impl FnMut() -> bool) -> Duration {
+        wait_for_or(what, timeout, check, String::new)
+    }
+
+    /// Like `wait_for`, with `context()` added to the message on timeout.
+    fn wait_for_or(
+        what: &str,
+        timeout: Duration,
+        mut check: impl FnMut() -> bool,
+        context: impl Fn() -> String,
+    ) -> Duration {
         let t0 = Instant::now();
         while !check() {
-            assert!(t0.elapsed() < timeout, "timed out waiting for {what}");
+            assert!(
+                t0.elapsed() < timeout,
+                "timed out waiting for {what}{}",
+                context()
+            );
             std::thread::sleep(Duration::from_millis(25));
         }
         t0.elapsed()
@@ -285,6 +299,13 @@ mod tests {
             sink.lock().unwrap().push(e.payload().to_owned())
         });
         scan_and_wait(&app, &webview);
+        // On timeout, show what the watcher received: event kinds and paths differ per OS.
+        let raw = || {
+            format!(
+                "\nraw events:\n  {}",
+                live::raw_events(app.handle()).join("\n  ")
+            )
+        };
 
         let status = invoke(&webview, "get_watch_status", json!({})).unwrap();
         assert!(status["repos"].as_u64().unwrap() >= 4, "{status}");
@@ -300,47 +321,69 @@ mod tests {
             .unwrap()
             .replace("- [ ] T3:", "- [x] T3:");
         std::fs::write(&tasks, text).unwrap();
-        let took = wait_for("the edit in the list", Duration::from_secs(2), || {
-            let list = invoke(&webview, "list_projects", json!({})).unwrap();
-            let spec = spec_of(&list, "acme-170-rate-limit").unwrap();
-            spec["instances"].as_array().unwrap().iter().any(|i| {
-                i["progress"] == json!([2, 3])
-                    && i["path"]
-                        .as_str()
-                        .unwrap()
-                        .contains("projects/acme_gateway")
-            })
-        });
+        let took = wait_for_or(
+            "the edit in the list",
+            Duration::from_secs(2),
+            || {
+                let list = invoke(&webview, "list_projects", json!({})).unwrap();
+                let spec = spec_of(&list, "acme-170-rate-limit").unwrap();
+                spec["instances"].as_array().unwrap().iter().any(|i| {
+                    // Windows paths use `\`.
+                    i["progress"] == json!([2, 3])
+                        && i["path"]
+                            .as_str()
+                            .unwrap()
+                            .replace('\\', "/")
+                            .contains("projects/acme_gateway")
+                })
+            },
+            raw,
+        );
         eprintln!("WAT-01: edit visible in the list after {took:?}");
-        wait_for("spec://changed", Duration::from_secs(2), || {
-            changed
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|p| p.contains("acme-170-rate-limit"))
-        });
+        wait_for_or(
+            "spec://changed",
+            Duration::from_secs(2),
+            || {
+                changed
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|p| p.contains("acme-170-rate-limit"))
+            },
+            raw,
+        );
 
         // A spec folder created together with its file appears (the folder's content is rescanned).
         let new = gw.join("acme-300-new");
         std::fs::create_dir(&new).unwrap();
         std::fs::write(new.join("spec.md"), "# ACME-300 — Nova\n").unwrap();
-        wait_for("the new spec", Duration::from_secs(2), || {
-            spec_of(
-                &invoke(&webview, "list_projects", json!({})).unwrap(),
-                "acme-300-new",
-            )
-            .is_some()
-        });
+        wait_for_or(
+            "the new spec",
+            Duration::from_secs(2),
+            || {
+                spec_of(
+                    &invoke(&webview, "list_projects", json!({})).unwrap(),
+                    "acme-300-new",
+                )
+                .is_some()
+            },
+            raw,
+        );
 
         // Removing it removes it from the list.
         std::fs::remove_dir_all(&new).unwrap();
-        wait_for("the spec to go away", Duration::from_secs(2), || {
-            spec_of(
-                &invoke(&webview, "list_projects", json!({})).unwrap(),
-                "acme-300-new",
-            )
-            .is_none()
-        });
+        wait_for_or(
+            "the spec to go away",
+            Duration::from_secs(2),
+            || {
+                spec_of(
+                    &invoke(&webview, "list_projects", json!({})).unwrap(),
+                    "acme-300-new",
+                )
+                .is_none()
+            },
+            raw,
+        );
     }
 
     fn parse(app: &tauri::App<MockRuntime>, args: &[&str], cwd: &Path) -> cli::CliRequest {
