@@ -93,7 +93,7 @@ T16 → T17 → T18 → T19 → T20
 T21 → T22 → T23
 ```
 
-- [ ] T21: Índice FTS5 incremental
+- [x] T21: Índice FTS5 incremental (c85dd8d)
 - [ ] T22: Busca global e na spec aberta
 - [ ] T23: Command palette
 
