@@ -43,6 +43,7 @@ T1 → T2 → T3
 ````
 
 - Linha de tarefa: `- [ ]` ou `- [x]`, id `T<n>`, `:`, título, e opcionalmente o hash curto do commit entre parênteses no fim.
+- Depois do título vêm, opcionalmente, um ou mais hashes curtos entre parênteses (`(a1b2c3d)` ou `(a1b2c3d, e4f5a6b)`) e, depois deles, uma nota entre parênteses, como `(gate passou, aguardando revisão visual)`. O parser separa os hashes e a nota do título. Um parêntese que não vem depois de um hash continua no título (`CI (Linux e Windows)`). Uma anotação entre o id e os dois-pontos (`T4 (aguardando CI):`) também é lida como nota.
 - Fases: cabeçalhos `### Fase <n>: <título>` (com sufixo opcional ` — <repo>`). O bloco de código logo abaixo é o diagrama de dependência em ASCII (`T1 → T2`; fases paralelas usam várias linhas).
 - Detalhamento: seções `### T<n>: <título>` com campos em negrito: `**What**`, `**Onde**`, `**Depende de**`, `**Reuses**`, `**Requirement**` (IDs separados por vírgula), `**Tools**`, `**Pronto quando**` (lista), `**Testes**`, `**Gate**` (`fase`, `final`, `e2e`).
 - O progresso é contado nas linhas de checkbox. Tarefas de fases de correção podem ter ids fora de ordem (ex.: `T26` entre `T20` e `T21`).

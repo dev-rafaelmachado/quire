@@ -48,7 +48,7 @@ fn fixture_tasks_counts_match_checkboxes() {
     let ids: Vec<&str> = doc.phases[2].tasks.iter().map(|t| t.id.as_str()).collect();
     assert_eq!(ids, ["T9", "T7"], "out-of-order ids keep file order");
     let t7 = doc.task("T7").unwrap();
-    assert!(t7.done && t7.hash.is_none());
+    assert!(t7.done && t7.commits.is_empty());
     assert_eq!(doc.task("T4").unwrap().requirements, ["TOK-01", "TOK-02"]);
     let d5 = doc.detail("T5").unwrap();
     assert_eq!(d5.depends_on(), ["T4"]);
@@ -99,6 +99,31 @@ fn quire_own_tasks_file_parses() {
     assert_eq!(doc.task("T1").unwrap().requirements, ["OSS-02"]);
     assert_eq!(doc.phases[0].diagram, vec![vec!["T1", "T2", "T3", "T4"]]);
     assert_eq!(doc.details.len(), 24);
+    // No title keeps the commit hash or the review note (T14, T24 lines).
+    for t in doc.phases.iter().flat_map(|p| &p.tasks) {
+        assert!(
+            t.commits.iter().all(|c| !t.title.contains(c.as_str())),
+            "{}: {}",
+            t.id,
+            t.title
+        );
+        assert!(!t.title.contains("aguardando"), "{}: {}", t.id, t.title);
+    }
+    let t4 = doc.task("T4").unwrap();
+    assert_eq!(
+        (t4.title.as_str(), t4.commits.as_slice()),
+        (
+            "CI no GitHub Actions (Linux e Windows)",
+            ["cfd7d06".to_owned()].as_slice()
+        )
+    );
+    let t14 = doc.task("T14").unwrap();
+    assert_eq!(t14.commits, ["ddbe3e3"]);
+    assert_eq!(
+        t14.note.as_deref(),
+        Some("gate passou, aguardando revisão visual")
+    );
+    assert_eq!(doc.task("T24").unwrap().commits, ["79ae831", "36609d2"]);
 }
 
 #[test]

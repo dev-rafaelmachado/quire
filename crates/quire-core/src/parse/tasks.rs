@@ -2,8 +2,12 @@
 //!
 //! - Phases: `### Fase <n>: <title>` with an optional ` — <repo>` suffix. The first fenced
 //!   block right after the heading is the dependency diagram (`T1 → T2`, one chain per line).
-//! - Task lines: `- [ ] T<n>: title` / `- [x] T<n>: title (abc1234)`; an annotation between the
-//!   id and the colon (`T4 (waiting CI):`) is kept as `note`.
+//! - Task lines: `- [ ] T<n>: title` / `- [x] T<n>: title (abc1234)`. The trailer is split off
+//!   the title: one or more short hashes in parentheses (`(abc1234)`, `(abc1234, def5678)`)
+//!   become `commits`, and parenthesized text after them (`(abc1234) (waiting review)`) becomes
+//!   `note`. A parenthesis that is not preceded by a hash group stays in the title, so titles
+//!   such as `CI (Linux e Windows)` are kept whole. An annotation between the id and the colon
+//!   (`T4 (waiting CI):`) is a note as well.
 //! - Details: `### T<n>: title` sections with `**Field**: value` lines; a field with an empty
 //!   value collects the list items below it (`**Pronto quando**:`).
 //!
@@ -22,9 +26,10 @@ pub struct Task {
     pub id: String,
     pub title: String,
     pub done: bool,
-    /// Short commit hash at the end of the line, if any.
-    pub hash: Option<String>,
-    /// Text between the id and the colon, e.g. `aguardando CI no GitHub`.
+    /// Short commit hashes at the end of the line, in order (`(a1b2c3d, e4f5a6b)`).
+    pub commits: Vec<String>,
+    /// Annotation of the task: the text between the id and the colon (`T4 (aguardando CI):`)
+    /// and the parenthesized text after the hashes (`(a1b2c3d) (aguardando revisão)`).
     pub note: Option<String>,
     /// Requirement ids from the task's detail section (TSK-03).
     pub requirements: Vec<String>,
@@ -143,6 +148,7 @@ struct Patterns {
     phase: Regex,
     task: Regex,
     hash: Regex,
+    hash_sep: Regex,
     detail: Regex,
     task_id: Regex,
 }
@@ -157,11 +163,78 @@ fn patterns() -> &'static Patterns {
         Patterns {
             phase: re(r"^###\s+Fase\s+(\d+)\s*:\s*(.+?)\s*$"),
             task: re(r"^\s*[-*]\s+\[([ xX])\]\s+(T\d+)\b(?:\s*\(([^)]*)\))?\s*:\s*(.*?)\s*$"),
-            hash: re(r"^(.*?)\s*\(([0-9a-f]{7,40})\)$"),
+            hash: re(r"^[0-9a-f]{7,40}$"),
+            hash_sep: re(r"[,\s]+"),
             detail: re(r"^###\s+(T\d+)\s*:\s*(.+?)\s*$"),
             task_id: re(r"\bT\d+\b"),
         }
     })
+}
+
+/// Last balanced `( … )` group of `s`: the text before it and the text inside.
+fn trailing_group(s: &str) -> Option<(&str, &str)> {
+    let s = s.trim_end();
+    let inner_end = s.strip_suffix(')')?.len();
+    let mut depth = 0usize;
+    for (i, c) in s.char_indices().rev() {
+        match c {
+            ')' => depth += 1,
+            '(' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some((s[..i].trim_end(), &s[i + 1..inner_end]));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The hashes of a group such as `a1b2c3d, e4f5a6b`, or `None` when it is not a hash list.
+fn hash_list(inner: &str) -> Option<Vec<String>> {
+    let p = patterns();
+    let hashes: Vec<String> = p
+        .hash_sep
+        .split(inner.trim())
+        .filter(|h| !h.is_empty())
+        .map(str::to_owned)
+        .collect();
+    (!hashes.is_empty() && hashes.iter().all(|h| p.hash.is_match(h))).then_some(hashes)
+}
+
+/// Splits `title (a1b2c3d) (note)` into the title, the commits and the trailing notes.
+fn split_trailer(rest: &str) -> (String, Vec<String>, Vec<String>) {
+    // Trailing groups, last one first.
+    let mut groups = vec![];
+    let mut head = rest.trim_end();
+    while let Some((before, inner)) = trailing_group(head) {
+        groups.push((before, inner));
+        head = before;
+    }
+    let Some(first_hash) = groups
+        .iter()
+        .position(|(_, inner)| hash_list(inner).is_some())
+    else {
+        return (rest.trim().to_owned(), vec![], vec![]);
+    };
+    let notes = groups[..first_hash]
+        .iter()
+        .rev()
+        .map(|(_, inner)| inner.trim().to_owned())
+        .filter(|n| !n.is_empty())
+        .collect();
+    // Hash groups may repeat: `(a1b2c3d) (e4f5a6b)`.
+    let mut commits = vec![];
+    let mut title = rest;
+    for (before, inner) in &groups[first_hash..] {
+        let Some(hashes) = hash_list(inner) else {
+            break;
+        };
+        commits.splice(0..0, hashes);
+        title = before;
+    }
+    (title.trim().to_owned(), commits, notes)
 }
 
 fn task_ids(text: &str) -> Vec<String> {
@@ -261,19 +334,20 @@ pub fn tasks(md: &str, id_pattern: Option<&Regex>) -> TasksDoc {
         }
         if let Some(c) = p.task.captures(raw) {
             let rest = c.get(4).map_or("", |m| m.as_str());
-            let (title, hash) = match p.hash.captures(rest) {
-                Some(h) => (h[1].to_owned(), Some(h[2].to_owned())),
-                None => (rest.to_owned(), None),
-            };
+            let (title, commits, trailing) = split_trailer(rest);
+            let notes: Vec<String> = c
+                .get(3)
+                .map(|m| m.as_str().trim().to_owned())
+                .filter(|s| !s.is_empty())
+                .into_iter()
+                .chain(trailing)
+                .collect();
             let task = Task {
                 id: c[2].to_owned(),
                 title,
                 done: &c[1] != " ",
-                hash,
-                note: c
-                    .get(3)
-                    .map(|m| m.as_str().trim().to_owned())
-                    .filter(|s| !s.is_empty()),
+                commits,
+                note: (!notes.is_empty()).then(|| notes.join(" · ")),
                 requirements: vec![],
                 line: line_no,
             };
@@ -405,15 +479,15 @@ T1 → T2 → T3
             (2, 3, PhaseState::InProgress)
         );
         assert_eq!(f1.tasks[1].title, "Repositório (Linux e Windows)");
-        assert_eq!(f1.tasks[1].hash.as_deref(), Some("b2c3d4e"));
-        assert_eq!(f1.tasks[2].hash, None);
+        assert_eq!(f1.tasks[1].commits, ["b2c3d4e"]);
+        assert!(f1.tasks[2].commits.is_empty());
         let f2 = &doc.phases[1];
         assert!(f2.diagram.is_empty());
         let ids: Vec<&str> = f2.tasks.iter().map(|t| t.id.as_str()).collect();
         assert_eq!(ids, ["T9", "T7", "T4"]);
         assert!(f2.tasks[1].done);
         assert_eq!(f2.tasks[2].note.as_deref(), Some("aguardando CI"));
-        assert_eq!(f2.tasks[2].hash.as_deref(), Some("cfd7d06"));
+        assert_eq!(f2.tasks[2].commits, ["cfd7d06"]);
         assert_eq!(doc.progress(), (4, 6));
         assert!(doc.task("T99").is_none());
     }
@@ -435,6 +509,70 @@ T1 → T2 → T3
         assert_eq!(
             plain.task("T1").unwrap().requirements,
             ["TOK-02", "contrato (suporta TOK-01)"]
+        );
+    }
+
+    /// Task lines as they appear in Quire's own `tasks.md`.
+    #[test]
+    fn commits_and_notes_are_split_from_the_title() {
+        let md = "\
+### Fase 0: Spike e fundação
+
+- [x] T4: CI no GitHub Actions (Linux e Windows) (cfd7d06)
+- [ ] T4 (aguardando CI no GitHub): CI no GitHub Actions (Linux e Windows) (cfd7d06)
+- [ ] T14: Tokens, tema, layout de três colunas e catálogo de strings (ddbe3e3) (gate passou, aguardando revisão visual)
+- [ ] T24: Documentação de uso, empacotamento e roteiro E2E (79ae831, 36609d2) (gate passou, aguardando revisão visual)
+- [x] T1: Scaffold do monorepo (Cargo + pnpm, Tauri 2, Vite React TS estrito) (1d09a59)
+- [x] T23: Preferências (scan paths, preset por projeto, tema)
+- [ ] T30: Duas entregas (a1b2c3d) (e4f5a6b)
+";
+        let doc = tasks(md, None);
+        let t: Vec<(&str, Vec<&str>, Option<&str>)> = doc.phases[0]
+            .tasks
+            .iter()
+            .map(|t| {
+                (
+                    t.title.as_str(),
+                    t.commits.iter().map(String::as_str).collect(),
+                    t.note.as_deref(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            t,
+            [
+                (
+                    "CI no GitHub Actions (Linux e Windows)",
+                    vec!["cfd7d06"],
+                    None
+                ),
+                (
+                    "CI no GitHub Actions (Linux e Windows)",
+                    vec!["cfd7d06"],
+                    Some("aguardando CI no GitHub")
+                ),
+                (
+                    "Tokens, tema, layout de três colunas e catálogo de strings",
+                    vec!["ddbe3e3"],
+                    Some("gate passou, aguardando revisão visual")
+                ),
+                (
+                    "Documentação de uso, empacotamento e roteiro E2E",
+                    vec!["79ae831", "36609d2"],
+                    Some("gate passou, aguardando revisão visual")
+                ),
+                (
+                    "Scaffold do monorepo (Cargo + pnpm, Tauri 2, Vite React TS estrito)",
+                    vec!["1d09a59"],
+                    None
+                ),
+                (
+                    "Preferências (scan paths, preset por projeto, tema)",
+                    vec![],
+                    None
+                ),
+                ("Duas entregas", vec!["a1b2c3d", "e4f5a6b"], None),
+            ]
         );
     }
 
