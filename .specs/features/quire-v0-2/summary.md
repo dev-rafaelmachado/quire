@@ -28,6 +28,8 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 - **Fase / tarefa:** Fase 0, T4 (recusar QUIRE_CONFIG/QUIRE_INDEX relativos)
 - **Concluídas:** T1, T27, T2
 - **Em andamento:** T4
+- **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
+- **NÃO VERIFICADO (depende de ambiente que não há aqui):** idioma pelo sistema no WebView2 (T27)
 - **Próximo passo:** T4, depois T5
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** nenhum de especificação. Dependem de máquina: T8 e partes de T9, T11 e T27 (autor com WSL ou Windows); T5 depende só do CI do Windows
