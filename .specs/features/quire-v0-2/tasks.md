@@ -112,7 +112,7 @@ T24 → T25
 T26
 ```
 
-- [ ] T26: Fixtures de escrita, roteiro E2E, documentação e gate final
+- [ ] T26: Fixtures de escrita, roteiro E2E, documentação e gate final (c7810ce, a75c7a0) (gate final passou, aguardando E2E manual e revisão visual)
 
 ## Detalhamento das tarefas
 
