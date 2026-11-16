@@ -1,6 +1,6 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 4/28 tarefas
+**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 5/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -12,7 +12,7 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 <!-- progress:start -->
 | Fase | Repositório | Tarefas |
 |---|---|---|
-| 0: Dívidas da v0.1 | quire | 4/9 |
+| 0: Dívidas da v0.1 | quire | 5/9 |
 | 1: Spikes | quire | 0/3 |
 | 2: Escrita segura no núcleo | quire | 0/5 |
 | 3: Editor | quire | 0/5 |
@@ -20,19 +20,19 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 | 5: Tasks e progresso | quire | 0/2 |
 | 6: Fechamento da v0.2 | quire | 0/1 |
 
-**Total:** 4/28 tarefas
+**Total:** 5/28 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 0, T7 (tauri-specta estável)
-- **Concluídas:** T1, T27, T2, T4
-- **Em andamento:** T7
+- **Fase / tarefa:** Fase 0, T8 (rodadas no WSL e remoção do spike)
+- **Concluídas:** T1, T27, T2, T4, T7
+- **Em andamento:** T8
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
 - **Aguardando decisão do autor:** T6 (orçamento de memória do modo Dividir: ≤ 456 MB, ver "Medições")
 - **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`)
 - **NÃO VERIFICADO (depende de ambiente que não há aqui):** idioma pelo sistema no WebView2 (T27); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
-- **Próximo passo:** T7, depois T8
+- **Próximo passo:** T8, depois T9
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** nenhum de especificação. Dependem de máquina: T8 e partes de T9, T11 e T27 (autor com WSL ou Windows); T5 depende só do CI do Windows
 - **Arquivos sem commit:** nenhum

@@ -50,7 +50,7 @@ T1 → T27 → T2 → T3 → T4 → T5 → T6 → T7 → T8
 - [x] T4: Recusar `QUIRE_CONFIG` e `QUIRE_INDEX` relativos (33af038)
 - [ ] T5: Binário auxiliar de console do CLI no Windows (a69fae3) (gate passou, aguardando CI do Windows)
 - [ ] T6: Memória com uma spec aberta: medição e orçamento (f945633) (medido; orçamento proposto aguardando aprovação do autor)
-- [ ] T7: `tauri-specta` estável
+- [x] T7: `tauri-specta` estável (c98f0cc)
 - [ ] T8: Rodadas pendentes no WSL e remoção do spike da v0.1
 
 ### Fase 1: Spikes
