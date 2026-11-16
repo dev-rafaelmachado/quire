@@ -27,7 +27,7 @@ Siga o `AGENTS.md`. Implemente **uma tarefa por vez, na ordem das fases**. Antes
 
 ## Comandos de gate
 
-- **fase:** `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && pnpm -r typecheck && pnpm -r test`
+- **fase:** `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --no-fail-fast && pnpm -r typecheck && pnpm -r test`
 - **final:** o gate de fase + `pnpm --filter desktop build` + `cargo build --workspace --release` + `pnpm --filter desktop tauri build --bundles deb` (ver a nota da T24 abaixo)
 - **e2e:** roteiro manual de T24 sobre `fixtures/workspace`
 

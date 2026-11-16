@@ -37,7 +37,7 @@ The UI talks to the core only through the commands in `src-tauri/src/commands.rs
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo test --workspace --no-fail-fast
 pnpm -r typecheck
 pnpm -r test
 ```
