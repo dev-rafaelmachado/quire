@@ -49,7 +49,7 @@ T1 → T27 → T2 → T3 → T4 → T5 → T6 → T7 → T8
 - [ ] T3: Chips de requisito em janela estreita (bb83a95) (gate passou, aguardando revisão visual)
 - [x] T4: Recusar `QUIRE_CONFIG` e `QUIRE_INDEX` relativos (33af038)
 - [ ] T5: Binário auxiliar de console do CLI no Windows (a69fae3) (gate passou, aguardando CI do Windows)
-- [ ] T6: Memória com uma spec aberta: medição e orçamento
+- [ ] T6: Memória com uma spec aberta: medição e orçamento (f945633) (medido; orçamento proposto aguardando aprovação do autor)
 - [ ] T7: `tauri-specta` estável
 - [ ] T8: Rodadas pendentes no WSL e remoção do spike da v0.1
 

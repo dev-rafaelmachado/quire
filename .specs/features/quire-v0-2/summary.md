@@ -25,13 +25,14 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 0, T6 (memória: medição e orçamento)
+- **Fase / tarefa:** Fase 0, T7 (tauri-specta estável)
 - **Concluídas:** T1, T27, T2, T4
-- **Em andamento:** T6
+- **Em andamento:** T7
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
+- **Aguardando decisão do autor:** T6 (orçamento de memória do modo Dividir: ≤ 456 MB, ver "Medições")
 - **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`)
 - **NÃO VERIFICADO (depende de ambiente que não há aqui):** idioma pelo sistema no WebView2 (T27); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
-- **Próximo passo:** T6, depois T7
+- **Próximo passo:** T7, depois T8
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** nenhum de especificação. Dependem de máquina: T8 e partes de T9, T11 e T27 (autor com WSL ou Windows); T5 depende só do CI do Windows
 - **Arquivos sem commit:** nenhum
@@ -68,6 +69,21 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - Criar spec ou arquivo novo, inclusive a partir de template (P1)
 - Alerta de divergência entre o progresso do `tasks.md` e a tabela do `summary.md` (P5, ID PRG-02 reservado), junto do lint de estrutura
 
+## Medições
+
+### T6: memória com uma spec aberta (DEB-07)
+
+**Como:** binário de produção (`tauri build`, 2026-11-16, commit `a69fae3`), Linux nativo (CachyOS, Hyprland 0.57.2, webkit2gtk-4.1 2.54.2, i5-1235U, Iris Xe), janela de 1440×900 numa saída headless do Hyprland, PSS somado do `quire` e dos processos WebKit filhos (`scripts/pss-tree.py`). Documento: `generateMarkdown(1)` do spike da v0.1 (42,8 KB, 6 diagramas Mermaid, blocos de código), numa pasta temporária fora do repositório, aberto com `quire open <spec.md>` no modo Ler. Amostra 15 s depois de abrir; 3 rodadas por cenário, cada uma com o app recém-aberto.
+
+| Cenário | PSS total (MB) | só WebKitWebProcess (MB) |
+| --- | --- | --- |
+| App sem spec aberta | 257, 258, 258 | 136, 137, 137 |
+| Spec de 40 KB, modo Ler | 395, 396, 447 | 276, 277, 328 |
+
+**Comparação com a v0.1:** o spike da T2 (build de desenvolvimento, `vite preview`) mediu 239 MB vazio e ~390 MB com a mesma spec; a T16 da v0.1 mediu 400–418 MB. A base de produção da v0.2 fica no mesmo patamar (mediana de 396 MB), com uma rodada fora da curva em 447 MB.
+
+**Orçamento proposto para o modo Dividir (editor + preview, T16 e T26):** base de 396 MB + 60 MB = **≤ 456 MB** de PSS total na mediana de 3 rodadas, mesmas condições. **Aguardando aprovação do autor**; até lá a T16 e a T26 usam esse número.
+
 ## Journal
 
 - 2026-11-16 · planejamento · spec, design e tarefas da v0.2 escritos na branch `docs/v0-2-spec`. Escopo do pedido do autor: edição com preview (CodeMirror 6), escrita segura, conflito com agentes, busca full-text (FTS5), command palette, checkbox opt-in, progresso x/y, edição com várias instâncias, Fase 0 de dívidas e três spikes antes das features
@@ -85,3 +101,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · T3 · chips em janela estreita (bb83a95); gate verde, **aguardando revisão visual**. `ChipList` mede a largura natural dos chips (régua invisível) e mostra os que cabem mais "+N", com a lista completa em `sr-only` e no `title`; o cálculo (`chipsThatFit`) tem teste próprio. A primeira captura em 1064 px mostrou um estouro que não era dos chips: a soma dos mínimos da linha (ícone, id, título, nota, hash, gate) passava da largura do card, e o chip "fase" saía da borda. Corrigido com container query no card da fase: abaixo de 520 px a coluna de gate some (o nível continua no painel da tarefa) e os espaços apertam; acima de 640 px o título ganha mínimo maior. Filtros da aba gates agrupados (rótulo + controle; contagem + somente leitura), então quebram em blocos. Capturas (caso real: `tasks.md` da v0.1 com o projeto `quire` em `exban`, por config temporário): `/tmp/quire-shots/v0-2/T3-tasks-1064-dark.png`, `T3-tasks-1064-light.png`, `T3-tasks-1440-dark.png`, `T3-tasks-1440-light.png`, `T3-gates-1064-dark.png`, `T3-gates-1064-light.png`. **Diferenças a revisar:** em 1064 px quase todos os chips viram só "+N", porque o card central fica com ~430 px ao lado do painel da tarefa; os filtros de gates ocupam três linhas nessa largura
 - 2026-11-16 · T4 · `QUIRE_CONFIG`/`QUIRE_INDEX` relativos recusados (33af038). `AppState::from_env` (o `load` só lê as variáveis): config relativo vira erro `config_env_relative` traduzido, sem `path` e não editável (o app abre com os padrões); índice relativo ou dentro de `.specs` encerra a inicialização com a mensagem no stderr, como qualquer falha de abertura do índice. Teste do shell com nomes relativos únicos: nada é criado no diretório de trabalho, `set_config` recusa com o mesmo código, e caminhos absolutos continuam funcionando. **Decisão fora do design:** `set_config` com config inválida passa a devolver o código do motivo (antes era sempre `config_invalid`), para a UI dizer o que corrigir
 - 2026-11-16 · T5 · binário auxiliar de console do Windows (a69fae3); gate verde, **aguardando CI do Windows**. Crate `quire-cli` (sem Tauri, sem `unsafe`): monta o `clap` a partir do `plugins.cli` do `tauri.conf.json` embutido, do mesmo jeito que o `tauri-plugin-cli` 2.5. **Dois detalhes achados pelo teste de paridade:** (1) o `Config::long_description()` do plugin devolve a própria descrição, o que liga o layout longo do `--help`; o auxiliar faz o mesmo de propósito; (2) o `clap` usa o `argv[0]` como nome, e o auxiliar se apresentava como `quire-cli`; agora usa sempre `quire`. Teste de paridade no shell (10 linhas de comando: ajuda, ajuda do subcomando, `help open`, flag inválida, `open` sem alvo, alvo a mais e as chamadas válidas) e diff dos binários reais no Linux: saída e código iguais. Chamada válida: inicia o `quire.exe` vizinho com `DETACHED_PROCESS` (API segura de `CommandExt`) e sai com 0; sem o app ao lado, mensagem e código 1. Empacotamento só no Windows: `tauri.windows.conf.json` com `externalBin` e o fragmento WiX `wix/quire-cli.wxs` (`bin\\quire.cmd` + `PATH` do sistema só com `bin`); `scripts/stage-quire-cli.sh` prepara o binário antes do `tauri build` (CI, release e CONTRIBUTING). `.gitattributes` força CRLF em `*.cmd`. `ci.yml`: passo que testa o `quire.cmd` em PowerShell e `cmd` (ajuda, versão, códigos 2 e 1) e job `msi` que gera, instala com `msiexec /qn` e roda `quire --version` pelo `PATH`; `actionlint` 1.7.12 limpo. `.deb` com a mesma lista de arquivos de antes. **NÃO VERIFICADO (sem Windows):** tudo que só roda no Windows, listado em Onde parou
+- 2026-11-16 · T6 · memória medida no binário de produção (f945633, `scripts/pss-tree.py`): app vazio 257–258 MB, spec de 40 KB no modo Ler 395–447 MB (mediana 396), tabela em "Medições". Orçamento proposto para o modo Dividir: mediana ≤ 456 MB (base + 60 MB), **aguardando aprovação do autor**; a tarefa fica sem `[x]` só por isso. A medição usa uma saída headless do Hyprland em vez de janela visível; o efeito disso no PSS não foi medido separadamente. Captura de conferência: `/tmp/quire-shots/v0-2/T6-40kb-read.png`
