@@ -232,6 +232,8 @@ pub(crate) trait Fs {
     fn set_permissions(&self, path: &Path, perm: fs::Permissions) -> std::io::Result<()>;
     fn sync(&self, file: &File) -> std::io::Result<()>;
     fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()>;
+    /// Creates `to` as a second name of `from`; fails if `to` exists (no-overwrite create).
+    fn hard_link(&self, from: &Path, to: &Path) -> std::io::Result<()>;
     fn sync_dir(&self, dir: &Path) -> std::io::Result<()>;
     /// Whether `ours` (just created by this process) and `theirs` have the same owner.
     fn same_owner(&self, ours: &Path, theirs: &Path) -> std::io::Result<bool>;
@@ -254,6 +256,9 @@ impl Fs for RealFs {
     }
     fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()> {
         fs::rename(from, to)
+    }
+    fn hard_link(&self, from: &Path, to: &Path) -> std::io::Result<()> {
+        fs::hard_link(from, to)
     }
     #[cfg(unix)]
     fn sync_dir(&self, dir: &Path) -> std::io::Result<()> {
@@ -454,51 +459,21 @@ pub(crate) fn save_with(
     // 4. Hidden temporary file in the same folder.
     let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
     let tmp = dir.join(temp_name(&name, std::process::id(), counter));
-    let mut file = fs_ops.create_new(&tmp).map_err(|e| WriteError::Io {
+    let file = fs_ops.create_new(&tmp).map_err(|e| WriteError::Io {
         step: Step::CreateTemp,
         message: e.to_string(),
     })?;
     // From here on, any failure removes the temporary file of this call (SAV-02).
-    let result = (|| {
-        if original.is_some()
-            && !fs_ops.same_owner(&tmp, &dest).map_err(|e| WriteError::Io {
-                step: Step::Resolve,
-                message: e.to_string(),
-            })?
-        {
-            return Err(WriteError::ForeignOwner);
-        }
-        // 5. Content, permissions of the original, flush to disk.
-        fs_ops
-            .write_all(&mut file, bytes)
-            .map_err(|e| WriteError::Io {
-                step: Step::WriteTemp,
-                message: e.to_string(),
-            })?;
-        if let Some(m) = &original {
-            fs_ops
-                .set_permissions(&tmp, m.permissions())
-                .map_err(|e| WriteError::Io {
-                    step: Step::Permissions,
-                    message: e.to_string(),
-                })?;
-        }
-        fs_ops.sync(&file).map_err(|e| WriteError::Io {
-            step: Step::SyncTemp,
-            message: e.to_string(),
-        })?;
-        // 6. Second check, right before the rename.
-        guard.check(Checkpoint::BeforeRename, &dest)?;
-        if expect == Expect::Absent && fs::symlink_metadata(&dest).is_ok() {
-            return Err(WriteError::Conflict {
-                disk: Fingerprint::of(&dest).ok().flatten(),
-            });
-        }
-        // 7. Replace, retrying while another program holds the file (Windows, SAV-08).
-        rename_with_retry(fs_ops, &tmp, &dest)
-    })();
-    drop(file);
-    if let Err(e) = result {
+    if let Err(e) = fill_and_place(
+        fs_ops,
+        file,
+        &tmp,
+        &dest,
+        bytes,
+        original.as_ref(),
+        expect,
+        guard,
+    ) {
         let _ = fs::remove_file(&tmp);
         return Err(e);
     }
@@ -507,6 +482,156 @@ pub(crate) fn save_with(
     let _ = fs_ops.sync_dir(dir);
     // 9. The new base for the caller.
     Ok(Fingerprint::of_bytes(bytes))
+}
+
+/// Steps 5 to 7: content, permissions, flush, second check, replace (or create).
+#[allow(clippy::too_many_arguments)]
+fn fill_and_place(
+    fs_ops: &dyn Fs,
+    mut file: File,
+    tmp: &Path,
+    dest: &Path,
+    bytes: &[u8],
+    original: Option<&fs::Metadata>,
+    expect: Expect,
+    guard: &dyn Guard,
+) -> Result<(), WriteError> {
+    if original.is_some()
+        && !fs_ops.same_owner(tmp, dest).map_err(|e| WriteError::Io {
+            step: Step::Resolve,
+            message: e.to_string(),
+        })?
+    {
+        return Err(WriteError::ForeignOwner);
+    }
+    // 5. Content, permissions of the original, flush to disk.
+    fs_ops
+        .write_all(&mut file, bytes)
+        .map_err(|e| WriteError::Io {
+            step: Step::WriteTemp,
+            message: e.to_string(),
+        })?;
+    if let Some(m) = original {
+        fs_ops
+            .set_permissions(tmp, m.permissions())
+            .map_err(|e| WriteError::Io {
+                step: Step::Permissions,
+                message: e.to_string(),
+            })?;
+    }
+    fs_ops.sync(&file).map_err(|e| WriteError::Io {
+        step: Step::SyncTemp,
+        message: e.to_string(),
+    })?;
+    // Closed before the rename: Windows refuses to move a file some handles keep open.
+    drop(file);
+    // 6. Second check, right before the rename.
+    guard.check(Checkpoint::BeforeRename, dest)?;
+    // 7. Replace, retrying while another program holds the file (Windows, SAV-08); or create
+    // without ever replacing (conflict copy, re-creation).
+    match expect {
+        Expect::Existing => rename_with_retry(fs_ops, tmp, dest),
+        Expect::Absent => create_new_name(fs_ops, tmp, dest),
+    }
+}
+
+/// Gives `tmp` the name `dest` only if `dest` does not exist. A hard link fails atomically when
+/// the name is taken; where links are not supported, the absence is checked once more right
+/// before a rename (the residual window of A6).
+fn create_new_name(fs_ops: &dyn Fs, tmp: &Path, dest: &Path) -> Result<(), WriteError> {
+    match fs_ops.hard_link(tmp, dest) {
+        Ok(()) => {
+            // The content now has its final name; the temporary name goes away.
+            let _ = fs::remove_file(tmp);
+            Ok(())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(WriteError::Conflict {
+            disk: Fingerprint::of(dest).ok().flatten(),
+        }),
+        Err(_) => {
+            if fs::symlink_metadata(dest).is_ok() {
+                return Err(WriteError::Conflict {
+                    disk: Fingerprint::of(dest).ok().flatten(),
+                });
+            }
+            rename_with_retry(fs_ops, tmp, dest)
+        }
+    }
+}
+
+/// The conflict check of both checkpoints (CNF-03, TD-13): the disk must still hold exactly the
+/// content the caller loaded, compared by size and hash of the raw bytes, never by `mtime`.
+pub struct Unchanged(pub Fingerprint);
+
+impl Guard for Unchanged {
+    fn check(&self, _at: Checkpoint, target: &Path) -> Result<(), WriteError> {
+        match Fingerprint::of(target) {
+            Ok(Some(disk)) if disk == self.0 => Ok(()),
+            Ok(disk) => Err(WriteError::Conflict { disk }),
+            Err(e) => Err(WriteError::Io {
+                step: Step::Resolve,
+                message: e.to_string(),
+            }),
+        }
+    }
+}
+
+/// Saves over a file the caller loaded with fingerprint `base` (CNF-02, CNF-03).
+pub fn save_over(
+    target: &Path,
+    bytes: &[u8],
+    base: &Fingerprint,
+) -> Result<Fingerprint, WriteError> {
+    save(target, bytes, Expect::Existing, &Unchanged(*base))
+}
+
+/// Creates a file that must not exist (conflict copy, confirmed re-creation); never replaces.
+pub fn save_new(target: &Path, bytes: &[u8]) -> Result<Fingerprint, WriteError> {
+    save(target, bytes, Expect::Absent, &NoGuard)
+}
+
+/// `<stem>.conflito-<stamp>.md`, then `-2`, `-3`… (CNF-08). `stamp` is the local time the UI
+/// gives, `AAAAMMDD-HHMMSS`.
+pub fn conflict_copy_name(name: &str, stamp: &str, n: u32) -> Result<String, WriteError> {
+    let valid = stamp.len() == 15
+        && stamp.as_bytes()[8] == b'-'
+        && stamp
+            .bytes()
+            .enumerate()
+            .all(|(i, b)| i == 8 || b.is_ascii_digit());
+    if !valid {
+        return Err(WriteError::Refused(format!("bad time stamp {stamp:?}")));
+    }
+    let (stem, ext) = match name.rfind('.') {
+        Some(i) if i > 0 => (&name[..i], &name[i..]),
+        _ => (name, ""),
+    };
+    Ok(if n <= 1 {
+        format!("{stem}.conflito-{stamp}{ext}")
+    } else {
+        format!("{stem}.conflito-{stamp}-{n}{ext}")
+    })
+}
+
+/// Writes `bytes` as a new conflict copy of `name` in `dir`, with the first free name; never
+/// over an existing file. Returns the name used and the fingerprint written.
+pub fn save_conflict_copy(
+    dir: &Path,
+    name: &str,
+    bytes: &[u8],
+    stamp: &str,
+) -> Result<(String, Fingerprint), WriteError> {
+    for n in 1..=99 {
+        let candidate = conflict_copy_name(name, stamp, n)?;
+        match save_new(&dir.join(&candidate), bytes) {
+            Ok(fp) => return Ok((candidate, fp)),
+            Err(WriteError::Conflict { .. }) => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Err(WriteError::Refused(format!(
+        "no free name for a conflict copy of {name}"
+    )))
 }
 
 /// Total wait for a file held by another program before giving up (SAV-08).
@@ -915,6 +1040,12 @@ mod tests {
             }
             RealFs.rename(from, to)
         }
+        fn hard_link(&self, from: &Path, to: &Path) -> std::io::Result<()> {
+            if self.0 == Step::Rename {
+                return Err(std::io::Error::other("injected: link failed"));
+            }
+            RealFs.hard_link(from, to)
+        }
         fn sync_dir(&self, dir: &Path) -> std::io::Result<()> {
             RealFs.sync_dir(dir)
         }
@@ -980,6 +1111,149 @@ mod tests {
         remove_orphan_temp(d.path(), &temp_name("spec.md", 99, 1)).unwrap();
         assert!(orphan_temps(d.path()).unwrap().is_empty());
         assert!(d.path().join("spec.md").exists() && d.path().join(".other.tmp").exists());
+    }
+
+    // ---------------------------------------------------------------- conflicts (T13)
+
+    /// Writes as an agent would at one checkpoint, then lets `Unchanged` check.
+    struct AgentAt(Checkpoint, &'static [u8], Unchanged);
+    impl Guard for AgentAt {
+        fn check(&self, at: Checkpoint, target: &Path) -> Result<(), WriteError> {
+            if at == self.0 {
+                fs::write(target, self.1).unwrap();
+            }
+            self.2.check(at, target)
+        }
+    }
+
+    #[test]
+    fn an_outside_write_before_the_save_is_a_conflict_and_survives() {
+        let d = tmpdir();
+        let f = d.path().join("spec.md");
+        fs::write(&f, b"loaded").unwrap();
+        let base = Fingerprint::of(&f).unwrap().unwrap();
+        fs::write(&f, b"agent wrote this").unwrap();
+        let r = save_over(&f, b"mine", &base);
+        assert!(
+            matches!(&r, Err(WriteError::Conflict { disk: Some(d) }) if *d == Fingerprint::of_bytes(b"agent wrote this")),
+            "{r:?}"
+        );
+        assert_eq!(fs::read(&f).unwrap(), b"agent wrote this");
+        assert!(leftovers(d.path()).is_empty());
+    }
+
+    #[test]
+    fn an_outside_write_between_the_temp_and_the_rename_is_caught() {
+        for at in [Checkpoint::BeforeTemp, Checkpoint::BeforeRename] {
+            let d = tmpdir();
+            let f = d.path().join("spec.md");
+            fs::write(&f, b"loaded").unwrap();
+            let base = Fingerprint::of(&f).unwrap().unwrap();
+            let r = save(
+                &f,
+                b"mine",
+                Expect::Existing,
+                &AgentAt(at, b"agent", Unchanged(base)),
+            );
+            assert!(
+                matches!(r, Err(WriteError::Conflict { .. })),
+                "{at:?}: {r:?}"
+            );
+            assert_eq!(fs::read(&f).unwrap(), b"agent", "{at:?}");
+            assert!(leftovers(d.path()).is_empty(), "{at:?}");
+        }
+    }
+
+    #[test]
+    fn same_mtime_with_other_content_is_a_conflict_and_the_reverse_is_not() {
+        let d = tmpdir();
+        let f = d.path().join("spec.md");
+        fs::write(&f, b"aaaa").unwrap();
+        let base = Fingerprint::of(&f).unwrap().unwrap();
+        let mtime = fs::metadata(&f).unwrap().modified().unwrap();
+        // Same size, same mtime, other bytes (a tool that preserves mtime).
+        fs::write(&f, b"bbbb").unwrap();
+        File::options()
+            .write(true)
+            .open(&f)
+            .unwrap()
+            .set_modified(mtime)
+            .unwrap();
+        assert_eq!(fs::metadata(&f).unwrap().modified().unwrap(), mtime);
+        assert!(matches!(
+            save_over(&f, b"mine", &base),
+            Err(WriteError::Conflict { .. })
+        ));
+        assert_eq!(fs::read(&f).unwrap(), b"bbbb");
+        // Same bytes, new mtime (touch): not a conflict.
+        fs::write(&f, b"aaaa").unwrap();
+        let later = mtime + Duration::from_secs(3600);
+        File::options()
+            .write(true)
+            .open(&f)
+            .unwrap()
+            .set_modified(later)
+            .unwrap();
+        let new = save_over(&f, b"mine", &base).unwrap();
+        assert_eq!(fs::read(&f).unwrap(), b"mine");
+        assert_eq!(new, Fingerprint::of_bytes(b"mine"));
+    }
+
+    #[test]
+    fn the_returned_fingerprint_is_the_next_base() {
+        let d = tmpdir();
+        let f = d.path().join("spec.md");
+        fs::write(&f, b"v1").unwrap();
+        let b1 = Fingerprint::of(&f).unwrap().unwrap();
+        let b2 = save_over(&f, b"v2", &b1).unwrap();
+        let b3 = save_over(&f, b"v3", &b2).unwrap();
+        assert_eq!(Fingerprint::of(&f).unwrap(), Some(b3));
+        // The old base no longer matches.
+        assert!(matches!(
+            save_over(&f, b"v4", &b1),
+            Err(WriteError::Conflict { .. })
+        ));
+    }
+
+    #[test]
+    fn conflict_copies_take_a_free_name_and_never_overwrite() {
+        let d = tmpdir();
+        fs::write(d.path().join("spec.md"), b"disk").unwrap();
+        let stamp = "20261116-143005";
+        let (n1, _) = save_conflict_copy(d.path(), "spec.md", b"buffer 1", stamp).unwrap();
+        assert_eq!(n1, "spec.conflito-20261116-143005.md");
+        let (n2, _) = save_conflict_copy(d.path(), "spec.md", b"buffer 2", stamp).unwrap();
+        assert_eq!(n2, "spec.conflito-20261116-143005-2.md");
+        // A file someone else created with the next name is kept.
+        fs::write(
+            d.path().join("spec.conflito-20261116-143005-3.md"),
+            b"theirs",
+        )
+        .unwrap();
+        let (n4, _) = save_conflict_copy(d.path(), "spec.md", b"buffer 3", stamp).unwrap();
+        assert_eq!(n4, "spec.conflito-20261116-143005-4.md");
+        assert_eq!(fs::read(d.path().join(&n1)).unwrap(), b"buffer 1");
+        assert_eq!(
+            fs::read(d.path().join("spec.conflito-20261116-143005-3.md")).unwrap(),
+            b"theirs"
+        );
+        assert_eq!(fs::read(d.path().join("spec.md")).unwrap(), b"disk");
+        assert!(leftovers(d.path()).is_empty());
+        for bad in [
+            "",
+            "2026-11-16",
+            "20261116_143005",
+            "2026111a-143005",
+            "../x",
+        ] {
+            assert!(
+                matches!(
+                    conflict_copy_name("spec.md", bad, 1),
+                    Err(WriteError::Refused(_))
+                ),
+                "{bad}"
+            );
+        }
     }
 
     #[cfg(windows)]
