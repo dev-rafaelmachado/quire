@@ -1,7 +1,90 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Execução · 1 de 7 fases completas · branch `feat/v0-2` · 14/28 tarefas
+**Status:** Execução concluída até onde o ambiente permite, aguardando revisão humana, CI do Windows e WSL · 1 de 7 fases completas · branch `feat/v0-2` · 14/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
+
+## Relatório da manhã (2026-11-16)
+
+**O que está pronto.** As 28 tarefas foram executadas na branch `feat/v0-2`, sem push, exceto a T8, que precisa do autor numa máquina com WSL. O gate final passou no último commit de código:
+
+- fmt e clippy com `-D warnings`;
+- 151 testes Rust, mais 2 ignorados de propósito;
+- typecheck e 195 testes vitest;
+- `pnpm build`, `cargo build --release` e `.deb` de produção de 9,4 MiB.
+
+Estão marcadas com `[x]`: T1, T27, T2, T4, T7, T10, T11, T12, T13, T28, T14, T15, T21 e T25. O núcleo de escrita (T12, T13, T28, T14) e os comandos do shell (T15) estão completos e cobertos por:
+
+- injeção de falha em cada etapa;
+- teste de propriedade com 3.000 textos;
+- crash real antes do rename (processo filho com `abort`);
+- formatos CRLF, BOM, sem newline final e mistos, salvos pelo IPC e comparados byte a byte;
+- link simbólico e arquivo somente leitura;
+- conflito antes e entre as duas verificações;
+- checkbox que muda 1 byte (`git diff --numstat` = 1 linha);
+- save sem ciclo de reconciliação.
+
+**Aguardando sua revisão visual** (capturas em `/tmp/quire-shots/v0-2/`, sempre nos dois temas):
+
+| Tarefa | Capturas |
+| --- | --- |
+| T3 | `T3-tasks-{1064,1440}-*`, `T3-gates-1064-*` |
+| T16 | `T16-{read,edit,split}-*` |
+| T17 | sem captura: rolagem sincronizada só na mão |
+| T18 | `T18-guard-*` |
+| T19 | `T19-conflict-*`, `T19-notice-*` |
+| T20 | `T20-versions-*` |
+| T22 | `T22-search-*`, `T22-highlight-*` |
+| T23 | `T23-palette-*`, `T23-palette-search-*` |
+| T24 | `T24-checkbox-*`, `T24-prefs-dark.png` |
+| T26 | roteiro E2E da v0.2 em `docs/e2e.md`, passos 43–74, com o binário de produção |
+
+Também ficam com você o roteiro de teclas mortas e IME (`apps/desktop/src/spike-editor/README.md`, T9 e T16) e a aprovação do orçamento de memória do modo Dividir (T6: ≤ 456 MB).
+
+**Decidido fora do design** (detalhes no Journal):
+
+- **Linguagem markdown do editor:** montada direto sobre `@lezer/markdown` com GFM, em vez de `@codemirror/lang-markdown`, que puxava HTML, CSS e JS (+74 KB gzip) (T9).
+- **Criar arquivo sem sobrescrever:** a cópia de conflito e a recriação usam `hard_link`, que falha de forma atômica quando o nome já existe (T13).
+- **Dono diferente:** detectado comparando o `uid` do temporário com o do original, sem `unsafe` (T12).
+- **fsync da pasta:** uma falha depois do rename não vira erro, porque o conteúdo já está no lugar (T12).
+- **Impressão digital no IPC:** cruza como token de texto `<len>-<hash>`, porque `u64`/`u128` não passam bem para o TypeScript (T15).
+- **`tasks_checkbox`:** entrou na T15, e não na T24. O `save_settings` passou a gravá-lo, e o `set_config` mantém o valor atual quando a UI não o envia.
+- **Códigos de erro:** os de `set_config` ficaram específicos (`poll_interval_range`, `unknown_theme`, `config_*`) e, com config inválida, ele devolve o código do motivo (T1, T4).
+- **Idioma:** vale ao clicar em Salvar, como o tema. Remover uma chave do `config.toml` passou a preservar o comentário de cima, um bug da v0.1 achado na T27.
+- **Cópia no diálogo de conflito:** depois de "Salvar como cópia", o buffer volta para o conteúdo do disco, porque as edições já estão na cópia (T19).
+- **Branch nos resultados:** a busca mostra a branch quando a spec tem cópias divergentes (T23).
+- **Links simbólicos:** passam a contar como arquivos da spec; link quebrado continua fora (T26).
+- **Ganchos de URL** para capturas e medição, só no modo dev: `?mode=`, `?bench=`, `?demo=`, `?search=`, `?highlight=` e `?palette=`.
+
+Três critérios de pronto foram interpretados, sem afrouxar a spec:
+
+- **T19:** um save pode gerar até duas reconciliações (a da escrita e a do watcher), e não "uma só". O teste prova que não há ciclo, que é o que o critério protege.
+- **T20:** o badge mostra "3 versões", e não "2 versões". As fixtures têm três cópias do ACME-142, e o badge da v0.1 conta cópias.
+- **T24:** o teste de 1 byte usa a ACME-142, e não a T3 da ACME-170. A ACME-170 aparece na captura.
+
+**Bugs achados no caminho e corrigidos:**
+
+- Trocar de Editar para Dividir desmontava o editor e perdia o texto.
+- Abrir a busca trocaria a coluna central com alterações não salvas, sem passar pela guarda.
+- Os `data-line` da visão Ler ficavam deslocados quando o cabeçalho era removido.
+- A busca aberta antes da primeira varredura não se atualizava.
+- A palette aberta cedo ficava sem specs.
+- Chips de requisito estouravam a linha em 1064 px por causa da coluna de gate.
+
+**O que parou e por quê.** Só a T8, por falta de WSL. Nenhum gate falhou duas vezes pelo mesmo motivo, nenhum TD precisou mudar e nenhum risco de perda de dado ficou sem tratamento.
+
+**NÃO VERIFICADO** (lista completa em "Onde parou"):
+
+- **Só com Windows ou CI do Windows:** tudo da T5 (console, `.cmd`, WiX, `PATH`, MSI); a semântica do NTFS (arquivo em uso, `hard_link`, rename); o editor e o idioma no WebView2.
+- **Só com WSL:** rename atômico em DrvFs, 9p e `\\wsl$`. Por isso essas classes ficam somente leitura (P6, padrão conservador).
+- **Só à mão:** teclas mortas e IME no Wayland; rolagem sincronizada com mouse; fechamento real da janela com alteração não salva; E2E na janela de produção; memória do modo Dividir no binário de produção (no binário de desenvolvimento, +44 MB sobre o Ler).
+
+**Depende de você:**
+
+1. Revisar as capturas e rodar o roteiro E2E da v0.2 e o de teclas mortas e IME.
+2. Aprovar ou ajustar o orçamento de memória (T6).
+3. Fazer push da `feat/v0-2` para o CI rodar no Windows. Olhe o passo "console helper (Windows)", o job "msi install" e o passo "rename spike (T11)", que deve preencher as linhas de ext4 e NTFS na tabela da T11.
+4. Rodar no WSL o spike T2 e o T3 da v0.1 (T8) e o `rename_spike` em `/mnt/c` e `\\wsl$` (T11), para liberar ou manter bloqueadas essas classes.
+5. Decidir sobre PR e tags (`v0.1.0` continua pendente, e a `v0.2.0` não foi criada).
 
 ## Em uma frase
 
