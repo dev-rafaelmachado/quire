@@ -1,0 +1,4 @@
+{
+  "example": "POST /tokens",
+  "response": { "id": "tok_123", "value": "shown-once" }
+}

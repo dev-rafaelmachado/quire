@@ -1,0 +1,6 @@
+/* Quire design tokens. Dark is the default (.qd); light (.ql) uses the same names.
+   Fonts: Inter (UI) and JetBrains Mono (code, IDs, hashes). */
+.qd{--bg:#0e1013;--side:#12151a;--panel:#161a1f;--raise:#1c2027;--line:#262b33;--text:#e7e9ec;--muted:#a0a8b2;--faint:#87919c;--acc:#8ea6ff;--acc-bg:#1b2340;--ok:#5fd0a5;--ok-bg:#10261e;--warn:#f2a661;--warn-bg:#2c2012;--code:#0b0d10}
+.ql{--bg:#ffffff;--side:#f4f5f7;--panel:#fafbfc;--raise:#e9ecf0;--line:#dfe3e8;--text:#14171b;--muted:#4b535d;--faint:#5f6873;--acc:#2f4bbf;--acc-bg:#e6ebff;--ok:#0b6e4f;--ok-bg:#dcf3ea;--warn:#9a5208;--warn-bg:#fdeed8;--code:#f1f3f5}
+
+:root{--radius-sm:4px;--radius-md:6px;--radius-lg:8px;--radius-xl:10px;--font-ui:'Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace}

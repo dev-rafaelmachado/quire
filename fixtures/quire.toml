@@ -1,0 +1,12 @@
+# Quire configuration for the synthetic fixtures (scripts/make-fixtures.sh).
+# Relative scan paths are resolved against this file's directory.
+# Run the app on them from the repository root (the path must be absolute):
+#   QUIRE_CONFIG="$PWD/fixtures/quire.toml" pnpm --filter desktop tauri dev
+scan_paths = ["workspace/projects"]
+
+[projects.acme_gateway]
+preset = "exban"
+issue_url_base = "https://tracker.example/browse/"
+
+[projects.acme_billing]
+preset = "exban"

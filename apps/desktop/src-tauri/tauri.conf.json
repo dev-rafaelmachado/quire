@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Quire",
+  "version": "0.1.0",
+  "identifier": "io.github.dev-rafaelmachado.quire",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Quire",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
+        "create": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "cli": {
+      "description": "Quire: lê as pastas de spec de vários repositórios e worktrees num só lugar.",
+      "args": [
+        {
+          "name": "path",
+          "index": 1,
+          "takesValue": true,
+          "description": "Pasta para abrir; `quire .` abre a spec da worktree atual."
+        }
+      ],
+      "subcommands": {
+        "open": {
+          "description": "Abre uma spec pela chave da issue (ex.: ACME-142) ou pelo caminho da pasta ou de um arquivo dela.",
+          "args": [
+            {
+              "name": "target",
+              "index": 1,
+              "takesValue": true,
+              "required": true,
+              "description": "Chave da issue ou caminho."
+            }
+          ]
+        }
+      }
+    }
+  }
+}

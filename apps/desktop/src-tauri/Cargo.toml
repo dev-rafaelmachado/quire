@@ -1,0 +1,33 @@
+[package]
+name = "quire-desktop"
+description = "Tauri shell for the Quire desktop app."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "quire"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+quire-core = { path = "../../../crates/quire-core", features = ["specta"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+specta = { version = "=2.0.0-rc.28", features = ["derive"] }
+specta-typescript = "0.0.15"
+tauri = { version = "2", features = [] }
+tauri-plugin-cli = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tauri-specta = { version = "=2.0.0-rc.29", features = ["derive", "typescript"] }
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+tempfile = "3.27.0"
+
+[lints]
+workspace = true

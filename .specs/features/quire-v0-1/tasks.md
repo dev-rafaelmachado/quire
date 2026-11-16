@@ -27,11 +27,18 @@ Siga o `AGENTS.md`. Implemente **uma tarefa por vez, na ordem das fases**. Antes
 
 ## Comandos de gate
 
-- **fase:** `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && pnpm -r typecheck && pnpm -r test`
-- **final:** o gate de fase + `pnpm --filter desktop build` + `cargo build --workspace --release`
+- **fase:** `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --no-fail-fast && pnpm -r typecheck && pnpm -r test`
+- **final:** o gate de fase + `pnpm --filter desktop build` + `cargo build --workspace --release` + `pnpm --filter desktop tauri build --bundles deb` (ver a nota da T24 abaixo)
 - **e2e:** roteiro manual de T24 sobre `fixtures/workspace`
 
-(Os comandos exatos serão confirmados em T1 e atualizados aqui.)
+Confirmados em T1 (Linux, Rust 1.100, Node 26, pnpm 12), rodando da raiz do repositório:
+
+- **setup:** `pnpm install` (o `@tauri-apps/cli` vem como devDependency de `apps/desktop`; não precisa de `cargo install tauri-cli`)
+- **dev:** `pnpm --filter desktop tauri dev` (ou `pnpm dev` na raiz); Vite fixo na porta 1420
+- `pnpm -r test` usa `vitest run --passWithNoTests`, então passa enquanto não houver testes de frontend
+- No gate final, `pnpm --filter desktop build` precisa rodar **antes** de `cargo build --workspace --release`: o `tauri::generate_context!` embute `apps/desktop/dist` no binário de release
+- **Nota da T24:** `cargo build --workspace --release` só prova que tudo compila. Sem a feature `tauri/custom-protocol` (que só o `tauri build` liga), o binário roda em modo dev e procura o servidor do Vite. O binário de produção e o pacote saem do `pnpm --filter desktop tauri build` (`target/release/quire` e `target/release/bundle/`); o `.AppImage` exige baixar o linuxdeploy e é gerado no `release.yml`
+- Pré-requisitos no Linux (Arch/CachyOS): `webkit2gtk-4.1` e `rustup` com os componentes `clippy` e `rustfmt`
 
 ## Plano de execução
 
@@ -41,10 +48,10 @@ Siga o `AGENTS.md`. Implemente **uma tarefa por vez, na ordem das fases**. Antes
 T1 → T2 → T3 → T4
 ```
 
-- [ ] T1: Scaffold do monorepo (Cargo + pnpm, Tauri 2, Vite React TS estrito)
-- [ ] T2: Spike do WebKitGTK: markdown grande, Mermaid e rolagem
-- [ ] T3: Spike do watcher e do custo de scan (ext4, WSL e `\\wsl$`)
-- [ ] T4: CI no GitHub Actions (Linux e Windows)
+- [x] T1: Scaffold do monorepo (Cargo + pnpm, Tauri 2, Vite React TS estrito) (1d09a59)
+- [x] T2: Spike do WebKitGTK: markdown grande, Mermaid e rolagem (cbb0913)
+- [x] T3: Spike do watcher e do custo de scan (ext4, WSL e `\\wsl$`) (242c3d8)
+- [x] T4: CI no GitHub Actions (Linux e Windows) (cfd7d06)
 
 ### Fase 1: Núcleo (`quire-core`)
 
@@ -52,14 +59,14 @@ T1 → T2 → T3 → T4
 T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12
 ```
 
-- [ ] T5: Fixtures sintéticas do workspace
-- [ ] T6: Scanner de `.specs`
-- [ ] T7: Identidade do projeto via git
-- [ ] T8: Modelo de spec e instâncias com deduplicação
-- [ ] T9: Framework de presets (`generic` e `exban`)
-- [ ] T10: Parsers (cabeçalho, tasks, progresso, IDs)
-- [ ] T11: Parsers JSONL tolerantes (gates e lessons)
-- [ ] T12: Índice SQLite com scan incremental
+- [x] T5: Fixtures sintéticas do workspace (a3e2c35)
+- [x] T6: Scanner de `.specs` (199f344)
+- [x] T7: Identidade do projeto via git (a5a0b9b)
+- [x] T8: Modelo de spec e instâncias com deduplicação (a7b1225)
+- [x] T9: Framework de presets (`generic` e `exban`) (91c0f7e)
+- [x] T10: Parsers (cabeçalho, tasks, progresso, IDs) (60c91ca)
+- [x] T11: Parsers JSONL tolerantes (gates e lessons) (64793b0)
+- [x] T12: Índice SQLite com scan incremental (f452ea3)
 
 ### Fase 2: Shell e base da UI
 
@@ -67,9 +74,9 @@ T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12
 T13 → T14 → T15
 ```
 
-- [ ] T13: Comandos e eventos Tauri com tipos compartilhados
-- [ ] T14: Tokens, tema, layout de três colunas e catálogo de strings
-- [ ] T15: Sidebar de projetos e specs
+- [x] T13: Comandos e eventos Tauri com tipos compartilhados (86de96e)
+- [ ] T14: Tokens, tema, layout de três colunas e catálogo de strings (ddbe3e3) (gate passou, aguardando revisão visual)
+- [x] T15: Sidebar de projetos e specs (97272fe)
 
 ### Fase 3: Visões
 
@@ -77,11 +84,11 @@ T13 → T14 → T15
 T16 → T17 → T18 → T19 → T20
 ```
 
-- [ ] T16: Pipeline de markdown (GFM, código, Mermaid, outline, colapsar)
-- [ ] T17: Abas, faixa de metadados e fallback de outros arquivos
-- [ ] T18: Visão de tasks por fase
-- [ ] T19: Visões de gates e lessons
-- [ ] T20: Seletor de instâncias
+- [ ] T16: Pipeline de markdown (GFM, código, Mermaid, outline, colapsar) (71a2796) (gate passou, aguardando revisão visual)
+- [x] T17: Abas, faixa de metadados e fallback de outros arquivos (c04312f)
+- [ ] T18: Visão de tasks por fase (32e779e) (gate passou, aguardando revisão visual)
+- [ ] T19: Visões de gates e lessons (5c4d3df) (gate passou, aguardando revisão visual)
+- [ ] T20: Seletor de instâncias (56df0cf) (gate passou, aguardando revisão visual)
 
 ### Fase 4: Ao vivo e CLI
 
@@ -89,8 +96,8 @@ T16 → T17 → T18 → T19 → T20
 T21 → T22
 ```
 
-- [ ] T21: Watcher ligado ao índice e à UI
-- [ ] T22: CLI com single-instance e seletor
+- [x] T21: Watcher ligado ao índice e à UI (f174742)
+- [ ] T22: CLI com single-instance e seletor (b4d523a) (gate passou, aguardando revisão visual)
 
 ### Fase 5: Fechamento da v0.1
 
@@ -98,8 +105,8 @@ T21 → T22
 T23 → T24
 ```
 
-- [ ] T23: Preferências (scan paths, preset por projeto, tema)
-- [ ] T24: Documentação de uso, empacotamento e roteiro E2E
+- [x] T23: Preferências (scan paths, preset por projeto, tema) (26d0369)
+- [ ] T24: Documentação de uso, empacotamento e roteiro E2E (79ae831, 36609d2) (gate passou, aguardando revisão visual)
 
 ## Detalhamento das tarefas
 
@@ -456,6 +463,8 @@ T23 → T24
 - Criar e remover pasta de spec atualiza a lista
 - Rename atômico de editor não vira "removido"
 - Em caminho sem eventos, o polling assume com o intervalo configurado
+- Ao receber `create` de uma pasta, o watcher varre o conteúdo dela: um arquivo criado junto com a pasta não gera evento próprio (spike T3: 0/20 no inotify)
+- O watch nativo cobre só as pastas `.specs` (recursivo) e a raiz de cada repo (não recursivo, para pegar a criação de `.specs`), nunca o scan path inteiro: `node_modules`, `target` e `.git` esgotariam `max_user_watches` (spike T3)
 
 **Testes**: integration, manual
 **Gate**: fase
