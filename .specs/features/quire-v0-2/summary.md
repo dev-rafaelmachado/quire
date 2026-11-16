@@ -1,6 +1,6 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 3/28 tarefas
+**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 4/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -12,7 +12,7 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 <!-- progress:start -->
 | Fase | Repositório | Tarefas |
 |---|---|---|
-| 0: Dívidas da v0.1 | quire | 3/9 |
+| 0: Dívidas da v0.1 | quire | 4/9 |
 | 1: Spikes | quire | 0/3 |
 | 2: Escrita segura no núcleo | quire | 0/5 |
 | 3: Editor | quire | 0/5 |
@@ -20,17 +20,17 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 | 5: Tasks e progresso | quire | 0/2 |
 | 6: Fechamento da v0.2 | quire | 0/1 |
 
-**Total:** 3/28 tarefas
+**Total:** 4/28 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 0, T4 (recusar QUIRE_CONFIG/QUIRE_INDEX relativos)
-- **Concluídas:** T1, T27, T2
-- **Em andamento:** T4
+- **Fase / tarefa:** Fase 0, T5 (binário auxiliar de console no Windows)
+- **Concluídas:** T1, T27, T2, T4
+- **Em andamento:** T5
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
 - **NÃO VERIFICADO (depende de ambiente que não há aqui):** idioma pelo sistema no WebView2 (T27)
-- **Próximo passo:** T4, depois T5
+- **Próximo passo:** T5, depois T6
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** nenhum de especificação. Dependem de máquina: T8 e partes de T9, T11 e T27 (autor com WSL ou Windows); T5 depende só do CI do Windows
 - **Arquivos sem commit:** nenhum
@@ -82,3 +82,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · T27 · idioma do sistema com fallback em inglês e seletor (bb0a0d0). `resolveLocale` testado por tabela (14 casos); `language` no `config.toml` lido como texto (valor desconhecido avisa nas Preferências e é regravado igual se o usuário salvar sem mexer). **Bug achado pelo teste e corrigido:** remover uma chave do `config.toml` (`set_or_remove`, também usado por `theme`) apagava o comentário escrito acima dela, que no `toml_edit` pertence ao prefixo da chave; agora o comentário passa para a chave seguinte (ou para o fim da tabela). Testes de vitest fixam `navigator.languages = ["pt-BR"]` num `setupFiles` para não depender do `LANG` da máquina. **Verificado no binário de produção (Linux):** `LANG=en_US.UTF-8` abre em inglês, `pt_BR` em português e `es_ES` em inglês (`/tmp/quire-shots/v0-2/T27-LANG-*.png`); Preferências com as linhas Tema e Idioma em `T27-prefs-dark.png` e `T27-prefs-light.png`. A primeira captura mostrou o seletor esticado e sem rótulo visível; corrigido antes do commit. **Decisão fora do design:** o idioma escolhido vale ao clicar em Salvar (como o tema), e não ao clicar no seletor. **NÃO VERIFICADO:** WebView2 (Windows). **Nota de captura:** o Hyprland daqui passou a usar configuração Lua (0.57.2) e uma janela num workspace especial oculto não pinta (a captura sai vazia); as capturas da v0.2 usam uma saída headless criada com `hyprctl output create headless QUIRESHOT` (sem tela física) e `grim -T` da janela
 - 2026-11-16 · T2 · sugestão do preset visível (d6f2502): faixa na sidebar, abaixo do cabeçalho do projeto, com "Usar exban" (grava só o preset daquele projeto pelo `set_config`, desabilitado se o `config.toml` não for editável) e "Dispensar sugestão" (vale na sessão); nas Preferências, o mesmo atalho só preenche o rascunho, gravado no Salvar. Testes: nada é escrito sem o clique, dispensar não escreve, só o preset do projeto muda (`settingsWithPreset`). As fixtures versionadas têm preset explícito nos dois projetos, então a captura usou uma cópia temporária do config no scratchpad (`/tmp/quire-shots/v0-2/T2-suggestion-dark.png` e `-light.png`); o clique em si não foi feito na janela real (sem automação de clique aqui), só no teste de componente
 - 2026-11-16 · T3 · chips em janela estreita (bb83a95); gate verde, **aguardando revisão visual**. `ChipList` mede a largura natural dos chips (régua invisível) e mostra os que cabem mais "+N", com a lista completa em `sr-only` e no `title`; o cálculo (`chipsThatFit`) tem teste próprio. A primeira captura em 1064 px mostrou um estouro que não era dos chips: a soma dos mínimos da linha (ícone, id, título, nota, hash, gate) passava da largura do card, e o chip "fase" saía da borda. Corrigido com container query no card da fase: abaixo de 520 px a coluna de gate some (o nível continua no painel da tarefa) e os espaços apertam; acima de 640 px o título ganha mínimo maior. Filtros da aba gates agrupados (rótulo + controle; contagem + somente leitura), então quebram em blocos. Capturas (caso real: `tasks.md` da v0.1 com o projeto `quire` em `exban`, por config temporário): `/tmp/quire-shots/v0-2/T3-tasks-1064-dark.png`, `T3-tasks-1064-light.png`, `T3-tasks-1440-dark.png`, `T3-tasks-1440-light.png`, `T3-gates-1064-dark.png`, `T3-gates-1064-light.png`. **Diferenças a revisar:** em 1064 px quase todos os chips viram só "+N", porque o card central fica com ~430 px ao lado do painel da tarefa; os filtros de gates ocupam três linhas nessa largura
+- 2026-11-16 · T4 · `QUIRE_CONFIG`/`QUIRE_INDEX` relativos recusados (33af038). `AppState::from_env` (o `load` só lê as variáveis): config relativo vira erro `config_env_relative` traduzido, sem `path` e não editável (o app abre com os padrões); índice relativo ou dentro de `.specs` encerra a inicialização com a mensagem no stderr, como qualquer falha de abertura do índice. Teste do shell com nomes relativos únicos: nada é criado no diretório de trabalho, `set_config` recusa com o mesmo código, e caminhos absolutos continuam funcionando. **Decisão fora do design:** `set_config` com config inválida passa a devolver o código do motivo (antes era sempre `config_invalid`), para a UI dizer o que corrigir
