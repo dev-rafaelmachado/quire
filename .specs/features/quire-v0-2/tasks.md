@@ -69,7 +69,7 @@ T9 → T10 → T11
 T12 → T13 → T28 → T14 → T15
 ```
 
-- [ ] T12: Pipeline de escrita atômica com preservação de formato
+- [x] T12: Pipeline de escrita atômica com preservação de formato (c56adbd)
 - [ ] T13: Impressão digital e detecção de conflito
 - [ ] T28: Escrita condicionada à classe do sistema de arquivos (P6)
 - [ ] T14: Alternância de checkbox por linha
