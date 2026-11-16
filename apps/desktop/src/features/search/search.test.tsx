@@ -29,7 +29,7 @@ const RESULTS: SearchResults = {
       title: "ACME-142 — Tokens de serviço",
       projectId: 1,
       project: "acme_gateway",
-      hits: [{ instanceId: 12, file: "spec.md", heading: "Problema", line: 14, snippet: "Usam \u0002integrações\u0003 <b>não</b>" }],
+      hits: [{ instanceId: 12, file: "spec.md", heading: "Problema", line: 14, snippet: "Usam \u0002integrações\u0003 <b>não</b>", branch: null }],
     },
   ],
 };

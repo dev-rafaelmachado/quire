@@ -110,7 +110,8 @@ export function SearchPanel() {
                     <span className="flex items-center gap-2 text-[12px] text-muted">
                       <FileText aria-hidden="true" className="size-3.5" />
                       <span className="font-code">{h.file}</span>
-                      {h.heading ? <span className="truncate">{h.heading}</span> : null}
+                      {h.heading ? <span className="min-w-0 truncate">{h.heading}</span> : null}
+                      {h.branch ? <span className="ml-auto flex-none font-code text-[11px] text-faint">{h.branch}</span> : null}
                     </span>
                     <span className="text-[13px] leading-relaxed">
                       <Snippet snippet={h.snippet} />

@@ -35,6 +35,8 @@ pub struct SearchHit {
     /// Excerpt with matches between U+0002 and U+0003; the UI turns them into `<mark>` and
     /// never renders HTML from here.
     pub snippet: String,
+    /// Branch of the copy, when the spec has several (divergent copies can match twice).
+    pub branch: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -142,12 +144,17 @@ pub async fn search(
             groups.len() - 1
         });
         if let Some(group) = groups.get_mut(g) {
+            let branch = (spec.instances.len() > 1)
+                .then(|| spec.instances.iter().find(|i| i.id == instance))
+                .flatten()
+                .map(|i| i.branch.clone().unwrap_or_else(|| "HEAD".to_owned()));
             group.hits.push(SearchHit {
                 instance_id: id32(instance),
                 file: r.file.clone(),
                 heading: r.heading.clone(),
                 line: u32::try_from(r.line).unwrap_or(0),
                 snippet: r.snippet.clone(),
+                branch,
             });
         }
     }

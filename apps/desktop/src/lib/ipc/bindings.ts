@@ -630,7 +630,7 @@ export type SearchGroup_Deserialize = {
 	title?: string | null,
 	projectId: number,
 	project: string,
-	hits: SearchHit[],
+	hits: SearchHit_Deserialize[],
 };
 
 export type SearchGroup_Serialize = {
@@ -640,10 +640,12 @@ export type SearchGroup_Serialize = {
 	title: string | null,
 	projectId: number,
 	project: string,
-	hits: SearchHit[],
+	hits: SearchHit_Serialize[],
 };
 
-export type SearchHit = {
+export type SearchHit = SearchHit_Serialize | SearchHit_Deserialize;
+
+export type SearchHit_Deserialize = {
 	/**
 	 *  The instance to open: the default copy when the section is in it, else the first copy
 	 *  that holds it (design, "Agrupamento").
@@ -658,6 +660,27 @@ export type SearchHit = {
 	 *  never renders HTML from here.
 	 */
 	snippet: string,
+	/**  Branch of the copy, when the spec has several (divergent copies can match twice). */
+	branch?: string | null,
+};
+
+export type SearchHit_Serialize = {
+	/**
+	 *  The instance to open: the default copy when the section is in it, else the first copy
+	 *  that holds it (design, "Agrupamento").
+	 */
+	instanceId: number,
+	file: string,
+	heading: string,
+	/**  First source line of the section (SRC-06). */
+	line: number,
+	/**
+	 *  Excerpt with matches between U+0002 and U+0003; the UI turns them into `<mark>` and
+	 *  never renders HTML from here.
+	 */
+	snippet: string,
+	/**  Branch of the copy, when the spec has several (divergent copies can match twice). */
+	branch: string | null,
 };
 
 export type SearchInput = SearchInput_Serialize | SearchInput_Deserialize;
