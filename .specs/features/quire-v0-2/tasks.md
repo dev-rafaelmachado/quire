@@ -46,7 +46,7 @@ T1 → T27 → T2 → T3 → T4 → T5 → T6 → T7 → T8
 - [x] T1: Catálogo em inglês e erros do backend por código (269a782)
 - [x] T27: Idioma do sistema, fallback em inglês e seletor nas Preferências (bb0a0d0)
 - [x] T2: Sugestão visível do preset `exban` (d6f2502)
-- [ ] T3: Chips de requisito em janela estreita
+- [ ] T3: Chips de requisito em janela estreita (bb83a95) (gate passou, aguardando revisão visual)
 - [ ] T4: Recusar `QUIRE_CONFIG` e `QUIRE_INDEX` relativos
 - [ ] T5: Binário auxiliar de console do CLI no Windows
 - [ ] T6: Memória com uma spec aberta: medição e orçamento
