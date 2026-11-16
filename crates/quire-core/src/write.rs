@@ -189,6 +189,8 @@ pub enum Step {
     Permissions,
     SyncTemp,
     Rename,
+    /// Creating a new file without hard links (conflict copy, re-creation).
+    CreateNew,
 }
 
 impl std::fmt::Display for Step {
@@ -200,6 +202,7 @@ impl std::fmt::Display for Step {
             Step::Permissions => "copying the permissions",
             Step::SyncTemp => "flushing the temporary file to disk",
             Step::Rename => "replacing the file",
+            Step::CreateNew => "creating the new file",
         })
     }
 }
@@ -540,30 +543,60 @@ fn fill_and_place(
     // without ever replacing (conflict copy, re-creation).
     match expect {
         Expect::Existing => rename_with_retry(fs_ops, tmp, dest),
-        Expect::Absent => create_new_name(fs_ops, tmp, dest),
+        Expect::Absent => create_new_name(fs_ops, tmp, dest, bytes),
     }
 }
 
-/// Gives `tmp` the name `dest` only if `dest` does not exist. A hard link fails atomically when
-/// the name is taken; where links are not supported, the absence is checked once more right
-/// before a rename (the residual window of A6).
-fn create_new_name(fs_ops: &dyn Fs, tmp: &Path, dest: &Path) -> Result<(), WriteError> {
+/// Gives the content the name `dest` only if `dest` does not exist, and never replaces a file
+/// (conflict copy, CNF-08; confirmed re-creation, CNF-07). A hard link from `tmp` fails
+/// atomically when the name is taken. Where links are not available (FAT/exFAT, some network or
+/// 9p mounts, or not allowed), the name is created exclusively (`create_new`, O_EXCL), which
+/// also fails when it exists, and `bytes` is written into it; there is no rename on this path.
+fn create_new_name(
+    fs_ops: &dyn Fs,
+    tmp: &Path,
+    dest: &Path,
+    bytes: &[u8],
+) -> Result<(), WriteError> {
+    let taken = || WriteError::Conflict {
+        disk: Fingerprint::of(dest).ok().flatten(),
+    };
     match fs_ops.hard_link(tmp, dest) {
         Ok(()) => {
             // The content now has its final name; the temporary name goes away.
             let _ = fs::remove_file(tmp);
             Ok(())
         }
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(WriteError::Conflict {
-            disk: Fingerprint::of(dest).ok().flatten(),
-        }),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(taken()),
         Err(_) => {
-            if fs::symlink_metadata(dest).is_ok() {
-                return Err(WriteError::Conflict {
-                    disk: Fingerprint::of(dest).ok().flatten(),
-                });
+            let mut file = match fs_ops.create_new(dest) {
+                Ok(f) => f,
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Err(taken()),
+                Err(e) => {
+                    return Err(WriteError::Io {
+                        step: Step::CreateNew,
+                        message: e.to_string(),
+                    });
+                }
+            };
+            let written = fs_ops
+                .write_all(&mut file, bytes)
+                .and_then(|()| fs_ops.sync(&file));
+            drop(file);
+            match written {
+                Ok(()) => {
+                    let _ = fs::remove_file(tmp);
+                    Ok(())
+                }
+                Err(e) => {
+                    // Only the file this call created exclusively a moment ago is removed.
+                    let _ = fs::remove_file(dest);
+                    Err(WriteError::Io {
+                        step: Step::CreateNew,
+                        message: e.to_string(),
+                    })
+                }
             }
-            rename_with_retry(fs_ops, tmp, dest)
         }
     }
 }
@@ -1163,6 +1196,146 @@ mod tests {
             assert_eq!(fs::read(&f).unwrap(), original, "{step:?}");
             assert!(leftovers(d.path()).is_empty(), "{step:?}");
         }
+    }
+
+    /// The real file system without hard links (FAT/exFAT, some 9p or network mounts): the link
+    /// fails with `Unsupported`. `race` creates `dest` first, as another program would at that
+    /// instant; `fail_writes_from` makes the n-th write fail.
+    struct NoLinks {
+        race: Option<&'static [u8]>,
+        fail_writes_from: Option<usize>,
+        writes: std::cell::Cell<usize>,
+    }
+    impl Fs for NoLinks {
+        fn create_new(&self, path: &Path) -> std::io::Result<File> {
+            RealFs.create_new(path)
+        }
+        fn write_all(&self, file: &mut File, bytes: &[u8]) -> std::io::Result<()> {
+            let n = self.writes.get() + 1;
+            self.writes.set(n);
+            if self.fail_writes_from.is_some_and(|from| n >= from) {
+                file.write_all(&bytes[..bytes.len() / 2])?;
+                return Err(std::io::Error::other("injected: disk full"));
+            }
+            RealFs.write_all(file, bytes)
+        }
+        fn set_permissions(&self, path: &Path, perm: fs::Permissions) -> std::io::Result<()> {
+            RealFs.set_permissions(path, perm)
+        }
+        fn sync(&self, file: &File) -> std::io::Result<()> {
+            RealFs.sync(file)
+        }
+        fn rename(&self, _: &Path, _: &Path) -> std::io::Result<()> {
+            panic!("creating a new file must never rename over a name");
+        }
+        fn hard_link(&self, _: &Path, to: &Path) -> std::io::Result<()> {
+            if let Some(theirs) = self.race {
+                fs::write(to, theirs)?;
+            }
+            Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+        }
+        fn sync_dir(&self, dir: &Path) -> std::io::Result<()> {
+            RealFs.sync_dir(dir)
+        }
+        fn same_owner(&self, ours: &Path, theirs: &Path) -> std::io::Result<bool> {
+            RealFs.same_owner(ours, theirs)
+        }
+        fn fs_class(&self, _: &Path) -> FsClass {
+            FsClass::Local
+        }
+    }
+
+    fn no_links(race: Option<&'static [u8]>, fail_writes_from: Option<usize>) -> NoLinks {
+        NoLinks {
+            race,
+            fail_writes_from,
+            writes: std::cell::Cell::new(0),
+        }
+    }
+
+    #[test]
+    fn without_hard_links_a_new_file_is_created_exclusively() {
+        let d = tmpdir();
+        let copy = d.path().join("spec.conflito-20261116-120000.md");
+        let fp = save_with(
+            &no_links(None, None),
+            &copy,
+            b"buffer",
+            Expect::Absent,
+            &NoGuard,
+        )
+        .unwrap();
+        assert_eq!(fs::read(&copy).unwrap(), b"buffer");
+        assert_eq!(fp, Fingerprint::of_bytes(b"buffer"));
+        assert!(leftovers(d.path()).is_empty());
+    }
+
+    #[test]
+    fn without_hard_links_a_name_taken_meanwhile_is_never_overwritten() {
+        let d = tmpdir();
+        let copy = d.path().join("spec.conflito-20261116-120000.md");
+        // Another program creates the name between the checks and the final step.
+        let r = save_with(
+            &no_links(Some(b"theirs"), None),
+            &copy,
+            b"buffer",
+            Expect::Absent,
+            &NoGuard,
+        );
+        assert!(
+            matches!(r, Err(WriteError::Conflict { disk: Some(_) })),
+            "{r:?}"
+        );
+        assert_eq!(fs::read(&copy).unwrap(), b"theirs");
+        assert!(leftovers(d.path()).is_empty());
+        // And the conflict copy moves on to the next free name.
+        fs::write(d.path().join("spec.md"), b"disk").unwrap();
+        fs::remove_file(&copy).unwrap();
+        fs::write(&copy, b"theirs").unwrap();
+        let mut n = 0;
+        for k in 1..=5 {
+            let name = conflict_copy_name("spec.md", "20261116-120000", k).unwrap();
+            if save_with(
+                &no_links(None, None),
+                &d.path().join(&name),
+                b"buffer",
+                Expect::Absent,
+                &NoGuard,
+            )
+            .is_ok()
+            {
+                n = k;
+                break;
+            }
+        }
+        assert_eq!(n, 2);
+        assert_eq!(fs::read(&copy).unwrap(), b"theirs");
+    }
+
+    #[test]
+    fn without_hard_links_a_failed_write_leaves_no_partial_file() {
+        let d = tmpdir();
+        let copy = d.path().join("spec.conflito-20261116-120000.md");
+        // The first write (the temporary file) works; the one into the new name fails halfway.
+        let r = save_with(
+            &no_links(None, Some(2)),
+            &copy,
+            b"buffer content",
+            Expect::Absent,
+            &NoGuard,
+        );
+        assert!(
+            matches!(
+                &r,
+                Err(WriteError::Io {
+                    step: Step::CreateNew,
+                    ..
+                })
+            ),
+            "{r:?}"
+        );
+        assert!(!copy.exists());
+        assert!(leftovers(d.path()).is_empty());
     }
 
     #[test]
