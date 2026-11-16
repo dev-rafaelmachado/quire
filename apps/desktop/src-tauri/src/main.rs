@@ -4,6 +4,7 @@
 mod cli;
 mod cli_delivery;
 mod commands;
+mod edit;
 mod events;
 mod live;
 mod state;
@@ -31,6 +32,13 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
             commands::get_gates,
             commands::get_lessons,
             commands::open_external::<Rt>,
+            edit::open_for_edit,
+            edit::file_fingerprint,
+            edit::save_file::<Rt>,
+            edit::save_copy::<Rt>,
+            edit::toggle_task::<Rt>,
+            edit::orphan_temps,
+            edit::remove_orphan_temp,
         ])
         .events(tauri_specta::collect_events![
             events::ScanProgress,
@@ -178,8 +186,22 @@ mod tests {
         ctx
     }
 
+    const FIXTURES_CONFIG: &str = "scan_paths = [\"ws/projects\"]\n[projects.acme_gateway]\npreset = \"exban\"\n[projects.acme_billing]\npreset = \"exban\"\n";
+
     fn app_on_fixtures(
         name: &str,
+    ) -> (
+        tauri::App<MockRuntime>,
+        WebviewWindow<MockRuntime>,
+        tempfile::TempDir,
+    ) {
+        app_on_fixtures_with(name, FIXTURES_CONFIG)
+    }
+
+    /// Fresh fixtures for this test only, with `config` as quire.toml.
+    fn app_on_fixtures_with(
+        name: &str,
+        config_text: &str,
     ) -> (
         tauri::App<MockRuntime>,
         WebviewWindow<MockRuntime>,
@@ -197,7 +219,7 @@ mod tests {
                 .success()
         );
         let cfg = tmp.path().join("quire.toml");
-        std::fs::write(&cfg, "scan_paths = [\"ws/projects\"]\n[projects.acme_gateway]\npreset = \"exban\"\n[projects.acme_billing]\npreset = \"exban\"\n").unwrap();
+        std::fs::write(&cfg, config_text).unwrap();
         let config = quire_core::Config::load(&cfg).unwrap();
         let state = state::AppState::new(
             config,
@@ -236,6 +258,286 @@ mod tests {
             .build()
             .unwrap();
         (app, webview)
+    }
+
+    /// The default instance of ACME-142 in the fixtures: (instance id, folder on disk).
+    fn acme_142(webview: &WebviewWindow<MockRuntime>) -> (Value, PathBuf) {
+        let list = invoke(webview, "list_projects", json!({})).unwrap();
+        let spec = list[1]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "acme-142-service-tokens")
+            .unwrap()
+            .clone();
+        let detail = invoke(webview, "get_spec", json!({ "specId": spec["id"] })).unwrap();
+        let inst = &detail["spec"]["instances"][detail["instanceIndex"].as_u64().unwrap() as usize];
+        (
+            inst["id"].clone(),
+            PathBuf::from(inst["path"].as_str().unwrap()),
+        )
+    }
+
+    fn wait_scan(app: &tauri::App<MockRuntime>) {
+        let state = app.state::<state::AppState>();
+        let t0 = Instant::now();
+        // The write starts the reconciliation before returning; wait until it is done.
+        while state.scanning.load(std::sync::atomic::Ordering::SeqCst) {
+            assert!(
+                t0.elapsed() < Duration::from_secs(60),
+                "scan did not finish"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    #[test]
+    fn write_commands_over_ipc() {
+        let (app, webview, _tmp) = app_on_fixtures("write");
+        scan_and_wait(&app, &webview);
+        let (instance_id, dir) = acme_142(&webview);
+        let spec_path = dir.join("spec.md");
+        let original = std::fs::read(&spec_path).unwrap();
+
+        // Open: text, format and base; locks by name (EDT-08).
+        let file = invoke(
+            &webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_id, "name": "spec.md" }),
+        )
+        .unwrap();
+        assert_eq!(file["locked"], Value::Null);
+        assert_eq!(file["readOnly"], false);
+        let base = file["fingerprint"].as_str().unwrap().to_owned();
+        let format = file["format"].clone();
+        let text = file["text"].as_str().unwrap().to_owned();
+        assert_eq!(
+            quire_core::write::encode(&text, &serde_json::from_value(format.clone()).unwrap()),
+            original
+        );
+        for (name, code) in [
+            ("lessons.jsonl", "edit_jsonl"),
+            ("payload.json", "edit_not_markdown"),
+        ] {
+            let f = invoke(
+                &webview,
+                "open_for_edit",
+                json!({ "instanceId": instance_id, "name": name }),
+            )
+            .unwrap();
+            assert_eq!(f["locked"]["code"], code, "{name}");
+        }
+
+        // Save with the right base: written, new base returned.
+        let edited = format!("{text}\nLinha nova.\n");
+        let saved = invoke(
+            &webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": edited, "format": format,
+            "base": base, "confirmMixed": false } }),
+        )
+        .unwrap();
+        let disk = std::fs::read(&spec_path).unwrap();
+        assert_eq!(
+            disk,
+            quire_core::write::encode(&edited, &serde_json::from_value(format.clone()).unwrap())
+        );
+        let new_base = saved["fingerprint"].as_str().unwrap().to_owned();
+        assert_eq!(
+            invoke(
+                &webview,
+                "file_fingerprint",
+                json!({ "instanceId": instance_id, "name": "spec.md" })
+            )
+            .unwrap(),
+            json!(new_base)
+        );
+        wait_scan(&app);
+
+        // The old base is a conflict now; the disk keeps what is there.
+        let stale = invoke(
+            &webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": "mine", "format": format,
+            "base": base, "confirmMixed": false } }),
+        );
+        assert_eq!(stale.unwrap_err()["code"], "write_conflict");
+        assert_eq!(std::fs::read(&spec_path).unwrap(), disk);
+
+        // Names outside the Markdown files of the folder are refused by the shell (SAV-09).
+        for name in [
+            "lessons.jsonl",
+            "gates.jsonl",
+            "payload.json",
+            "../spec.md",
+            "a/b.md",
+            "missing.md",
+        ] {
+            let r = invoke(
+                &webview,
+                "save_file",
+                json!({ "input": {
+                "instanceId": instance_id, "name": name, "text": "x", "format": format,
+                "base": new_base, "confirmMixed": false } }),
+            );
+            assert_eq!(r.unwrap_err()["code"], "write_refused", "{name}");
+        }
+
+        // Mixed line endings need the confirmation (SAV-03).
+        let mut mixed = format.clone();
+        mixed["mixed"] = json!(true);
+        let r = invoke(
+            &webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": "x", "format": mixed,
+            "base": new_base, "confirmMixed": false } }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "write_mixed_eol");
+        assert_eq!(std::fs::read(&spec_path).unwrap(), disk);
+
+        // Copy: a new file, the original untouched (CNF-08).
+        let copy = invoke(
+            &webview,
+            "save_copy",
+            json!({ "instanceId": instance_id, "name": "spec.md",
+            "text": "buffer", "format": format, "stamp": "20261116-120000" }),
+        )
+        .unwrap();
+        assert_eq!(copy["name"], "spec.conflito-20261116-120000.md");
+        assert_eq!(
+            std::fs::read(dir.join("spec.conflito-20261116-120000.md")).unwrap(),
+            b"buffer"
+        );
+        assert_eq!(std::fs::read(&spec_path).unwrap(), disk);
+        wait_scan(&app);
+
+        // Checkbox writes are refused while the project has not opted in (CHK-01).
+        let tasks = invoke(&webview, "get_tasks", json!({ "instanceId": instance_id })).unwrap();
+        assert_eq!(tasks["checkbox"], false);
+        let r = invoke(
+            &webview,
+            "toggle_task",
+            json!({ "instanceId": instance_id, "taskId": "T8",
+            "line": 1, "done": false, "base": tasks["fingerprint"] }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "checkbox_off");
+
+        // Orphan temps: listed on request, never in the file list, removed only by name (SAV-10).
+        let orphan = quire_core::write::temp_name("spec.md", 4242, 1);
+        std::fs::write(dir.join(&orphan), b"partial").unwrap();
+        assert_eq!(
+            invoke(
+                &webview,
+                "orphan_temps",
+                json!({ "instanceId": instance_id })
+            )
+            .unwrap(),
+            json!([orphan])
+        );
+        scan_and_wait(&app, &webview);
+        let (instance_id, _) = acme_142(&webview);
+        let detail_files = invoke(&webview, "get_spec", json!({ "specId": invoke(&webview, "list_projects", json!({})).unwrap()[1]["specs"].as_array().unwrap().iter().find(|s| s["folder"] == "acme-142-service-tokens").unwrap()["id"] })).unwrap();
+        assert!(
+            !detail_files["others"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|o| o.as_str().unwrap().ends_with(".tmp")),
+            "{detail_files}"
+        );
+        invoke(
+            &webview,
+            "remove_orphan_temp",
+            json!({ "instanceId": instance_id, "name": orphan }),
+        )
+        .unwrap();
+        assert!(!dir.join(&orphan).exists());
+        let r = invoke(
+            &webview,
+            "remove_orphan_temp",
+            json!({ "instanceId": instance_id, "name": "spec.md" }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "write_refused");
+        assert!(spec_path.exists());
+    }
+
+    #[test]
+    fn checkbox_and_progress_without_the_watcher() {
+        // Polling every 60 s: within this test, only the write itself can update the list.
+        let cfg = "scan_paths = [\"ws/projects\"]\npoll_interval_ms = 60000\n\n[watch]\nmode = \"poll\"\n\n[projects.acme_gateway]\npreset = \"exban\"\ntasks_checkbox = true\n\n[projects.acme_billing]\npreset = \"exban\"\n";
+        let (app, webview, _tmp) = app_on_fixtures_with("checkbox", cfg);
+        scan_and_wait(&app, &webview);
+        let (instance_id, dir) = acme_142(&webview);
+        let before = std::fs::read(dir.join("tasks.md")).unwrap();
+        let tasks = invoke(&webview, "get_tasks", json!({ "instanceId": instance_id })).unwrap();
+        assert_eq!(tasks["checkbox"], true);
+        assert_eq!(
+            (tasks["done"].as_u64(), tasks["total"].as_u64()),
+            (Some(7), Some(8))
+        );
+        let pending = tasks["phases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|p| p["tasks"].as_array().unwrap().iter())
+            .find(|t| t["done"] == false)
+            .unwrap()
+            .clone();
+
+        // A stale base is refused and nothing changes (CHK-03).
+        let r = invoke(
+            &webview,
+            "toggle_task",
+            json!({ "instanceId": instance_id, "taskId": pending["id"],
+            "line": pending["line"], "done": false, "base": "1-00000000000000000000000000000000" }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "write_conflict");
+        // The line moved: refused.
+        let r = invoke(
+            &webview,
+            "toggle_task",
+            json!({ "instanceId": instance_id, "taskId": pending["id"],
+            "line": pending["line"].as_u64().unwrap() + 1, "done": false, "base": tasks["fingerprint"] }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "toggle_moved");
+        assert_eq!(std::fs::read(dir.join("tasks.md")).unwrap(), before);
+
+        let t0 = Instant::now();
+        let view = invoke(
+            &webview,
+            "toggle_task",
+            json!({ "instanceId": instance_id, "taskId": pending["id"],
+            "line": pending["line"], "done": false, "base": tasks["fingerprint"] }),
+        )
+        .unwrap();
+        assert_eq!(
+            (view["done"].as_u64(), view["total"].as_u64()),
+            (Some(8), Some(8))
+        );
+        let after = std::fs::read(dir.join("tasks.md")).unwrap();
+        assert_eq!(before.len(), after.len());
+        assert_eq!(before.iter().zip(&after).filter(|(a, b)| a != b).count(), 1);
+        // The list follows from the write's own reconciliation (PRG-01, CHK-05).
+        wait_scan(&app);
+        let (instance_after, _) = acme_142(&webview);
+        let list = invoke(&webview, "list_projects", json!({})).unwrap();
+        let spec = list[1]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "acme-142-service-tokens")
+            .unwrap();
+        let inst = spec["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == instance_after)
+            .unwrap();
+        assert_eq!(inst["progress"], json!([8, 8]));
+        assert!(t0.elapsed() < Duration::from_secs(5), "{:?}", t0.elapsed());
     }
 
     #[test]

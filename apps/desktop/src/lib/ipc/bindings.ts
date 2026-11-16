@@ -32,12 +32,34 @@ export const commands = {
 	/**  One spec with the requested instance, or the default one (DUP-04). */
 	getSpec: (specId: number, instanceId: number | null, options?: InvokeOptions) => __TAURI_INVOKE<SpecDetail_Serialize>("get_spec", { specId, instanceId }, options),
 	readFile: (instanceId: number, name: string, options?: InvokeOptions) => __TAURI_INVOKE<FileContent_Serialize>("read_file", { instanceId, name }, options),
-	/**  `tasks.md` by phase (TSK-01..04). Read-only (TSK-05). */
+	/**  `tasks.md` by phase (TSK-01..04). */
 	getTasks: (instanceId: number, options?: InvokeOptions) => __TAURI_INVOKE<TasksView_Serialize>("get_tasks", { instanceId }, options),
 	getGates: (instanceId: number, options?: InvokeOptions) => __TAURI_INVOKE<GatesView_Serialize>("get_gates", { instanceId }, options),
 	getLessons: (instanceId: number, options?: InvokeOptions) => __TAURI_INVOKE<LessonsView_Serialize>("get_lessons", { instanceId }, options),
 	/**  Opens an http(s) link in the system browser (VIW-07). Nothing else is accepted. */
 	openExternal: (url: string, options?: InvokeOptions) => __TAURI_INVOKE<null>("open_external", { url }, options),
+	openForEdit: (instanceId: number, name: string, options?: InvokeOptions) => __TAURI_INVOKE<EditableFile_Serialize>("open_for_edit", { instanceId, name }, options),
+	/**
+	 *  The fingerprint token of a file of the instance now, `None` when it does not exist. The UI
+	 *  compares it with its base when the watcher reports a change (TD-14, CNF-04..06).
+	 */
+	fileFingerprint: (instanceId: number, name: string, options?: InvokeOptions) => __TAURI_INVOKE<string | null>("file_fingerprint", { instanceId, name }, options),
+	/**
+	 *  Saves the buffer (EDT-05, SAV-01..05, SAV-08, CNF-02, CNF-03). Conflicts come back as the
+	 *  error code `write_conflict`; nothing is written then.
+	 */
+	saveFile: (input: SaveInput_Deserialize, options?: InvokeOptions) => __TAURI_INVOKE<Saved>("save_file", { input }, options),
+	/**  "Salvar como cópia" (CNF-08, SAV-04): a new file next to the original, never over one. */
+	saveCopy: (instanceId: number, name: string, text: string, format: TextFormat, stamp: string, options?: InvokeOptions) => __TAURI_INVOKE<SavedCopy>("save_copy", { instanceId, name, text, format, stamp }, options),
+	/**
+	 *  Checks or unchecks a task (CHK-02, CHK-03), only when the project opted in (CHK-01).
+	 *  Returns the tasks view of what was written, so progress updates at once (CHK-05, PRG-01).
+	 */
+	toggleTask: (instanceId: number, taskId: string, line: number, done: boolean, base: string, options?: InvokeOptions) => __TAURI_INVOKE<TasksView_Serialize>("toggle_task", { instanceId, taskId, line, done, base }, options),
+	/**  Temporary files of the write pipeline left in the spec folder by a crash (SAV-10). */
+	orphanTemps: (instanceId: number, options?: InvokeOptions) => __TAURI_INVOKE<string[]>("orphan_temps", { instanceId }, options),
+	/**  Removes one of them, on an explicit click (SAV-10). */
+	removeOrphanTemp: (instanceId: number, name: string, options?: InvokeOptions) => __TAURI_INVOKE<null>("remove_orphan_temp", { instanceId, name }, options),
 };
 
 /** Events */
@@ -136,6 +158,51 @@ export type DetailField = {
 	text: string,
 	items: string[],
 };
+
+/**  A Markdown file opened for editing (EDT-01, EDT-08, CNF-01). */
+export type EditableFile = EditableFile_Serialize | EditableFile_Deserialize;
+
+/**  A Markdown file opened for editing (EDT-01, EDT-08, CNF-01). */
+export type EditableFile_Deserialize = {
+	name: string,
+	/**
+	 *  The text as the editor shows it (LF line endings, no BOM); `None` when locked by the
+	 *  content (not UTF-8, binary, too large).
+	 */
+	text?: string | null,
+	format?: TextFormat | null,
+	/**  Fingerprint token of the bytes read: the base of the next save. */
+	fingerprint?: string | null,
+	/**
+	 *  Why Editar and Dividir are disabled (EDT-08), as a translatable code; `None` when the
+	 *  file is editable.
+	 */
+	locked?: CmdError | null,
+	/**  The file is read-only: editing is allowed, saving offers a copy (SAV-04). */
+	readOnly: boolean,
+};
+
+/**  A Markdown file opened for editing (EDT-01, EDT-08, CNF-01). */
+export type EditableFile_Serialize = {
+	name: string,
+	/**
+	 *  The text as the editor shows it (LF line endings, no BOM); `None` when locked by the
+	 *  content (not UTF-8, binary, too large).
+	 */
+	text: string | null,
+	format: TextFormat | null,
+	/**  Fingerprint token of the bytes read: the base of the next save. */
+	fingerprint: string | null,
+	/**
+	 *  Why Editar and Dividir are disabled (EDT-08), as a translatable code; `None` when the
+	 *  file is editable.
+	 */
+	locked: CmdError | null,
+	/**  The file is read-only: editing is allowed, saving offers a copy (SAV-04). */
+	readOnly: boolean,
+};
+
+export type Eol = "lf" | "crlf";
 
 export type FileContent = FileContent_Serialize | FileContent_Deserialize;
 
@@ -406,6 +473,8 @@ export type ProjectConfigView_Deserialize = {
 	preset?: string | null,
 	alias?: string | null,
 	issueUrlBase?: string | null,
+	/**  Checking tasks from the app (CHK-01); absent in input means off. */
+	tasksCheckbox?: boolean | null,
 };
 
 export type ProjectConfigView_Serialize = {
@@ -413,6 +482,8 @@ export type ProjectConfigView_Serialize = {
 	preset: string | null,
 	alias: string | null,
 	issueUrlBase: string | null,
+	/**  Checking tasks from the app (CHK-01); absent in input means off. */
+	tasksCheckbox: boolean | null,
 };
 
 export type ProjectRef = ProjectRef_Serialize | ProjectRef_Deserialize;
@@ -459,6 +530,48 @@ export type ProjectSummary_Serialize = {
 	gitWarning: string | null,
 	/**  Sorted by folder. */
 	specs: SpecSummary_Serialize[],
+};
+
+export type SaveInput = SaveInput_Serialize | SaveInput_Deserialize;
+
+export type SaveInput_Deserialize = {
+	instanceId: number,
+	name: string,
+	text: string,
+	format: TextFormat,
+	/**
+	 *  The fingerprint the buffer was loaded from. `None` re-creates a file deleted during the
+	 *  edit, after the user confirmed it (CNF-07); it never replaces an existing file.
+	 */
+	base?: string | null,
+	/**  The user confirmed normalizing mixed line endings (SAV-03, A4). */
+	confirmMixed: boolean,
+};
+
+export type SaveInput_Serialize = {
+	instanceId: number,
+	name: string,
+	text: string,
+	format: TextFormat,
+	/**
+	 *  The fingerprint the buffer was loaded from. `None` re-creates a file deleted during the
+	 *  edit, after the user confirmed it (CNF-07); it never replaces an existing file.
+	 */
+	base: string | null,
+	/**  The user confirmed normalizing mixed line endings (SAV-03, A4). */
+	confirmMixed: boolean,
+};
+
+export type Saved = {
+	/**  The new base of the buffer. */
+	fingerprint: string,
+	/**  The format now on disk (mixed line endings are gone after a save). */
+	format: TextFormat,
+};
+
+export type SavedCopy = {
+	name: string,
+	fingerprint: string,
 };
 
 export type ScanPathError = {
@@ -646,6 +759,13 @@ export type TasksView_Deserialize = {
 	details: TaskDetail[],
 	done: number,
 	total: number,
+	/**
+	 *  Fingerprint token of the `tasks.md` this view was built from: the base of a checkbox
+	 *  write (CHK-03).
+	 */
+	fingerprint?: string | null,
+	/**  The project opted in to checking tasks from the app (CHK-01). */
+	checkbox: boolean,
 };
 
 export type TasksView_Serialize = {
@@ -655,6 +775,28 @@ export type TasksView_Serialize = {
 	details: TaskDetail[],
 	done: number,
 	total: number,
+	/**
+	 *  Fingerprint token of the `tasks.md` this view was built from: the base of a checkbox
+	 *  write (CHK-03).
+	 */
+	fingerprint: string | null,
+	/**  The project opted in to checking tasks from the app (CHK-01). */
+	checkbox: boolean,
+};
+
+/**  How a text file is laid out on disk, so a save writes it back the same way (SAV-03). */
+export type TextFormat = {
+	/**  Starts with a UTF-8 byte order mark. */
+	bom: boolean,
+	/**  The line ending written on save: the one most used in the file (A4). */
+	eol: Eol,
+	/**
+	 *  The file mixes line endings (CRLF and LF, or a lone CR). Saving normalizes to `eol`,
+	 *  which the user confirms on the first save (A4, SAV-03).
+	 */
+	mixed: boolean,
+	/**  Ends with a line ending (informative: the text itself carries it). */
+	finalNewline: boolean,
 };
 
 /**  What the file watcher is doing (status bar; WAT-03). */

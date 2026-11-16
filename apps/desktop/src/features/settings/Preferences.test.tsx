@@ -36,7 +36,7 @@ const config: ConfigView = {
   error: null,
   scanPaths: ["/ws/projects", "/missing"],
   pollIntervalMs: 3000,
-  projects: [{ name: "acme_gateway", preset: "exban", alias: null, issueUrlBase: null }],
+  projects: [{ name: "acme_gateway", preset: "exban", alias: null, issueUrlBase: null, tasksCheckbox: false }],
   presets: ["exban", "generic"],
   theme: null,
   language: null,

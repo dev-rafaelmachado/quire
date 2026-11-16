@@ -55,6 +55,8 @@ pub struct ProjectConfigView {
     pub preset: Option<String>,
     pub alias: Option<String>,
     pub issue_url_base: Option<String>,
+    /// Checking tasks from the app (CHK-01); absent in input means off.
+    pub tasks_checkbox: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -117,6 +119,7 @@ fn config_view(state: &AppState) -> ConfigView {
                 preset: p.preset.clone(),
                 alias: p.alias.clone(),
                 issue_url_base: p.issue_url_base.clone(),
+                tasks_checkbox: Some(p.tasks_checkbox),
             })
             .collect(),
         presets: config.preset_names().map(str::to_owned).collect(),
@@ -176,6 +179,11 @@ pub async fn set_config<R: Runtime>(
         Some(other) => return Err(err("unknown_theme", format!("unknown theme {other}"))),
     };
     let clean = |v: Option<String>| v.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
+    let current = state
+        .config
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
     let next = Settings {
         scan_paths: settings
             .scan_paths
@@ -194,6 +202,13 @@ pub async fn set_config<R: Runtime>(
                     preset: clean(p.preset),
                     alias: clean(p.alias),
                     issue_url_base: clean(p.issue_url_base),
+                    // Not sent: keep what config.toml has (an older UI must not turn it off).
+                    tasks_checkbox: p.tasks_checkbox.unwrap_or_else(|| {
+                        current
+                            .projects
+                            .get(&p.name)
+                            .is_some_and(|c| c.tasks_checkbox)
+                    }),
                 };
                 (p.name, config)
             })
@@ -481,7 +496,7 @@ pub async fn get_spec(
     })
 }
 
-fn instance(state: &AppState, instance_id: u32) -> Result<InstanceInfo, CmdError> {
+pub(crate) fn instance(state: &AppState, instance_id: u32) -> Result<InstanceInfo, CmdError> {
     lock(&state.index)
         .instance_info(id(instance_id))
         .map_err(|e| err("index", e))?
@@ -490,7 +505,7 @@ fn instance(state: &AppState, instance_id: u32) -> Result<InstanceInfo, CmdError
 
 /// Reads a file of an instance. Only names recorded for that instance are accepted, so no
 /// path can escape the spec folder.
-fn read_known(info: &InstanceInfo, name: &str) -> Result<Option<Vec<u8>>, CmdError> {
+pub(crate) fn read_known(info: &InstanceInfo, name: &str) -> Result<Option<Vec<u8>>, CmdError> {
     if !info.files.iter().any(|f| f.0 == name) || Path::new(name).components().count() != 1 {
         return Err(err(
             "not_found",
@@ -592,9 +607,14 @@ pub struct TasksView {
     pub details: Vec<TaskDetail>,
     pub done: u32,
     pub total: u32,
+    /// Fingerprint token of the `tasks.md` this view was built from: the base of a checkbox
+    /// write (CHK-03).
+    pub fingerprint: Option<String>,
+    /// The project opted in to checking tasks from the app (CHK-01).
+    pub checkbox: bool,
 }
 
-/// `tasks.md` by phase (TSK-01..04). Read-only (TSK-05).
+/// `tasks.md` by phase (TSK-01..04).
 #[tauri::command]
 #[specta::specta]
 pub async fn get_tasks(
@@ -602,21 +622,42 @@ pub async fn get_tasks(
     instance_id: u32,
 ) -> Result<TasksView, CmdError> {
     let info = instance(&state, instance_id)?;
+    tasks_view(&state, &info)
+}
+
+/// The tasks view of an instance, read from disk now.
+pub(crate) fn tasks_view(state: &AppState, info: &InstanceInfo) -> Result<TasksView, CmdError> {
+    let bytes = match info.files.iter().any(|f| f.0 == "tasks.md") {
+        true => read_known(info, "tasks.md")?,
+        false => None,
+    };
+    Ok(tasks_view_of(state, info, bytes.as_deref()))
+}
+
+/// The tasks view of `bytes` as the `tasks.md` of `info` (also used right after a write, so
+/// progress updates without waiting for the watcher, PRG-01).
+pub(crate) fn tasks_view_of(
+    state: &AppState,
+    info: &InstanceInfo,
+    bytes: Option<&[u8]>,
+) -> TasksView {
     let config = state
         .config
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let preset = config.preset_for(&info.project_name);
-    let text = match info.files.iter().any(|f| f.0 == "tasks.md") {
-        true => read_known(&info, "tasks.md")?.map(|b| String::from_utf8_lossy(&b).into_owned()),
-        false => None,
-    };
+    let checkbox = config
+        .projects
+        .get(&info.project_name)
+        .is_some_and(|p| p.tasks_checkbox);
+    let fingerprint = bytes.map(|b| quire_core::fingerprint::Fingerprint::of_bytes(b).token());
+    let text = bytes.map(|b| String::from_utf8_lossy(b).into_owned());
     let doc = match (preset.tasks, text) {
         (TasksGrammar::Phases, Some(t)) => parse::tasks(&t, preset.id_pattern.as_ref()),
         _ => parse::TasksDoc::default(),
     };
     let (done, total) = doc.progress();
-    Ok(TasksView {
+    TasksView {
         structured: !doc.is_empty(),
         phases: doc
             .phases
@@ -631,7 +672,9 @@ pub async fn get_tasks(
         details: doc.details,
         done: u32::try_from(done).unwrap_or(u32::MAX),
         total: u32::try_from(total).unwrap_or(u32::MAX),
-    })
+        fingerprint,
+        checkbox,
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Type)]

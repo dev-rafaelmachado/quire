@@ -17,7 +17,7 @@ const config: ConfigView = {
   error: null,
   scanPaths: ["/ws"],
   pollIntervalMs: 3000,
-  projects: [{ name: "acme_gateway", preset: "exban", alias: "gw", issueUrlBase: null }],
+  projects: [{ name: "acme_gateway", preset: "exban", alias: "gw", issueUrlBase: null, tasksCheckbox: false }],
   presets: ["exban", "generic"],
   theme: "light",
   language: null,
@@ -40,7 +40,7 @@ describe("preset suggestion (DEB-03)", () => {
       theme: "light",
       language: null,
       projects: [
-        { name: "acme_gateway", preset: "exban", alias: "gw", issueUrlBase: null },
+        { name: "acme_gateway", preset: "exban", alias: "gw", issueUrlBase: null, tasksCheckbox: false },
         { name: "acme_billing", preset: "exban", alias: null, issueUrlBase: null },
       ],
     });

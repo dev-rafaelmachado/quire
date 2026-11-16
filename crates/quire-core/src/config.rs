@@ -71,6 +71,8 @@ pub struct ProjectConfig {
     pub preset: Option<String>,
     pub alias: Option<String>,
     pub issue_url_base: Option<String>,
+    /// Checking tasks from the app is on for this project (CHK-01). Off by default.
+    pub tasks_checkbox: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -138,6 +140,8 @@ struct RawWatch {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawProject {
+    #[serde(default)]
+    tasks_checkbox: bool,
     preset: Option<Spanned<String>>,
     alias: Option<String>,
     issue_url_base: Option<String>,
@@ -271,6 +275,7 @@ impl Config {
                     preset: rp.preset.map(Spanned::into_inner),
                     alias: rp.alias,
                     issue_url_base: rp.issue_url_base,
+                    tasks_checkbox: rp.tasks_checkbox,
                 },
             );
         }
@@ -532,7 +537,10 @@ pub fn save_settings(path: &Path, settings: &Settings) -> Result<Config, ConfigE
         .and_then(toml_edit::Item::as_table_mut)
     {
         for (name, pc) in &settings.projects {
-            let empty = pc.preset.is_none() && pc.alias.is_none() && pc.issue_url_base.is_none();
+            let empty = pc.preset.is_none()
+                && pc.alias.is_none()
+                && pc.issue_url_base.is_none()
+                && !pc.tasks_checkbox;
             if empty {
                 projects.remove(name);
                 continue;
@@ -547,6 +555,11 @@ pub fn save_settings(path: &Path, settings: &Settings) -> Result<Config, ConfigE
                 set_or_remove(t, "preset", pc.preset.as_deref());
                 set_or_remove(t, "alias", pc.alias.as_deref());
                 set_or_remove(t, "issue_url_base", pc.issue_url_base.as_deref());
+                if pc.tasks_checkbox {
+                    put(t, "tasks_checkbox", true);
+                } else {
+                    remove_keeping_comments(t, "tasks_checkbox");
+                }
             }
         }
     }
@@ -745,6 +758,7 @@ preset = "team"
                         preset: Some("generic".into()),
                         alias: Some("A".into()),
                         issue_url_base: None,
+                        tasks_checkbox: false,
                     },
                 ),
                 ("gone".into(), ProjectConfig::default()),
@@ -754,6 +768,7 @@ preset = "team"
                         preset: None,
                         alias: None,
                         issue_url_base: Some("https://t.example/".into()),
+                        tasks_checkbox: false,
                     },
                 ),
             ],
@@ -826,6 +841,33 @@ preset = "team"
     }
 
     #[test]
+    fn tasks_checkbox_is_saved_and_a_project_with_only_it_is_kept() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("config.toml");
+        fs::write(&path, "[projects.a]\ntasks_checkbox = true # opt-in\n").unwrap();
+        let c = Config::load(&path).unwrap();
+        assert!(c.projects["a"].tasks_checkbox);
+        let mut settings = Settings {
+            scan_paths: vec![],
+            poll_interval_ms: 3000,
+            theme: None,
+            language: None,
+            projects: vec![("a".into(), c.projects["a"].clone())],
+        };
+        save_settings(&path, &settings).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("tasks_checkbox = true # opt-in"), "{text}");
+        settings.projects[0].1.tasks_checkbox = false;
+        let c = save_settings(&path, &settings).unwrap();
+        assert!(!c.projects.contains_key("a"));
+        assert!(
+            !fs::read_to_string(&path)
+                .unwrap()
+                .contains("tasks_checkbox =")
+        );
+    }
+
+    #[test]
     fn invalid_settings_are_rejected_before_writing() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("config.toml");
@@ -841,6 +883,7 @@ preset = "team"
                     preset: Some("nope".into()),
                     alias: None,
                     issue_url_base: None,
+                    tasks_checkbox: false,
                 },
             )],
         };
