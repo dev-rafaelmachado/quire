@@ -68,8 +68,8 @@ export type CliOpen = CliOpen_Serialize | CliOpen_Deserialize;
 
 /**  What the UI should do (event `cli://open`). */
 export type CliOpen_Deserialize = 
-/**  Open this spec, in this instance when given. */
-{ kind: "spec"; specId: number; instanceId?: number | null } | 
+/**  Open this spec, in this instance when given, on this file's tab when given. */
+{ kind: "spec"; specId: number; instanceId?: number | null; file?: string | null } | 
 /**  `quire .` in a worktree with several specs: the project list, these highlighted. */
 { kind: "highlight"; query: string; specIds: number[] } | 
 /**  The key matches specs in more than one place: let the user pick (CLI-02). */
@@ -77,8 +77,8 @@ export type CliOpen_Deserialize =
 
 /**  What the UI should do (event `cli://open`). */
 export type CliOpen_Serialize = 
-/**  Open this spec, in this instance when given. */
-{ kind: "spec"; specId: number; instanceId: number | null } | 
+/**  Open this spec, in this instance when given, on this file's tab when given. */
+{ kind: "spec"; specId: number; instanceId: number | null; file: string | null } | 
 /**  `quire .` in a worktree with several specs: the project list, these highlighted. */
 { kind: "highlight"; query: string; specIds: number[] } | 
 /**  The key matches specs in more than one place: let the user pick (CLI-02). */

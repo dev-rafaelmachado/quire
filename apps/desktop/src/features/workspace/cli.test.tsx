@@ -68,9 +68,10 @@ afterEach(cleanup);
 
 describe("command line navigation", () => {
   it("opens a spec in the requested instance (CLI-03)", () => {
-    applyCliOpen({ kind: "spec", specId: 2, instanceId: 20 });
+    applyCliOpen({ kind: "spec", specId: 2, instanceId: 20, file: "design.md" });
     expect(useWorkspace.getState().selectedSpecId).toBe(2);
     expect(useSpecView.getState().chosen).toEqual({ 2: 20 });
+    expect(useSpecView.getState().requestedTab).toBe("design.md");
   });
 
   it("highlights the specs of the worktree (CLI-01)", () => {

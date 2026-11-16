@@ -71,10 +71,11 @@ pub fn interpret(matches: &Matches, cwd: &Path) -> CliRequest {
     rename_all_fields = "camelCase"
 )]
 pub enum CliOpen {
-    /// Open this spec, in this instance when given.
+    /// Open this spec, in this instance when given, on this file's tab when given.
     Spec {
         spec_id: u32,
         instance_id: Option<u32>,
+        file: Option<String>,
     },
     /// `quire .` in a worktree with several specs: the project list, these highlighted.
     Highlight {
@@ -105,9 +106,16 @@ fn by_path(list: &[ProjectSummary], path: &Path, query: &str) -> CliOpen {
     for p in list {
         for s in &p.specs {
             if let Some(i) = s.instances.iter().find(|i| path.starts_with(&i.path)) {
+                // A file directly inside the spec folder opens on its tab.
+                let file = path
+                    .strip_prefix(&i.path)
+                    .ok()
+                    .filter(|rest| rest.components().count() == 1)
+                    .map(|rest| rest.to_string_lossy().into_owned());
                 return CliOpen::Spec {
                     spec_id: id(s.id),
                     instance_id: Some(id(i.id)),
+                    file,
                 };
             }
         }
@@ -144,6 +152,7 @@ fn by_path(list: &[ProjectSummary], path: &Path, query: &str) -> CliOpen {
         [(spec_id, instance_id)] => CliOpen::Spec {
             spec_id: *spec_id,
             instance_id: Some(*instance_id),
+            file: None,
         },
         many => CliOpen::Highlight {
             query: query.to_owned(),
@@ -174,6 +183,7 @@ fn by_key(list: &[ProjectSummary], key: &str) -> CliOpen {
         [only] => CliOpen::Spec {
             spec_id: *only,
             instance_id: None,
+            file: None,
         },
         _ => CliOpen::Pick {
             query: key.to_owned(),
@@ -298,14 +308,16 @@ mod tests {
             resolve(&list(), &open("ACME-142")),
             Some(CliOpen::Spec {
                 spec_id: 1,
-                instance_id: None
+                instance_id: None,
+                file: None
             })
         );
         assert_eq!(
             resolve(&list(), &open("bill-31")),
             Some(CliOpen::Spec {
                 spec_id: 5,
-                instance_id: None
+                instance_id: None,
+                file: None
             })
         );
         assert_eq!(
@@ -333,7 +345,8 @@ mod tests {
             ),
             Some(CliOpen::Spec {
                 spec_id: 5,
-                instance_id: Some(50)
+                instance_id: Some(50),
+                file: Some("tasks.md".into())
             })
         );
         assert_eq!(
@@ -357,7 +370,8 @@ mod tests {
             resolve(&list(), &path),
             Some(CliOpen::Spec {
                 spec_id: 2,
-                instance_id: Some(20)
+                instance_id: Some(20),
+                file: None
             })
         );
         assert_eq!(resolve(&list(), &CliRequest::Nothing), None);

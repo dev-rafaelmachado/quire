@@ -399,7 +399,7 @@ mod tests {
         cli_delivery::deliver(app.handle(), parse(&app, &["open", "ACME-142"], &ws));
         assert_eq!(
             take(),
-            json!({ "kind": "spec", "specId": spec_id("acme-142-service-tokens", 1), "instanceId": null })
+            json!({ "kind": "spec", "specId": spec_id("acme-142-service-tokens", 1), "instanceId": null, "file": null })
         );
         cli_delivery::deliver(app.handle(), parse(&app, &["open", "acme-200"], &ws));
         let pick = take();
@@ -423,6 +423,7 @@ mod tests {
         assert_eq!(by_path["kind"], "spec");
         assert_eq!(by_path["specId"], spec_id("acme-170-rate-limit", 1));
         assert!(by_path["instanceId"].is_number());
+        assert_eq!(by_path["file"], "tasks.md");
 
         cli_delivery::deliver(app.handle(), parse(&app, &["open", "NOPE-1"], &ws));
         assert_eq!(take(), json!({ "kind": "notFound", "query": "NOPE-1" }));

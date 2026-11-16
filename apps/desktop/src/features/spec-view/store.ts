@@ -29,6 +29,10 @@ interface SpecViewState {
   error: string | null;
   /** Instance chosen per spec; lasts for the session (DUP-04). */
   chosen: Readonly<Record<number, number>>;
+  /** File to show when the next spec opens (`quire open <file>`). */
+  requestedTab: string | null;
+  /** Shows a file of the open spec: its tab, or the "outros" tab on that file. */
+  showFile: (file: string) => Promise<void>;
   /** Message about a change made outside the app (WAT-04). */
   notice: string | null;
   setNotice: (notice: string | null) => void;
@@ -79,6 +83,7 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
   scrollRequest: 0,
   error: null,
   chosen: {},
+  requestedTab: null,
   notice: null,
   setNotice: (notice) => set({ notice }),
   open: async (specId) => {
@@ -92,9 +97,11 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       if (get().specId !== specId) return;
       set({ detail });
       void loadCounts(detail).then((counts) => get().specId === specId && set({ counts }));
-      const wanted = pendingTab !== null && detail.tabs.includes(pendingTab) ? pendingTab : null;
+      const wanted = pendingTab ?? get().requestedTab;
       pendingTab = null;
-      await get().selectTab(wanted ?? detail.tabs[0] ?? OTHERS);
+      set({ requestedTab: null });
+      if (wanted !== null && (detail.tabs.includes(wanted) || detail.others.includes(wanted))) await get().showFile(wanted);
+      else await get().selectTab(detail.tabs[0] ?? OTHERS);
     } catch (e) {
       set({ error: asCmdError(e).message });
     }
@@ -139,6 +146,16 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       await get().selectTab(keep && tab !== null ? tab : (detail.tabs[0] ?? OTHERS));
     } catch (e) {
       set({ error: asCmdError(e).message });
+    }
+  },
+  showFile: async (file) => {
+    const { detail } = get();
+    if (!detail) return;
+    if (detail.tabs.includes(file)) {
+      await get().selectTab(file);
+    } else if (detail.others.includes(file)) {
+      set({ tab: OTHERS });
+      await get().show(file);
     }
   },
   selectTab: async (tab) => {

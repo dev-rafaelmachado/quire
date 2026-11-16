@@ -11,13 +11,18 @@ export function applyCliOpen(open: CliOpen): void {
   switch (open.kind) {
     case "spec": {
       const instanceId = open.instanceId ?? null;
+      const file = open.file ?? null;
       if (instanceId !== null) {
         useSpecView.setState({ chosen: { ...view.chosen, [open.specId]: instanceId } });
       }
       ws.setHighlight(null);
       if (ws.selectedSpecId === open.specId) {
-        if (instanceId !== null) void view.switchInstance(instanceId);
+        const current = view.detail?.spec.instances[view.detail.instanceIndex]?.id;
+        const switching = instanceId !== null && instanceId !== current ? view.switchInstance(instanceId) : Promise.resolve();
+        if (file !== null) void switching.then(() => useSpecView.getState().showFile(file));
+        else void switching;
       } else {
+        useSpecView.setState({ requestedTab: file });
         ws.select(open.specId);
       }
       break;
