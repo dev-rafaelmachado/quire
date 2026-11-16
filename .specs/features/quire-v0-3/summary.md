@@ -1,11 +1,21 @@
 # QUIRE v0.3 — Referências, lint, histórico e export
 
-**Status:** Especificação escrita, aguardando as decisões do autor (Q1–Q10) e aprovação · 0 de 8 fases · branch `docs/v0-3-spec` · 0/23 tarefas
+**Status:** Aprovada (decisões Q1–Q10 de 2026-11-16), **aguardando feedback de uso** da `v0.2.0-rc.1` para começar a execução · 0 de 8 fases · branch `docs/v0-3-spec` · 0/25 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
 
-Seguir um critério da spec até a tarefa, a evidência, o gate e o diff do commit sem sair do Quire, com backlinks pela gramática do preset, lint de estrutura no app e no CI (`quire lint`), histórico git somente leitura, export HTML e PDF sem vazamento e criação de arquivo ausente, depois de fechar as dívidas de WSL, assinatura do MSI e fontes.
+Seguir um critério da spec até a tarefa, a evidência, o gate e o diff do commit sem sair do Quire, com backlinks pela gramática do preset, lint de estrutura no app e no CI (`quire lint`, com binário avulso para Linux), histórico git somente leitura, export HTML e PDF sem vazamento e criação de arquivo ausente, depois de fechar as dívidas de WSL, SmartScreen do MSI e fontes.
+
+## Feedback de uso
+
+**Aguardando feedback de uso.** Por decisão do autor (Q10), a execução da v0.3 só começa depois do uso real da `v0.2.0-rc.1`. Preencha abaixo; um item que mude o escopo volta para a `spec.md` antes da T1.
+
+- **Período e ambiente de uso** (sistema, quantos projetos e specs, com ou sem agente escrevendo junto):
+- **O que mais atrapalhou:**
+- **O que faltou para seguir um critério até a evidência:**
+- **Bugs encontrados:**
+- **Efeito na ordem das fases ou no escopo da v0.3:**
 
 ## Fases
 
@@ -14,25 +24,25 @@ Seguir um critério da spec até a tarefa, a evidência, o gate e o diff do comm
 |---|---|---|
 | 0: Dívidas da v0.2 | quire | 0/4 |
 | 1: Spikes | quire | 0/4 |
-| 2: Referências e navegação | quire | 0/5 |
-| 3: Lint | quire | 0/3 |
+| 2: Referências e navegação | quire | 0/6 |
+| 3: Lint | quire | 0/4 |
 | 4: Histórico e diff via git | quire | 0/3 |
 | 5: Export | quire | 0/2 |
 | 6: Criar arquivo ausente | quire | 0/1 |
 | 7: Fechamento da v0.3 | quire | 0/1 |
 
-**Total:** 0/23 tarefas
+**Total:** 0/25 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** especificação (spec, design, tasks e summary) escrita; nenhuma tarefa iniciada
+- **Fase / tarefa:** especificação aprovada pelo autor em 2026-11-16, com as decisões Q1–Q10 registradas; **aguardando feedback de uso** da `v0.2.0-rc.1` (Q10); nenhuma tarefa iniciada
 - **Concluídas (`[x]`):** nenhuma
 - **Em andamento:** nenhuma
-- **Aguardando decisão do autor:** Q1–Q10 da spec. Cada uma tem padrão conservador, então nenhuma bloqueia o início, exceto se o autor quiser mudar o escopo (Q3, Q4, Q5 e Q6 mudam o que é entregue)
-- **Próximo passo:** o autor revisa a spec e responde às perguntas; depois, aprovação e execução a partir da Fase 0 (T2, T3, T4; a T1 é do autor com WSL)
-- **Pré-requisitos vindos da v0.2:** nenhum bloqueante pelo padrão da Q9. Ficam na v0.2: revisões visuais, roteiro E2E, roteiro de teclas mortas e IME, `quire .` no Windows, orçamento de memória da T6 e a decisão de publicar a `v0.2.0-rc.1` ou fechar a `v0.2.0`
-- **Bloqueios:** nenhum para começar. A T1 depende do autor numa máquina com WSL e não bloqueia as outras fases (Q7)
+- **Aguardando o autor:** o bloco "Feedback de uso" preenchido; a T1 (rodadas no WSL), que não bloqueia as outras fases (Q7)
+- **Próximo passo:** depois do feedback, ajustar a spec se ele mudar o escopo; então `git switch main && git pull` e execução a partir da Fase 0 (T2, T3, T4)
+- **Pré-requisitos vindos da v0.2:** nenhum bloqueante; a v0.3 segue em paralelo (Q9). Ficam na v0.2: revisões visuais, roteiro E2E, roteiro de teclas mortas e IME, `quire .` no Windows, orçamento de memória da T6 e a decisão de publicar a `v0.2.0-rc.1` ou fechar a `v0.2.0`
+- **Bloqueios:** a execução espera o feedback de uso (Q10). A T1 depende do autor numa máquina com WSL e não bloqueia as outras fases (Q7)
 - **Arquivos sem commit:** nenhum
 - **Branch / worktree:** `docs/v0-3-spec`, criada de `main` em `13523e6`. Esse commit, com o registro da `v0.2.0-rc.1` no summary da v0.2, ainda não foi enviado ao `origin`. Sem push, sem PR, sem tag
 
@@ -44,7 +54,7 @@ Levantadas no Relatório da manhã, na tabela de pendências, no "Onde parou" e 
 | --- | --- | --- |
 | Rodadas no WSL (spikes T2 e T3 da v0.1) e remoção de `apps/desktop/src/spike/` | T8 da v0.2 (bloqueada sem WSL) | **T1** (DEB-11), Fase 0, do autor; não bloqueia (Q7) |
 | Escrita em `\\wsl$`, DrvFs e 9p (P6 da v0.2; `VERIFIED_ATOMIC` vazia) | T11 da v0.2 | **T1**: a decisão sai do dado; sem dado, as classes seguem somente leitura (TD-22) |
-| MSI sem assinatura (aviso do SmartScreen) | release `v0.2.0-rc.1` | **T2** (DEB-12): avaliar e decidir; padrão: não assinar e documentar (Q6) |
+| MSI sem assinatura (aviso do SmartScreen) | release `v0.2.0-rc.1` | **T2** (DEB-12): não assinar e documentar o SmartScreen (Q6, TD-37) |
 | Fontes Inter e JetBrains Mono não embutidas | T14 da v0.1, adiada na v0.2 | **T3** (DEB-13): agora é necessária, porque o PDF precisa sair igual no WebKitGTK e no WebView2 (EXP-06) |
 | Seção ativa do outline só depois de rolar até um título | T16 da v0.1, adiada na v0.2 (cosmético) | **T4** (DEB-14): o voltar/avançar restaura a rolagem e precisa do destaque correto |
 | `arquivo:linha` e IDs clicáveis | T18 e T19 da v0.1 | **T11, T12** (REF-04, REF-09) |
@@ -52,7 +62,7 @@ Levantadas no Relatório da manhã, na tabela de pendências, no "Onde parou" e 
 | "Comparar selecionadas" no seletor de instâncias | T20 da v0.1, wireframe 4 | **T18** (HIS-07) |
 | "N commits à frente" no seletor | T20 da v0.1 | **Backlog**: não serve ao critério de pronto da v0.3 |
 | Detecção de unidade de rede mapeada no Windows | T21 da v0.1, adiada na v0.2 | **Descartada da v0.3**: exige FFI ou dependência com `unsafe` encapsulado (o motivo que descartou a opção (b) do TD-20); `[watch.paths]` cobre. Reavaliar só com feedback de uso no Windows |
-| Criar spec ou arquivo novo (P1 da v0.2) | backlog decidido na v0.2 | **T21** (NEW) para arquivo primário ausente; spec nova depende da Q4 (padrão: backlog da v0.4) |
+| Criar spec ou arquivo novo (P1 da v0.2) | backlog decidido na v0.2 | **T21** (NEW) para arquivo primário ausente; spec nova na v0.4 (Q4) |
 | Alerta `tasks.md` × tabela do `summary.md` (P5 da v0.2, PRG-02 reservado) | backlog decidido na v0.2 | **T13**: regra `progress-mismatch`, com o ID PRG-02 reservado |
 | `parse::summary_progress` sem uso | design da v0.2 | **T13** |
 | Revisões visuais T3, T16–T20, T22–T24 e E2E T26 da v0.2 | Relatório da manhã da v0.2 | **Continuam na v0.2**, sem bloquear (Q9) |
@@ -65,18 +75,17 @@ Levantadas no Relatório da manhã, na tabela de pendências, no "Onde parou" e 
 
 ## Backlog da v0.4 decidido na v0.3
 
-Valem até o autor decidir o contrário nas perguntas da spec:
-
 - Criar spec nova, com pasta, chave, slug, repositório e worktree (Q4)
-- Export de `gates.jsonl` e `lessons.jsonl` com caminhos mascarados (Q5)
-- Forma qualificada de ID entre specs (Q1) e supressão do lint dentro do arquivo (Q2), se o autor quiser mudar o formato
+- Binário avulso do `quire-cli` para outras arquiteturas e sistemas (aarch64, macOS)
 - Abrir `arquivo:linha` no `$EDITOR` na linha; "N commits à frente/atrás"; detecção de unidade mapeada no Windows
 - Correção automática pelo lint
 - Should restantes do MoSCoW: journal com quick-add, copiar contexto para um agente, indicadores de git por projeto
 
+Decididos como **não** (sem backlog): forma qualificada de ID entre specs (Q1), supressão do lint dentro do arquivo (Q2), export de `gates.jsonl` e `lessons.jsonl` (Q5) e assinatura do MSI enquanto o público for o time (Q6, TD-37).
+
 ## Medições
 
-Ainda nenhuma. Cada spike e a T1/T2 preenchem a sua seção.
+Ainda nenhuma. Cada spike e a T1 preenchem a sua seção.
 
 ### T1: rodadas no WSL (DEB-11)
 
@@ -87,10 +96,6 @@ Mesma tabela da T11 da v0.2. As linhas de btrfs, tmpfs, ext4 e NTFS já estão m
 | DrvFs (`/mnt/c` no WSL) | máquina do autor | **NÃO VERIFICADO** | | | | | |
 | 9p (WSL ↔ Windows) | máquina do autor | **NÃO VERIFICADO** | | | | | |
 | `\\wsl$` / `\\wsl.localhost` (Windows → WSL) | Windows com WSL | **NÃO VERIFICADO** | | | | | |
-
-### T2: assinatura do MSI (DEB-12)
-
-A preencher: opções, custo, processo, segredo no CI, efeito no SmartScreen, fontes consultadas e data.
 
 ### T5: índice de referências (REF-10)
 
@@ -117,3 +122,5 @@ A preencher.
 - 2026-11-16 · planejamento · confirmado no código: o modo Ler não renderiza HTML cru (sem `rehype-raw`), o Mermaid roda com `securityLevel: "strict"`, links não `http(s)` não navegam, não há `tauri-plugin-dialog`, e o `git.rs` já tem tempo limite (5 s) e trata o `git` ausente. Com isso, o export reaproveita a árvore do modo Ler sem precisar sanitizar HTML do usuário, e o histórico parte do mesmo mecanismo de processo do `git` da v0.1
 - 2026-11-16 · planejamento · riscos tratados de frente no design: IDs ambíguos (TD-26), falsos positivos do lint (pré-condições por regra, fixtures limpas com zero problemas, severidade conservadora), `git` lento ou ausente (tempo limite, cancelamento, paginação), `git` executando código do repositório por `core.fsmonitor`/`diff.external`/`textconv` (TD-31, com teste de arquivo-sentinela), export vazando caminho (teste de vazamento, verificação antes de gravar, JSONL fora), PDF diferente entre WebKitGTK e WebView2 (fontes embutidas, spike T7) e desempenho do índice de referências (spike T5)
 - 2026-11-16 · planejamento · Fase 0 decidida: T1 (WSL, do autor, não bloqueia pelo padrão da Q7), T2 (assinatura do MSI), T3 (fontes, agora exigidas pelo PDF) e T4 (outline, exigido pelo voltar/avançar). Detecção de unidade mapeada no Windows descartada da v0.3, com justificativa na tabela de pendências
+- 2026-11-16 · planejamento · **decisões do autor sobre Q1–Q10 registradas; spec aprovada.** Q1: sem ID qualificado entre specs. Q2: silenciar o lint só por configuração. Q3: publicar o `quire-cli` para Linux na release (história nova PKG-01 a PKG-03, TD-38 e T24; o `release.yml` muda na T24, não agora). Q4: criar spec nova na v0.4. Q5: sem export de JSONL. Q6: MSI sem assinatura, SmartScreen documentado (TD-37; a T2 vira documentação). Q7: a rodada no WSL não bloqueia. Q8: `AD-xxx` definido em título, começo de item de lista ou primeira célula de tabela (REF-11; T25 com um `STATE.md` sintético nos três casos). Q9: em paralelo com a v0.2, a partir da `main` atualizada. Q10: aprovada, mas a execução só começa depois do uso real da `v0.2.0-rc.1`; o bloco "Feedback de uso" fica aberto acima
+- 2026-11-16 · planejamento · achado ao desenhar a T24: no Linux, `app_path` do `quire-cli` procura um `quire` ao lado do executável (`crates/quire-cli/src/lib.rs`). No `.tar.gz`, o próprio auxiliar se chama `quire`, então ele se acharia como app e se lançaria de novo, em laço. O design e a T24 passam a exigir que `app_path` recuse o próprio executável

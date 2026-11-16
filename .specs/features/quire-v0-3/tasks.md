@@ -3,7 +3,7 @@
 ## Execução
 
 - Repositório: quire
-- Base: `main` com a v0.2 mergeada (PR #2, `5efaa19`); release de teste `v0.2.0-rc.1` em rascunho. As revisões pendentes da v0.2 não bloqueiam (Q9, padrão)
+- Base: `main` atualizada no início da execução (`git switch main && git pull`), com a v0.2 mergeada (PR #2, `5efaa19`). A v0.3 segue em paralelo com as pendências da v0.2, que não bloqueiam (Q9)
 - Verificação: full
 - Paralelo: não
 - E2E: manual (roteiro em T23)
@@ -17,12 +17,12 @@ Siga o `AGENTS.md`. Implemente **uma tarefa por vez, na ordem das fases**. Antes
 
 **Spec**: `.specs/features/quire-v0-3/spec.md`
 **Design**: `.specs/features/quire-v0-3/design.md`
-**Status**: rascunho, aguardando as decisões do autor sobre Q1–Q10
+**Status**: aprovado com as decisões do autor de 2026-11-16 (Q1–Q10); **execução aguardando o feedback de uso da `v0.2.0-rc.1`** (Q10)
 
 **Condições obrigatórias da execução:**
 
-1. As perguntas Q1–Q10 da spec têm um padrão conservador. Sem resposta do autor, a execução usa o padrão. Uma tarefa que precise de algo fora do padrão e das decisões registradas para e registra no Journal.
-2. A Fase 0 vem antes das features. A T1 depende do autor numa máquina com WSL e, pelo padrão da Q7, **não bloqueia** as fases seguintes: sem a rodada, `\\wsl$`, DrvFs e 9p continuam somente leitura. As T2, T3 e T4 bloqueiam.
+1. **A execução só começa depois do uso real da `v0.2.0-rc.1`** (Q10): o bloco "Feedback de uso" do `summary.md` precisa estar preenchido pelo autor. Um feedback que mude o escopo volta para a spec antes da T1. As decisões do autor de 2026-11-16 (spec, "Decisões do autor") valem para todas as tarefas; uma tarefa que precise de algo fora delas para e registra no Journal.
+2. A Fase 0 vem antes das features. A T1 depende do autor numa máquina com WSL e, por decisão do autor (Q7), **não bloqueia** as fases seguintes: sem a rodada, `\\wsl$`, DrvFs e 9p continuam somente leitura. As T2, T3 e T4 bloqueiam.
 3. Os spikes (Fase 1) vêm antes das features (Fases 2 a 6). Cada spike registra a decisão no `summary.md`; um resultado que contradiga o design **para a execução** até o autor decidir.
 4. Nenhuma tarefa escreve no repositório git do usuário nem em arquivo de spec fora do pipeline do TD-12. Os testes de histórico criam repositórios em tempdir; os de criação de arquivo e de export usam tempdir.
 5. Fixtures são sintéticas. Nenhum dado real de empresa entra no repositório, nem em spike: os repositórios grandes dos spikes são gerados por script numa pasta temporária.
@@ -46,7 +46,7 @@ T2 → T3 → T4
 ```
 
 - [ ] T1: Rodadas no WSL e decisão de escrita em `\\wsl$`, DrvFs e 9p
-- [ ] T2: Assinatura do MSI: avaliação e decisão
+- [ ] T2: MSI sem assinatura: documentar o SmartScreen
 - [ ] T3: Fontes Inter e JetBrains Mono embutidas
 - [ ] T4: Seção ativa do outline desde o primeiro render
 
@@ -64,10 +64,11 @@ T5 → T6 → T7 → T8
 ### Fase 2: Referências e navegação
 
 ```
-T22 → T9 → T10 → T11 → T12
+T22 → T25 → T9 → T10 → T11 → T12
 ```
 
-- [ ] T22: Fixtures de referências, `STATE.md`, defeitos de lint e histórico git
+- [ ] T22: Fixtures de referências, defeitos de lint e histórico git
+- [ ] T25: `STATE.md` sintético com os três casos de definição de `AD-xxx`
 - [ ] T9: Gramática de referências no preset, extração e resolução no núcleo
 - [ ] T10: Referências no índice (esquema v3) e comandos
 - [ ] T11: Links no modo Ler, "Referenciado em" e voltar/avançar
@@ -76,12 +77,13 @@ T22 → T9 → T10 → T11 → T12
 ### Fase 3: Lint
 
 ```
-T13 → T14 → T15
+T13 → T14 → T15 → T24
 ```
 
 - [ ] T13: Motor de lint, regras e configuração
 - [ ] T14: Painel de problemas, selos e lint incremental
 - [ ] T15: `quire lint` no CLI
+- [ ] T24: `quire-cli` avulso para Linux na release
 
 ### Fase 4: Histórico e diff via git
 
@@ -138,19 +140,19 @@ T23
 
 ---
 
-### T2: Assinatura do MSI: avaliação e decisão
+### T2: MSI sem assinatura: documentar o SmartScreen
 
-**What**: Levantar as opções para assinar o `.msi` (não assinar; certificado de assinatura de código comprado; serviço de assinatura para projetos open source), com custo, processo de obtenção, guarda do segredo no GitHub Actions (só em tag do repositório principal, nunca em PR de fork) e efeito no SmartScreen. Recomendar uma e registrar a decisão do autor como TD-37 (Q6). Sem decisão, aplicar o padrão: não assinar e documentar no README o aviso do SmartScreen ("Mais informações" → "Executar assim mesmo"). Se a decisão for assinar, a implementação no `release.yml` entra nesta tarefa, com a verificação da assinatura (`signtool verify` ou equivalente) no job do MSI.
-**Onde**: `design.md` (TD-37), `README.md`, `.github/workflows/release.yml` e `ci.yml` (se assinar)
+**What**: O autor decidiu não assinar o MSI (Q6, TD-37). Documentar no README, na seção de instalação no Windows, o aviso do SmartScreen para um instalador sem assinatura, com o texto que o Windows mostra e o caminho para prosseguir ("Mais informações" → "Executar assim mesmo"), e dizer que o MSI não é assinado. Registrar no `docs/e2e.md` o passo de instalação com o aviso.
+**Onde**: `README.md`, `docs/e2e.md`
 **Depende de**: nenhuma
 **Requirement**: DEB-12
 **Pronto quando**:
 
-- Tabela de opções no `summary.md` ("Medições"), com as fontes consultadas e o que ficou NÃO VERIFICADO (preços mudam)
-- TD-37 registrado com a decisão e o motivo
-- Se não assinar: README com o passo a passo do SmartScreen. Se assinar: assinatura verificada no CI numa tag de teste, e nenhum segredo exposto a PR de fork (`actionlint` limpo)
+- README com o aviso, em inglês, com os textos do Windows em inglês e em português entre parênteses
+- TD-37 conferido no `design.md`, com a condição para reavaliar
+- Nenhuma mudança no `release.yml` nem no `ci.yml`
 
-**Testes**: manual, CI (se assinar)
+**Testes**: manual (revisão do texto)
 **Gate**: fase
 
 ---
@@ -258,7 +260,7 @@ T23
 
 ### T22: Fixtures de referências, `STATE.md`, defeitos de lint e histórico git
 
-**What**: Ampliar `fixtures/templates` e `scripts/make-fixtures.sh`: `STATE.md` com `AD-001` a `AD-003` em `acme_gateway`; o mesmo ID (`TOK-01`) em duas specs do mesmo projeto; a mesma chave de issue em dois projetos (já existe para o `quire open`; reaproveitar); referências cruzadas por chave; `arquivo:linha` para código das fixtures; uma spec "limpa" sem nenhum problema e uma spec com um defeito plantado por regra de LNT-02 (lista esperada num arquivo `expected-lint.json` ao lado); tabela de progresso divergente no `summary.md` de uma spec; e uma sequência de commits no `make-fixtures.sh` que toca a pasta de uma spec, com os hashes curtos escritos no `tasks.md` e no `gates.jsonl` gerados pelo script.
+**What**: Ampliar `fixtures/templates` e `scripts/make-fixtures.sh`: o mesmo ID (`TOK-01`) em duas specs do mesmo projeto; a mesma chave de issue em dois projetos (já existe para o `quire open`; reaproveitar); referências cruzadas por chave; `arquivo:linha` para código das fixtures; uma spec "limpa" sem nenhum problema e uma spec com um defeito plantado por regra de LNT-02 (lista esperada num arquivo `expected-lint.json` ao lado); tabela de progresso divergente no `summary.md` de uma spec; e uma sequência de commits no `make-fixtures.sh` que toca a pasta de uma spec, com os hashes curtos escritos no `tasks.md` e no `gates.jsonl` gerados pelo script.
 **Onde**: `fixtures/templates/`, `scripts/make-fixtures.sh`, `fixtures/README.md`
 **Depende de**: T8
 **Requirement**: REF-01, REF-02, LNT-06
@@ -274,15 +276,32 @@ T23
 
 ---
 
+### T25: `STATE.md` sintético com os três casos de definição de `AD-xxx`
+
+**What**: Acrescentar `fixtures/templates/acme_gateway/.specs/STATE.md` (Q8), copiado pelo `make-fixtures.sh`, com conteúdo inventado. `AD-001` é definido num título (`## AD-001: …`), `AD-002` no começo de um item de lista (`- AD-002: …`) e `AD-003` na primeira célula de uma linha de tabela (`| AD-003 | … |`). O arquivo também traz usos que não são definição: um no meio de uma frase, um num item de lista que não começa pelo ID e um numa célula que não é a primeira. Traz ainda `AD-001` definido uma segunda vez mais abaixo e um `AD-009` dentro de bloco de código. As specs do `acme_gateway` citam `AD-001` a `AD-003` e `AD-004`, que não existe. O `acme_billing` fica sem `STATE.md`, para o caso `no_state_file`. Lista esperada das definições e dos usos num `expected-refs.json` ao lado.
+**Onde**: `fixtures/templates/acme_gateway/.specs/STATE.md`, specs do `acme_gateway`, `scripts/make-fixtures.sh`, `fixtures/README.md`
+**Depende de**: T22
+**Requirement**: REF-11
+**Pronto quando**:
+
+- `scripts/make-fixtures.sh` copia o `STATE.md` e continua idempotente; os testes da v0.1 e da v0.2 continuam verdes (o `STATE.md` não vira spec nem aparece em "outros")
+- `expected-refs.json` lista, com linha, as três definições, a definição repetida, os usos e o `AD-004` sem definição; o `AD-009` do bloco de código não aparece
+- Nenhum dado real; nomes `acme`
+
+**Testes**: unit (conferido pelos testes da T9)
+**Gate**: fase
+
+---
+
 ### T9: Gramática de referências no preset, extração e resolução no núcleo
 
 **What**: `quire-core::refs` (TD-25, TD-26): `ReferenceGrammar` no `Preset` (`requirement`, `issue_key`, `decision`, `file_line`), leitura de `decision_pattern` e `file_line` no `config.toml`, `extract` com papéis de definição e uso fora de código, e `resolve` por escopo (REF-03) com os motivos de quebra (REF-08). `evidence_chain` fica na T12.
 **Onde**: `crates/quire-core/src/refs.rs`, `preset.rs`, `config.rs`
-**Depende de**: T22
-**Requirement**: REF-01, REF-02, REF-03
+**Depende de**: T25
+**Requirement**: REF-01, REF-02, REF-03, REF-11
 **Pronto quando**:
 
-- Testes por tabela da extração: ID em comentário (definição), em `**Requirement**`, na tabela do `validation.md` e em texto (usos); nada dentro de bloco cercado nem de código inline; `AD-001` em título do `STATE.md` (definição) e em texto (uso); `src/main.ts:12` e `src\main.ts:12` normalizados
+- Testes por tabela da extração: ID em comentário (definição), em `**Requirement**`, na tabela do `validation.md` e em texto (usos); nada dentro de bloco cercado nem de código inline; o `STATE.md` da T25 produz exatamente o `expected-refs.json` (definição em título, em começo de item de lista e em primeira célula de tabela; usos no meio de frase, em item que não começa pelo ID e em célula que não é a primeira; a definição repetida listada depois da primeira; nada do bloco de código); `src/main.ts:12` e `src\main.ts:12` normalizados
 - Testes de resolução com as fixtures: `TOK-01` de cada spec resolve na própria spec; a chave em dois projetos devolve dois destinos; `AD-009` sem definição é quebrada com `missing_definition`; `../../etc/passwd:1` e caminho absoluto são `outside_repo`; linha além do fim é `line_out_of_range`
 - O preset `generic` só extrai `arquivo:linha` e links; um `decision_pattern` inválido no `config.toml` dá erro no campo, como o `id_pattern`
 
@@ -382,8 +401,8 @@ T23
 
 ### T15: `quire lint` no CLI
 
-**What**: Subcomando `lint` no `plugins.cli` do `tauri.conf.json`; parser compartilhado como biblioteca do `quire-cli` (TD-30); no app, o `main` trata o `lint` antes de montar o Tauri; no `quire-cli`, o `lint` roda no processo, com o `quire-core`. Saída em texto e JSON, `--fail-on`, `--preset`, `--config` e os códigos 0, 1, 2 e 3 (LNT-07). CI: teste de fumaça do `quire lint` em Linux e Windows, e passo informativo que roda o `quire lint` nas `.specs` do próprio Quire (OSS-08). Se a Q3 for aprovada, o `release.yml` publica o `quire-cli` para Linux.
-**Onde**: `crates/quire-cli/`, `apps/desktop/src-tauri/src/main.rs` e `cli.rs`, `tauri.conf.json`, `.github/workflows/ci.yml` (e `release.yml` se Q3)
+**What**: Subcomando `lint` no `plugins.cli` do `tauri.conf.json`; parser compartilhado como biblioteca do `quire-cli` (TD-30); no app, o `main` trata o `lint` antes de montar o Tauri; no `quire-cli`, o `lint` roda no processo, com o `quire-core`. Saída em texto e JSON, `--fail-on`, `--preset`, `--config` e os códigos 0, 1, 2 e 3 (LNT-07). CI: teste de fumaça do `quire lint` em Linux e Windows, e passo informativo que roda o `quire lint` nas `.specs` do próprio Quire (OSS-08). A publicação do `quire-cli` para Linux é a T24.
+**Onde**: `crates/quire-cli/`, `apps/desktop/src-tauri/src/main.rs` e `cli.rs`, `tauri.conf.json`, `.github/workflows/ci.yml`
 **Depende de**: T14
 **Requirement**: LNT-07, OSS-08
 **Pronto quando**:
@@ -399,11 +418,30 @@ T23
 
 ---
 
+### T24: `quire-cli` avulso para Linux na release
+
+**What**: Q3 e TD-38. `app_path` passa a recusar um vizinho que seja o próprio executável, e a mensagem de "app não encontrado" diz que o binário avulso só traz o lint (PKG-02). Job novo no `release.yml`: no `ubuntu-22.04`, sem as dependências do Tauri, `cargo build --release --locked -p quire-cli`; conferência das bibliotecas dinâmicas por lista fechada; `quire --version` e `quire lint` sobre as fixtures geradas; `.tar.gz` com o binário `quire` e o `LICENSE`, mais o `.sha256`; `gh release upload` na release rascunho da tag, depois do job do Tauri (PKG-01). No `ci.yml`, um passo que compila só o `quire-cli` num runner sem as dependências do Tauri. Seção no README com o download, a conferência do `.sha256`, a glibc mínima e um exemplo de job do GitHub Actions (PKG-03).
+**Onde**: `crates/quire-cli/src/lib.rs`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`, `README.md`
+**Depende de**: T15
+**Requirement**: PKG-01, PKG-02, PKG-03
+**Pronto quando**:
+
+- Teste do `quire-cli`: com o próprio executável copiado como `quire` numa pasta sem o app, `quire .` sai com 1 e a mensagem, sem lançar processo nenhum (o lançamento é injetável, como na T5 da v0.2); com o app de verdade ao lado, o comportamento da v0.2 não muda
+- `actionlint` limpo; o job da release só roda em tag e não expõe segredo a PR de fork (usa o `GITHUB_TOKEN` com `contents: write`, como o job do Tauri)
+- A conferência de bibliotecas falha de propósito num teste local com um binário que liga ao GTK (registrado no Journal) e passa com o `quire-cli`
+- O passo do `ci.yml` compila o `quire-cli` num runner sem `libwebkit2gtk` instalado
+- O job da release roda de verdade só numa tag de teste que o autor pedir; até lá, fica **NÃO VERIFICADO** no Journal, incluindo o `gh release upload` num rascunho criado pelo `tauri-action`
+
+**Testes**: unit, CI
+**Gate**: fase
+
+---
+
 ### T16: `git` somente leitura no núcleo e comandos de histórico
 
 **What**: `quire-core::history` (TD-31): lista fechada de subcomandos, validação de hash e caminho, endurecimento por `-c` e variáveis de ambiente, saída `-z` com teto de bytes, tempo limite do spike T6, cancelamento por id. Funções de log paginado, arquivo no commit, arquivos alterados entre commits, commit por hash curto (ambíguo e inexistente). Comandos `history_log`, `history_file`, `history_changes`, `history_commit` e `history_cancel` com bindings.
 **Onde**: `crates/quire-core/src/history.rs`, `apps/desktop/src-tauri/src/`
-**Depende de**: T15
+**Depende de**: T24
 **Requirement**: HIS-01, HIS-02, HIS-03, HIS-04, HIS-05, HIS-06, HIS-08
 **Pronto quando**:
 
@@ -518,7 +556,7 @@ T23
 **Pronto quando**:
 
 - Roteiro E2E escrito sobre `fixtures/workspace`, com o binário de produção, e executado no que dá para executar sem olho humano; o resto fica para o autor
-- README cobre referências, lint (com exemplo de CI e códigos de saída), histórico, export e criação de arquivo; `CHANGELOG.md` com a v0.3.0
+- README cobre referências, lint (com exemplo de CI e códigos de saída), o binário avulso, histórico, export, criação de arquivo e o aviso do SmartScreen; `CHANGELOG.md` com a v0.3.0
 - CI verde em Linux e Windows depois do push que o autor pedir; `actionlint` limpo
 - Gate final verde; Relatório da manhã no topo do `summary.md`
 

@@ -2,24 +2,24 @@
 
 **Idioma:** pt-BR
 **Spec:** `spec.md`
-**Status:** rascunho, aguardando as decisões do autor sobre Q1–Q10
+**Status:** aprovado com as decisões do autor de 2026-11-16 (Q1–Q10); execução aguardando o feedback de uso da `v0.2.0-rc.1` (Q10)
 
-## Perguntas do autor e onde entram no design
+## Decisões do autor e onde entram no design
 
-As perguntas Q1 a Q10 estão na spec ("Perguntas em aberto"). Enquanto não houver resposta, vale o padrão conservador indicado em cada uma, e o design abaixo já está escrito sobre esse padrão.
+As perguntas Q1 a Q10 foram decididas em 2026-11-16 (spec, "Decisões do autor"). Mapeamento:
 
-| Pergunta | Padrão | Onde entra |
-| --- | --- | --- |
-| Q1: ID qualificado entre specs | sem forma qualificada | TD-26 (escopo de resolução) |
-| Q2: silenciar regra no arquivo | só por configuração | TD-29, "Configuração do lint" |
-| Q3: `quire-cli` para Linux | não publicado; `quire lint` no app e no auxiliar do Windows | TD-30 |
-| Q4: criar spec nova | fora | TD-36, NEW-03 |
-| Q5: export de JSONL | fora | TD-33, EXP-08 |
-| Q6: assinatura do MSI | não assinar e documentar | T2; vira o TD-37 quando decidida |
-| Q7: Fase 0 bloqueia? | não bloqueia | `tasks.md`, condição 2 |
-| Q8: definição de `AD-xxx` | regra de A4 | `refs`, gramática `decision` |
-| Q9: pendências da v0.2 | em paralelo | `summary.md`, "Pendências da v0.2" |
-| Q10: feedback de uso | sem feedback | Riscos |
+| Decisão | Onde entra |
+| --- | --- |
+| Q1: sem ID qualificado entre specs | TD-26 (escopo de resolução) |
+| Q2: silenciar só por configuração | TD-29, "Configuração do lint" |
+| Q3: `quire-cli` publicado para Linux | TD-30, TD-38, "Binário avulso para CI" |
+| Q4: criar spec nova na v0.4 | TD-36, NEW-03 |
+| Q5: sem export de JSONL | TD-33, EXP-08 |
+| Q6: MSI sem assinatura, SmartScreen documentado | TD-37 |
+| Q7: WSL não bloqueia | `tasks.md`, condição 2 |
+| Q8: definição de `AD-xxx` em título, item de lista ou linha de tabela | `refs`, gramática `decision`; REF-11 |
+| Q9: em paralelo com a v0.2, a partir da `main` atualizada | base do `tasks.md` |
+| Q10: aprovada, execução depois do uso da rc.1 | `summary.md` ("Feedback de uso"); `tasks.md`, condição 1 |
 
 ## Ponto de partida (o que a v0.2 entrega e o que muda)
 
@@ -111,7 +111,7 @@ crates/quire-core/src/
   history.rs         # git somente leitura: log, show, cat-file, diff-tree; endurecimento
   template.rs        # modelos de arquivo por preset
 crates/quire-cli/src/
-  lib.rs             # parser clap a partir do plugins.cli, compartilhado com o app (TD-30)
+  lib.rs             # já existe: parser clap a partir do plugins.cli; passa a ser usado também pelo app (TD-30)
   lint.rs            # saída texto/JSON e códigos de saída
 apps/desktop/src/features/
   navigation/        # pilha de voltar/avançar (TD-28)
@@ -121,6 +121,8 @@ apps/desktop/src/features/
   export/            # HTML estático, verificação de vazamento, impressão
 apps/desktop/src/lib/diff/   # diff por linha compartilhado (TD-32), saído de features/conflict
 apps/desktop/src/assets/fonts/  # Inter e JetBrains Mono woff2 + OFL (DEB-13)
+.github/workflows/release.yml   # job do quire-cli avulso para Linux (T24, TD-38)
+fixtures/templates/acme_gateway/.specs/STATE.md  # AD-xxx nos três casos de definição (T25)
 fixtures/templates/          # specs com referências, STATE.md e defeitos plantados (T22)
 ```
 
@@ -129,7 +131,7 @@ fixtures/templates/          # specs com referências, STATE.md e defeitos plant
 ### `quire-core::refs` (REF)
 
 - **Gramática (TD-25):** o `Preset` ganha `references: ReferenceGrammar` com quatro entradas opcionais: `requirement` (o `id_pattern` atual, sem mudar o nome no `config.toml`), `issue_key` (o `issue_key_pattern` aplicado ao texto, sem a âncora `^…-` do nome da pasta), `decision` (padrão do `exban`: `AD-\d{3}`) e `file_line` (liga/desliga; padrão `caminho/relativo.ext:N`, com `\` normalizada). Links relativos de markdown valem para todo preset. O `generic` tem só `file_line` e links.
-- **Extração:** `extract(md, file, &grammar) -> Vec<Occurrence>`, com `Occurrence { kind, key, role: Def | Use, line, col }`. Ignora blocos de código cercados e código inline (a mesma `Fence` do `parse`). Definições: comentário `<!-- ID -->` no `spec.md` (A2), pasta da spec para a chave (A3), regra de A4 no `STATE.md` para `AD-xxx`. Usos: todo o resto que casa a gramática, mais `**Requirement**`, a primeira coluna do `validation.md` e o `source` do `lessons.jsonl`.
+- **Extração:** `extract(md, file, &grammar) -> Vec<Occurrence>`, com `Occurrence { kind, key, role: Def | Use, line, col }`. Ignora blocos de código cercados e código inline (a mesma `Fence` do `parse`). Definições: comentário `<!-- ID -->` no `spec.md` (A2), pasta da spec para a chave (A3) e, para `AD-xxx`, a ocorrência no `STATE.md` que está num título, no começo de um item de lista (depois do marcador `-`, `*` ou `N.`) ou na primeira célula de uma linha de tabela (REF-11, Q8). A primeira definição vale; as repetidas ficam na lista de definições para a navegação mostrar. Usos: todo o resto que casa a gramática, mais `**Requirement**`, a primeira coluna do `validation.md` e o `source` do `lessons.jsonl`.
 - **Resolução na consulta (TD-26):** `resolve(kind, key, from: InstanceRef) -> Resolution` com os escopos de REF-03: requisito na mesma instância; `AD-xxx` no `STATE.md` da raiz do repositório da instância; `arquivo:linha` sob a raiz do repositório, com o caminho canonizado e recusado se sair dela (A5); chave de issue no mesmo projeto, depois nos demais, devolvendo todos os destinos. `Resolution` é `Found(Vec<Target>)` ou `Broken(Reason)`, e o `Reason` é um código traduzido na UI (`missing_definition`, `missing_file`, `line_out_of_range`, `outside_repo`, `no_state_file`).
 - **Cadeia até a evidência (REF-06):** `evidence_chain(instance, id)` junta as tarefas cujo `requirements` contém o ID (estado e hashes, do `parse::tasks`), a linha do `validation.md` (primeira coluna igual ao ID) e as linhas do `gates.jsonl` cujo `head` começa com um dos hashes (prefixo ≥ 7 caracteres).
 
@@ -179,7 +181,15 @@ O `ProjectConfig` ganha o campo `lint` (hoje ele tem `deny_unknown_fields`). Uma
 - **No Windows:** o `quire.cmd` chama o `quire-cli.exe`, que roda o `lint` no próprio processo (passa a depender do `quire-core`, que não depende de Tauri) e só lança o app para os demais comandos.
 - **Preset no CLI:** `--preset`, senão o preset do projeto no `config.toml` do usuário quando o repositório está configurado, senão a sugestão automática da v0.1 (PST-01: `exban` quando a estrutura é reconhecida), senão `generic`. A linha de stderr diz qual preset valeu.
 - **Raiz do repositório:** subindo até achar `.git` (pasta ou arquivo de worktree), sem chamar o `git`. Sem `.git`, a raiz é a pasta que contém `.specs`.
-- **Q3:** se aprovado, o mesmo `quire-cli` é compilado para Linux e anexado à release como binário avulso, sem dependência de WebKit.
+- **Binário avulso (Q3, TD-38):** o mesmo `quire-cli` compilado para Linux x86_64; ver "Binário avulso para CI".
+
+### Binário avulso para CI (PKG, TD-38)
+
+- **Build:** um job novo no `release.yml`, no `ubuntu-22.04` (a mesma glibc do AppImage), roda `cargo build --release --locked -p quire-cli` sem instalar as dependências do Tauri. Isso prova por construção que o crate não puxa WebKit nem GTK.
+- **Conferência:** antes de anexar, o job lista as bibliotecas dinâmicas do binário (`ldd`/`readelf -d`) e falha se houver alguma fora de uma lista fechada (libc, libm, libgcc_s, ld-linux, libpthread, libdl). Também roda `quire --version` e `quire lint` sobre as fixtures geradas, conferindo os códigos.
+- **Empacotamento:** `quire-cli-<versão>-x86_64-unknown-linux-gnu.tar.gz` com o binário renomeado para `quire` e o `LICENSE`, mais o `.sha256` do `.tar.gz`. O job espera o job de build do Tauri (`needs`) e anexa os dois arquivos à mesma release rascunho com `gh release upload <tag>`.
+- **Comportamento sem o app:** o `quire-cli` repassa os comandos que abrem o app para o binário vizinho (`app_path`: `quire.exe` no Windows, `quire` nos demais, confirmado em `crates/quire-cli/src/lib.rs`). No `.tar.gz` o próprio auxiliar se chama `quire`, então ele se acharia como "app" e se lançaria de novo, em laço. Por isso `app_path` passa a recusar um vizinho que seja o próprio executável (caminhos canonizados iguais) e cai no caminho que já existe: mensagem e código 1 (T5 da v0.2), agora dizendo que este binário só traz o lint (PKG-02).
+- **CI de PR:** o job de verificação já compila o workspace; a T24 acrescenta um passo que compila só o `quire-cli` num runner sem as dependências do Tauri, para pegar cedo uma dependência que puxe GTK.
 
 ### `quire-core::history` (HIS)
 
@@ -274,18 +284,19 @@ Esquema v3 descrito acima. O cache continua descartável: apagar o arquivo recon
 As decisões TD-01 a TD-10 da v0.1 e TD-11 a TD-24 da v0.2 continuam valendo. O TD-20 ganha um complemento no TD-30, sem ser reescrito. As novas:
 
 - **TD-25 Gramática de referências no preset** (REF-01): os tipos de referência e seus padrões vêm do `Preset`, sobrescrevíveis no `config.toml`. O núcleo não conhece `AD-` nem o formato do ID; o `generic` só conhece `arquivo:linha` e links relativos.
-- **TD-26 Escopo de resolução por tipo, com ID nu restrito à spec** (REF-03, A1, Q1): IDs são únicos só dentro da spec (o formato não impede dois `DEB-01` no mesmo projeto; as specs do Quire evitam isso só por convenção), então resolver um ID no projeto inteiro geraria destinos errados. A chave de issue é o elo entre specs. Uma forma qualificada só entra se o autor aprovar a Q1, com TD novo.
+- **TD-26 Escopo de resolução por tipo, com ID nu restrito à spec** (REF-03, A1, Q1): IDs são únicos só dentro da spec (o formato não impede dois `DEB-01` no mesmo projeto; as specs do Quire evitam isso só por convenção), então resolver um ID no projeto inteiro geraria destinos errados. A chave de issue é o elo entre specs. O autor decidiu não ter forma qualificada (Q1, 2026-11-16): o formato das specs não muda.
 - **TD-27 Ocorrências no índice, resolução na consulta** (REF-02, REF-10): guardam-se definições e usos por documento deduplicado por hash, nunca o destino resolvido, que depende da instância e do estado atual do disco. Esquema v3 no mesmo SQLite descartável.
 - **TD-28 Histórico de navegação só em memória** (REF-07): até 100 posições, perdido ao fechar o app, como o histórico do editor (TD-24). Toda troca de arquivo passa pela guarda de SAV-06.
-- **TD-29 Lint puro no núcleo, sem índice, com mensagens por código** (LNT): o motor recebe a spec lida do disco e devolve problemas com código e parâmetros. A UI traduz; o CLI imprime em inglês, que é o idioma dos logs de CI, e o formato não muda com o idioma do sistema. Silenciar é só por configuração (Q2): nada no arquivo da spec muda por causa do lint. A severidade padrão é conservadora: erro só para o que é certamente quebrado (`duplicate-id`, `unknown-id`, `unknown-dependency`).
-- **TD-30 `quire lint` sem janela e `quire-cli` com o núcleo** (LNT-07, Q3; complementa o TD-20): o TD-20 fez do `quire-cli` um auxiliar de console só do Windows, sem `quire-core`, que repassava tudo ao app. Com o lint, o auxiliar precisa executar um comando de verdade no console, e o binário GUI do Linux não serve a um CI sem WebKit. Por isso o `quire-cli` passa a depender do `quire-core` (continua sem Tauri e sem `unsafe`) e a biblioteca do parser é compartilhada com o app, que trata o `lint` antes de montar o Tauri. Publicar o `quire-cli` para Linux depende da Q3.
+- **TD-29 Lint puro no núcleo, sem índice, com mensagens por código** (LNT): o motor recebe a spec lida do disco e devolve problemas com código e parâmetros. A UI traduz; o CLI imprime em inglês, que é o idioma dos logs de CI, e o formato não muda com o idioma do sistema. Silenciar é só por configuração (Q2, decidido em 2026-11-16): nada no arquivo da spec muda por causa do lint. A severidade padrão é conservadora: erro só para o que é certamente quebrado (`duplicate-id`, `unknown-id`, `unknown-dependency`).
+- **TD-30 `quire lint` sem janela e `quire-cli` com o núcleo** (LNT-07, Q3; complementa o TD-20): o TD-20 fez do `quire-cli` um auxiliar de console só do Windows, sem `quire-core`, que repassava tudo ao app. Com o lint, o auxiliar precisa executar um comando de verdade no console, e o binário GUI do Linux não serve a um CI sem WebKit. Por isso o `quire-cli` passa a depender do `quire-core` (continua sem Tauri e sem `unsafe`) e a biblioteca do parser é compartilhada com o app, que trata o `lint` antes de montar o Tauri. A publicação para Linux, aprovada na Q3, está no TD-38.
 - **TD-31 `git` somente leitura por lista fechada e endurecimento** (HIS-05, HIS-06): só subcomandos de leitura, argumentos validados, sem pager, editor, prompt, diff externo, `textconv`, `fsmonitor` nem locks opcionais, e nenhuma comparação contra a worktree (assim o `git` nunca reescreve o `.git/index`). O motivo é duplo: o Quire não pode alterar o repositório, e a configuração de um repositório clonado (`core.fsmonitor`, drivers de diff) pode executar comandos. O tempo limite e o teto de saída vêm do spike T6.
 - **TD-32 Um diff por linha no app para conflito, histórico e instâncias** (HIS-03, HIS-07): o conteúdo vem do disco ou do `git cat-file`, e o diff é sempre do app, com a mesma apresentação. O "Comparar" de instâncias não depende do `git`.
 - **TD-33 Export HTML a partir da árvore do modo Ler, escrita só no backend** (EXP): o export mostra o que o app mostra, com tema claro, sem JavaScript e sem recurso externo. O backend abre o diálogo de salvar (`tauri-plugin-dialog`, usado só do Rust) e grava pelo pipeline de escrita, então o webview nunca escolhe nem recebe um caminho de escrita. A verificação de vazamento roda no backend antes da gravação. JSONL fica fora (Q5).
 - **TD-34 PDF pela impressão do webview** (EXP-05, EXP-06): sem gerador de PDF próprio. O arquivo é gravado pelo diálogo de impressão do sistema, por escolha do usuário. Se o spike T7 mostrar que uma plataforma não imprime de forma aceitável, a opção fica indisponível ali, com o motivo, e o export HTML continua.
 - **TD-35 Fontes embutidas no app, não no HTML exportado** (DEB-13, EXP-06, EXP-07): Inter e JetBrains Mono em woff2 (OFL) acabam com a diferença entre máquinas e entre WebKitGTK e WebView2, inclusive na impressão. O HTML exportado não as embute, para ficar abaixo de 2 MB, e cai na fonte do sistema de quem abre.
 - **TD-36 Criar só `.md` primário ausente, por modelo do preset e criação exclusiva** (NEW, Q4): o modelo tem só título e títulos de seção; o núcleo recusa qualquer outro nome; a criação usa o caminho exclusivo da v0.2, que nunca sobrescreve.
-- **TD-37 (reservado):** a decisão sobre a assinatura do MSI, tomada na T2 (DEB-12, Q6).
+- **TD-37 MSI sem assinatura, com o SmartScreen documentado** (DEB-12; Q6 decidida em 2026-11-16): o MSI continua sem assinatura de código. O README mostra o aviso do SmartScreen e como prosseguir. Motivo: assinar exige certificado com custo recorrente ou aprovação de terceiros, e o público atual é o próprio autor e o time. Reavaliar quando houver usuários de fora do time ou quando o aviso virar reclamação no feedback de uso.
+- **TD-38 `quire-cli` avulso para Linux na release** (PKG; Q3 decidida em 2026-11-16): o `quire-cli` é compilado no `ubuntu-22.04` sem as dependências do Tauri e anexado à release como `.tar.gz` com `.sha256`, depois de uma conferência das bibliotecas dinâmicas por lista fechada. É o mesmo crate do auxiliar do Windows (TD-20, TD-30), então a gramática e a saída do `quire lint` são as mesmas do app. Só Linux x86_64; outras arquiteturas ficam para o backlog.
 
 ## Risks & Concerns
 
@@ -300,11 +311,12 @@ As decisões TD-01 a TD-10 da v0.1 e TD-11 a TD-24 da v0.2 continuam valendo. O 
 | **PDF inconsistente entre WebKitGTK e WebView2** | Médio | Fontes embutidas (TD-35); folha de impressão única; `htmlLabels: false`; diferenças registradas | Spike T7 nos dois motores (Windows pelo CI ou pelo autor; o que faltar fica NÃO VERIFICADO) |
 | **Desempenho do índice de referências** | Médio (scan e reconciliação mais lentos) | Dedup por hash; uma transação com o FTS; índice por `(kind, key)` | Spike T5 com ~300 specs e muitas referências; orçamento de REF-10 |
 | **Custo do lint incremental** | Baixo | Só a spec afetada; segundo plano; sem índice | Spike T8 |
-| **Spec sem feedback de uso** | Médio (escopo grande pode atacar dor errada) | Fases independentes (referências e lint primeiro, que servem ao critério de pronto); Q10 permite reordenar | Revisar a ordem das fases quando houver feedback |
-| **`quire lint` inutilizável em CI Linux** (binário com WebKit) | Médio | TD-30; Q3 | Teste de fumaça do `quire-cli` no CI Linux, mesmo sem publicar |
+| **Spec sem feedback de uso** | Médio (escopo grande pode atacar dor errada) | A execução espera o uso real da `v0.2.0-rc.1` (Q10); feedback que mude o escopo volta para a spec; fases independentes (referências e lint primeiro) | Bloco "Feedback de uso" do `summary.md` preenchido antes da T1 |
+| **`quire lint` inutilizável em CI Linux** (binário com WebKit) | Médio | Binário avulso sem WebKit na release (TD-38) | Conferência de bibliotecas no `release.yml` e compilação num runner sem as dependências do Tauri no CI (T24) |
+| **Binário avulso dependente de glibc nova** | Baixo | Build no `ubuntu-22.04` | Glibc mínima documentada no README (PKG-03) |
 | **Escopo grande para uma release** | Médio | Cada fase entrega algo usável; histórico, export e criação são P2/P3 e podem ser cortados sem quebrar as P1 | Ordem das fases no `tasks.md` |
 | **Criação de arquivo concorrente com agente** | Médio | Criação exclusiva (TD-36) | Teste com o arquivo criado entre a verificação e a criação (T21) |
-| **Rodada no WSL sem data** (T1 depende do autor) | Baixo para dados (classes seguem somente leitura), médio para quem usa WSL | Q7: não bloqueia; padrão seguro | T1 aberta até haver dado |
+| **Rodada no WSL sem data** (T1 depende do autor) | Baixo para dados (classes seguem somente leitura), médio para quem usa WSL | Não bloqueia (Q7); classes seguem somente leitura | T1 aberta até haver dado |
 
 ## Confirmado no código e não verificado
 
@@ -321,7 +333,7 @@ As decisões TD-01 a TD-10 da v0.1 e TD-11 a TD-24 da v0.2 continuam valendo. O 
 - `features/conflict/diff.ts` é o diff por linha da v0.2.
 - `write.rs`: `save_new` e `create_new_name` (exclusivo, `hard_link` ou `create_new`).
 - `src-tauri/Cargo.toml`: plugins `cli`, `opener` e `single-instance`; não há `tauri-plugin-dialog`.
-- `quire-cli` monta o `clap` a partir do `plugins.cli` embutido e só repassa chamadas válidas ao `quire.exe`; não depende do `quire-core`.
+- `quire-cli` monta o `clap` a partir do `plugins.cli` embutido e só repassa chamadas válidas ao app vizinho; não depende do `quire-core`. `app_path` procura `quire.exe` no Windows e `quire` nos demais sistemas, sem excluir o próprio executável.
 
 **Não verificado (nenhum artefato pode afirmar o contrário até os spikes):**
 
@@ -334,4 +346,5 @@ As decisões TD-01 a TD-10 da v0.1 e TD-11 a TD-24 da v0.2 continuam valendo. O 
 - Custo do lint de uma spec e de 300 specs a partir do disco (T8).
 - Se `GIT_OPTIONAL_LOCKS=0` e as opções do TD-31 bastam para que nenhuma operação escreva no `.git` em todas as versões do `git` do CI (T16).
 - Como DrvFs, 9p e `\\wsl$` se comportam no rename (herdado da v0.2, T1).
-- Custo e processo de cada opção de assinatura do MSI (T2).
+- Se `gh release upload <tag>` anexa arquivos a uma release rascunho criada pelo `tauri-action` sem criar outra release (o `gh release view v0.2.0-rc.1` encontrou o rascunho pela tag em 2026-11-16, mas o upload não foi testado) (T24).
+- Se o `quire-cli` compila sem nenhuma dependência de sistema além da libc no `ubuntu-22.04` (hoje ele só é compilado onde as dependências do Tauri estão instaladas) (T24).
