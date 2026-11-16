@@ -867,6 +867,8 @@ export type TasksView_Deserialize = {
 	fingerprint?: string | null,
 	/**  The project opted in to checking tasks from the app (CHK-01). */
 	checkbox: boolean,
+	/**  Why the checkboxes are disabled even though the project opted in (SAV-11). */
+	locked?: CmdError | null,
 };
 
 export type TasksView_Serialize = {
@@ -883,6 +885,8 @@ export type TasksView_Serialize = {
 	fingerprint: string | null,
 	/**  The project opted in to checking tasks from the app (CHK-01). */
 	checkbox: boolean,
+	/**  Why the checkboxes are disabled even though the project opted in (SAV-11). */
+	locked: CmdError | null,
 };
 
 /**  How a text file is laid out on disk, so a save writes it back the same way (SAV-03). */

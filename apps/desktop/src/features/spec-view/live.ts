@@ -5,7 +5,7 @@ import { useConflict } from "../conflict/store";
 import { useEditor } from "../editor/store";
 import { hasUnsaved } from "../unsaved/store";
 import { useLogs } from "../logs-view/store";
-import { useTasks } from "../tasks-view/store";
+import { setToggledHandler, useTasks } from "../tasks-view/store";
 import { useWorkspace } from "../workspace/store";
 import { displayed, worktreeName } from "./labels";
 import { useSpecView } from "./store";
@@ -87,6 +87,8 @@ export function useLiveUpdates(): void {
         if (cancelled) fn();
         else unlisten = fn;
       });
+    // A checkbox write: the tab count and the header follow at once (CHK-05, PRG-01).
+    setToggledHandler(() => void useSpecView.getState().refresh());
     // After the app's own save the read view and the tasks follow at once (PRG-01).
     const unsubscribeSaves = useEditor.subscribe((state, prev) => {
       if (state.lastSaved === prev.lastSaved) return;
@@ -104,6 +106,7 @@ export function useLiveUpdates(): void {
       unlisten?.();
       unsubscribe();
       unsubscribeSaves();
+      setToggledHandler(null);
     };
   }, []);
 }

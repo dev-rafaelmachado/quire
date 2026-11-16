@@ -38,6 +38,7 @@ export function TaskDetailPanel() {
   const selected = useTasks((s) => s.selected);
   const gates = useTasks((s) => s.gates);
   if (!view || !selected) return null;
+  const checkbox = view.checkbox;
   const task = view.phases.flatMap((p) => p.tasks).find((x) => x.id === selected);
   const detail = view.details.find((d) => d.id === selected);
   const next = nextTaskId(view.phases);
@@ -146,7 +147,7 @@ export function TaskDetailPanel() {
       </div>
       <p className="m-0 flex flex-none items-start gap-2 border-t border-line px-4 py-3 text-[11.5px] text-faint">
         <Lock aria-hidden="true" className="mt-0.5 size-3 flex-none" />
-        {t("tasks.readOnlyNote")}
+        {checkbox ? t("tasks.checkboxNote") : t("tasks.readOnlyNote")}
       </p>
     </section>
   );

@@ -612,6 +612,8 @@ pub struct TasksView {
     pub fingerprint: Option<String>,
     /// The project opted in to checking tasks from the app (CHK-01).
     pub checkbox: bool,
+    /// Why the checkboxes are disabled even though the project opted in (SAV-11).
+    pub locked: Option<CmdError>,
 }
 
 /// `tasks.md` by phase (TSK-01..04).
@@ -651,6 +653,16 @@ pub(crate) fn tasks_view_of(
         .get(&info.project_name)
         .is_some_and(|p| p.tasks_checkbox);
     let fingerprint = bytes.map(|b| quire_core::fingerprint::Fingerprint::of_bytes(b).token());
+    let class = quire_core::fs_kind::classify(&info.path.join("tasks.md"));
+    let locked = (checkbox && !quire_core::fs_kind::writable(class)).then(|| {
+        err(
+            "write_unreliable_fs",
+            format!(
+                "writes are disabled on this file system ({})",
+                class.as_str()
+            ),
+        )
+    });
     let text = bytes.map(|b| String::from_utf8_lossy(b).into_owned());
     let doc = match (preset.tasks, text) {
         (TasksGrammar::Phases, Some(t)) => parse::tasks(&t, preset.id_pattern.as_ref()),
@@ -674,6 +686,7 @@ pub(crate) fn tasks_view_of(
         total: u32::try_from(total).unwrap_or(u32::MAX),
         fingerprint,
         checkbox,
+        locked,
     }
 }
 

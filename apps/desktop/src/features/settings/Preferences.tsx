@@ -12,13 +12,15 @@ interface ProjectDraft {
   preset: string;
   alias: string;
   issueUrlBase: string;
+  /** Checking tasks from the app (CHK-01), off by default. */
+  tasksCheckbox: boolean;
 }
 
 function draftProjects(config: ConfigView, projects: readonly ProjectSummary[]): ProjectDraft[] {
   const names = [...new Set([...projects.map((p) => p.name), ...config.projects.map((p) => p.name)])].sort();
   return names.map((name) => {
     const c = config.projects.find((p) => p.name === name);
-    return { name, preset: c?.preset ?? "", alias: c?.alias ?? "", issueUrlBase: c?.issueUrlBase ?? "" };
+    return { name, preset: c?.preset ?? "", alias: c?.alias ?? "", issueUrlBase: c?.issueUrlBase ?? "", tasksCheckbox: c?.tasksCheckbox ?? false };
   });
 }
 
@@ -77,6 +79,7 @@ export function Preferences({ config }: { config: ConfigView }) {
           preset: r.preset || null,
           alias: r.alias || null,
           issueUrlBase: r.issueUrlBase || null,
+          tasksCheckbox: r.tasksCheckbox,
         })),
       });
       setConfig(next);
@@ -155,6 +158,7 @@ export function Preferences({ config }: { config: ConfigView }) {
                   <th className="pb-2 font-semibold">{t("prefs.preset")}</th>
                   <th className="pb-2 font-semibold">{t("prefs.alias")}</th>
                   <th className="pb-2 font-semibold">{t("prefs.trackerUrl")}</th>
+                  <th className="pb-2 pl-3 font-semibold">{t("prefs.tasksCheckbox")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -195,6 +199,16 @@ export function Preferences({ config }: { config: ConfigView }) {
                         onChange={(e) => update(r.name, { issueUrlBase: e.target.value })}
                         disabled={!editable}
                         className={`${input} w-full font-code`}
+                      />
+                    </td>
+                    <td className="py-2 pl-3 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={t("prefs.tasksCheckboxFor", { name: r.name })}
+                        checked={r.tasksCheckbox}
+                        onChange={(e) => update(r.name, { tasksCheckbox: e.target.checked })}
+                        disabled={!editable}
+                        className="size-4 accent-[var(--acc)]"
                       />
                     </td>
                   </tr>

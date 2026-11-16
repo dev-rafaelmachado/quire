@@ -698,6 +698,19 @@ mod tests {
         let after = std::fs::read(dir.join("tasks.md")).unwrap();
         assert_eq!(before.len(), after.len());
         assert_eq!(before.iter().zip(&after).filter(|(a, b)| a != b).count(), 1);
+        // And git sees exactly one changed line in tasks.md (CHK-02).
+        let numstat = Command::new("git")
+            .args(["diff", "--numstat", "--", "tasks.md"])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&numstat.stdout)
+                .split_whitespace()
+                .take(2)
+                .collect::<Vec<_>>(),
+            ["1", "1"]
+        );
         // The list follows from the write's own reconciliation (PRG-01, CHK-05).
         wait_scan(&app);
         let (instance_after, _) = acme_142(&webview);

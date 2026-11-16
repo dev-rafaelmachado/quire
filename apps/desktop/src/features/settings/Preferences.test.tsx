@@ -81,7 +81,7 @@ describe("preferences", () => {
       pollIntervalMs: 3000,
       theme: "light",
       language: null,
-      projects: [{ name: "acme_gateway", preset: null, alias: "gateway", issueUrlBase: null }],
+      projects: [{ name: "acme_gateway", preset: null, alias: "gateway", issueUrlBase: null, tasksCheckbox: false }],
     });
     expect(useTheme.getState().theme).toBe("light");
   });

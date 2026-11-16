@@ -1,7 +1,9 @@
-import { Check, ChevronDown, ChevronRight, CircleCheck, CircleDot, Circle, Hourglass, Lock } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, CircleCheck, CircleDot, Circle, Hourglass, Lock, X } from "lucide-react";
 import { t } from "../../lib/i18n";
+import { errorText } from "../../lib/i18n/errors";
+import { useEditor } from "../editor/store";
 import type { PhaseView, Task, TasksView } from "../../lib/ipc";
-import { Chip, ChipList, cx, ProgressBar, Segmented, type BarTone, type Tone } from "../../ui";
+import { Chip, ChipList, cx, ErrorText, IconButton, ProgressBar, Segmented, type BarTone, type Tone } from "../../ui";
 import { fieldText, markOf, nextTaskId, phaseKey, type TaskMark } from "./model";
 import { type TaskFilter, useTasks } from "./store";
 
@@ -41,43 +43,73 @@ export function NoteBadge({ note }: { note: string }) {
   );
 }
 
+/** Why the checkboxes of this view cannot be used now, if they are on at all. */
+function useCheckboxBlock(view: TasksView | null): string | null {
+  const editingTasks = useEditor((s) => s.dirty && s.buffer?.name === "tasks.md");
+  if (!view?.checkbox) return null;
+  if (view.locked) return errorText(view.locked);
+  if (editingTasks) return t("tasks.checkboxDirty");
+  return null;
+}
+
 function TaskRow({ task, mark, selected, gate }: { task: Task; mark: TaskMark; selected: boolean; gate: string | null }) {
   const select = useTasks((s) => s.select);
+  const view = useTasks((s) => s.view);
+  const toggle = useTasks((s) => s.toggle);
+  const toggling = useTasks((s) => s.toggling);
+  const block = useCheckboxBlock(view);
+  const checkbox = view?.checkbox ?? false;
   return (
-    <button
-      type="button"
-      aria-current={selected ? "true" : undefined}
-      onClick={() => select(task.id)}
+    <div
       className={cx(
-        "flex min-h-10 w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-1.5 text-left @[560px]:gap-3 @[560px]:px-3",
+        "flex min-h-10 w-full min-w-0 items-center rounded-[var(--radius-md)] border",
         selected ? "border-acc bg-acc-bg/40" : "border-transparent hover:bg-raise",
       )}
     >
-      <MarkIcon mark={mark} />
-      <span className="w-10 flex-none font-code text-xs text-muted">{task.id}</span>
-      <span className="min-w-24 flex-1 truncate @[640px]:min-w-44">{task.title}</span>
-      {task.note ? (
-        // Gives way before the title does: shrinks down to the icon in narrow windows.
-        <span className="flex min-w-7 max-w-56 shrink">
-          <NoteBadge note={task.note} />
-        </span>
+      {checkbox ? (
+        // A real checkbox when the project opted in (CHK-01); it writes only the box (CHK-02).
+        <input
+          type="checkbox"
+          checked={task.done}
+          disabled={block !== null || toggling !== null}
+          title={block ?? undefined}
+          aria-label={t("tasks.toggle", { id: task.id, title: task.title })}
+          onChange={() => void toggle(task)}
+          className="ml-2.5 size-4 flex-none accent-[var(--acc)] @[560px]:ml-3"
+        />
       ) : null}
-      {task.requirements.length > 0 ? (
-        // Gives way before the title: shows the chips that fit and "+N" (DEB-04).
-        <ChipList items={task.requirements} label={t("tasks.requirementsList", { list: task.requirements.join(", ") })} />
-      ) : null}
-      <span className="flex flex-none justify-center gap-1 font-code text-xs @[520px]:min-w-16">
-        {task.commits.length > 0 ? (
-          task.commits.map((hash) => <CommitChip key={hash} hash={hash} />)
-        ) : (
-          <span className="text-faint" aria-label={t("tasks.noHash")}>
-            —
+      <button
+        type="button"
+        aria-current={selected ? "true" : undefined}
+        onClick={() => select(task.id)}
+        className="flex min-h-10 w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left @[560px]:gap-3 @[560px]:px-3"
+      >
+        {checkbox ? null : <MarkIcon mark={mark} />}
+        <span className="w-10 flex-none font-code text-xs text-muted">{task.id}</span>
+        <span className="min-w-24 flex-1 truncate @[640px]:min-w-44">{task.title}</span>
+        {task.note ? (
+          // Gives way before the title does: shrinks down to the icon in narrow windows.
+          <span className="flex min-w-7 max-w-56 shrink">
+            <NoteBadge note={task.note} />
           </span>
-        )}
-      </span>
-      {/* The gate level is also in the task panel; narrow cards drop it before anything overflows. */}
-      <span className="hidden w-12 flex-none text-right @[520px]:block">{gate ? <Chip>{gate}</Chip> : null}</span>
-    </button>
+        ) : null}
+        {task.requirements.length > 0 ? (
+          // Gives way before the title: shows the chips that fit and "+N" (DEB-04).
+          <ChipList items={task.requirements} label={t("tasks.requirementsList", { list: task.requirements.join(", ") })} />
+        ) : null}
+        <span className="flex flex-none justify-center gap-1 font-code text-xs @[520px]:min-w-16">
+          {task.commits.length > 0 ? (
+            task.commits.map((hash) => <CommitChip key={hash} hash={hash} />)
+          ) : (
+            <span className="text-faint" aria-label={t("tasks.noHash")}>
+              —
+            </span>
+          )}
+        </span>
+        {/* The gate level is also in the task panel; narrow cards drop it before anything overflows. */}
+        <span className="hidden w-12 flex-none text-right @[520px]:block">{gate ? <Chip>{gate}</Chip> : null}</span>
+      </button>
+    </div>
   );
 }
 
@@ -141,7 +173,34 @@ function PhaseCard({ phase, index, next, filter }: { phase: PhaseView; index: nu
   );
 }
 
-/** `tasks.md` by phase (TSK-01..03); read-only (TSK-05). */
+/** Whether the checkboxes write, and why not when they cannot (CHK-01, CHK-04, SAV-11). */
+function CheckboxState({ view }: { view: TasksView }) {
+  const block = useCheckboxBlock(view);
+  const changed = useTasks((s) => s.changedNotice);
+  const toggleError = useTasks((s) => s.toggleError);
+  const dismiss = useTasks((s) => s.dismissChanged);
+  return (
+    <>
+      {!view.checkbox ? (
+        <Chip icon={<Lock aria-hidden="true" className="size-3" />}>{t("tasks.readOnly")}</Chip>
+      ) : block ? (
+        <Chip tone="warn" icon={<Lock aria-hidden="true" className="size-3" />}>
+          {block}
+        </Chip>
+      ) : (
+        <Chip tone="acc">{t("tasks.checkboxOn")}</Chip>
+      )}
+      {changed || toggleError ? (
+        <span role="status" className="flex items-center gap-1.5 text-[12px] text-warn">
+          {toggleError ? <ErrorText error={toggleError} /> : t("tasks.changedOnDisk")}
+          <IconButton label={t("live.dismiss")} icon={<X className="size-3" />} onClick={dismiss} className="size-5 text-warn" />
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/** `tasks.md` by phase (TSK-01..03); checkboxes only when the project opted in (CHK-01). */
 export function TasksPanel({ view }: { view: TasksView }) {
   const filter = useTasks((s) => s.filter);
   const setFilter = useTasks((s) => s.setFilter);
@@ -157,7 +216,7 @@ export function TasksPanel({ view }: { view: TasksView }) {
         </span>
         <ProgressBar done={view.done} total={view.total} tone={view.done === view.total ? "ok" : "acc"} width={180} label={t("progress.label", { done: view.done, total: view.total })} />
         <Chip>{t("tasks.phasesDone", { done: phasesDone, total: view.phases.length })}</Chip>
-        <Chip icon={<Lock aria-hidden="true" className="size-3" />}>{t("tasks.readOnly")}</Chip>
+        <CheckboxState view={view} />
         <div className="flex-1" />
         <Segmented
           label={t("tasks.filterLabel")}
