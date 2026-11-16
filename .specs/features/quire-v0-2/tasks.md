@@ -85,7 +85,7 @@ T16 → T17 → T18 → T19 → T20
 - [ ] T17: Preview ao vivo e rolagem sincronizada (bc9af81) (gate passou, aguardando revisão visual)
 - [ ] T18: Guarda de alterações não salvas (ff3cef7) (gate passou, aguardando revisão visual)
 - [ ] T19: Conflito: diálogo, diff, mudança no disco e supressão da própria escrita (466390f) (gate passou, aguardando revisão visual)
-- [ ] T20: Edição com várias instâncias
+- [ ] T20: Edição com várias instâncias (63353c8) (gate passou, aguardando revisão visual)
 
 ### Fase 4: Busca e command palette
 
