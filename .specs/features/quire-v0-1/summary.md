@@ -1,6 +1,6 @@
 # QUIRE v0.1 — Leitura de specs em vários repositórios e worktrees
 
-**Status:** Em execução · 2 de 6 fases completas · Fase 2 em andamento · 17/24 tarefas
+**Status:** Implementação da v0.1 concluída · 17/24 tarefas marcadas · 7 aguardando revisão visual (T14, T16, T18, T19, T20, T22, T24)
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -22,18 +22,59 @@ App desktop local (Tauri) que descobre as pastas de spec de vários repositório
 **Total:** 17/24 tarefas
 <!-- progress:end -->
 
+## Relatório da manhã (2026-11-15)
+
+**O que está pronto.** As 24 tarefas da v0.1 estão implementadas na branch `feat/core-and-ipc`, sem push. O gate final passou no último commit: fmt, clippy `-D warnings`, 92 testes Rust, typecheck, 91 testes vitest, build do frontend, `cargo build --release` e o `.deb` de produção (`target/release/bundle/deb/Quire_0.1.0_amd64.deb`, 9,1 MiB). Estão marcadas com `[x]` T1–T13, T15, T17, T21 e T23.
+
+**O que espera a sua revisão visual** (gate verde; marque `[x]` mantendo o hash que já está na linha). As capturas ficam em `/tmp/quire-shots/`, que **some no reboot** (já aconteceu uma vez nesta execução):
+
+| Tarefa | O que olhar | Capturas |
+| --- | --- | --- |
+| T14 | tokens, temas, três colunas | `T14-dark.png`, `T14-light.png` (também `T15-dark.png`, `T15-light.png`) |
+| T16 | markdown, outline, Mermaid | `T16-dark.png`, `T16-light.png`, `T24-prod-csp-dark.png` (design.md com Mermaid, no binário de produção) |
+| T18 | tasks por fase e painel da tarefa | `T18-dark.png`, `T18-light.png`, `e2e-42-tasks.png` |
+| T19 | gates e lessons | `T19-dark.png`, `T19-light.png`, `T19-lessons-dark.png` |
+| T20 | seletor de instâncias | `T20-dark.png`, `T20-light.png`, `e2e-36-depois.png` (aviso de cópia removida) |
+| T22 | CLI e seletor | `e2e-39-quire-ponto.png`, `e2e-40-seletor.png`, `e2e-41-spec.png` |
+| T24 | textos e roteiro | `README.md`, `CONTRIBUTING.md`, `docs/e2e.md`, `.github/workflows/release.yml`; resultado do E2E em "Resultados dos spikes › T24" |
+
+Também há `T23-dark.png` (preferências) e `e2e-01-lista.png`, `e2e-32-ao-vivo.png`, `e2e-33-nova.png`, `e2e-33-removida.png`, `e2e-36-antes.png` (modo ao vivo, T21). Todas foram feitas com a janela num workspace oculto, sem capturar a tela.
+
+**O que foi decidido fora do design** (detalhes no Journal de cada tarefa). Nesta sessão:
+- CSP estrita no lugar de `null`, com `'wasm-unsafe-eval'` (Shiki) e estilos inline (Mermaid)
+- `quire open <arquivo>` abre na aba do arquivo (campo `file` em `CliOpen::Spec`)
+- Um pedido novo do CLI fecha o seletor que tinha ficado aberto
+- O gate final do `tasks.md` ganhou `pnpm --filter desktop tauri build --bundles deb`, porque `cargo build --release` sozinho gera um binário que procura o servidor do Vite
+- `release.yml` cria a release como rascunho e usa ubuntu-22.04 (glibc antiga, AppImage mais portátil)
+
+Antes desta sessão: o spike segue isolado em `apps/desktop/src/spike/` em vez de apagado (espera a rodada no WSLg), e a detecção de unidade de rede mapeada no Windows ficou de fora (exigiria `unsafe`).
+
+**O que parou e por quê.** Nenhum gate falhou duas vezes, e nenhum critério ou TD precisou ser mudado. O que não deu para fazer depende de ambiente:
+- **WSL** (rodadas dos spikes T2 e T3)
+- **Windows nativo:** saída do CLI no console, que é P2, e o `.msi`
+- **AppImage local**, que exige baixar o linuxdeploy; o `release.yml` gera
+- **Passos E2E que pedem olho humano** (19, 21, 34 e 35 do `docs/e2e.md`)
+
+**O que depende de você.**
+1. Revisão visual das 7 tarefas acima.
+2. Push de `feat/core-and-ipc` e conferir o CI. A última rodada verde foi em `fde19e5`, na T4; os commits seguintes não passaram pelo CI de Windows.
+3. Rodadas no WSL dos spikes T2 e T3. Depois disso, apagar `apps/desktop/src/spike/`.
+4. Criar a tag `v0.1.0` para disparar o `release.yml` (nunca executado). Revisar a release em rascunho e publicá-la.
+5. No Windows, testar o `.msi` e o `quire` no PATH.
+6. Abrir PR e fazer o merge em `main`.
+
 ## Onde parou
 
-- **Fase / tarefa:** Fase 5; T23 concluída, próxima é a T24
+- **Fase / tarefa:** Fase 5; todas as tarefas implementadas. A T24 fechou com o gate final verde
 - **Concluídas:** T1–T13, T15 (97272fe), T17 (c04312f), T21 (f174742), T23 (26d0369)
-- **Em andamento:** T24
-- **Próximo passo:** T24: documentação, empacotamento e roteiro E2E
-- **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` para ser rodado lá (ver README da pasta) e deve ser apagado quando a T16 entrar
-- **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). Colar as tabelas em "Resultados dos spikes › T3" e confirmar ou ajustar a regra do TD-05 antes da T21
+- **Em andamento:** nenhuma; T14, T16, T18, T19, T20, T22 e T24 aguardam revisão visual (o hash já está na linha de cada uma)
+- **Próximo passo:** revisão visual (ver "Relatório da manhã"); depois push, CI na branch e tag `v0.1.0`
+- **Pendências do spike T2:** rodada no WSLg não feita (máquina de desenvolvimento é Linux nativo); o spike continua isolado em `apps/desktop/src/spike/` (a página `app.html` é a medição da T16) para ser rodado lá e apagado depois
+- **Pendências do spike T3 (WSL, não verificado):** rodar `scripts/watch-spike.sh` em WSL2 ext4, em DrvFs (`/mnt/c`) e o `cargo run` nativo do Windows sobre `\\wsl$` e NTFS, mais o modo `--observe` com escrita do outro lado (roteiro em `crates/quire-core/examples/README.md`). A T21 aplicou a regra do TD-05 sem essa confirmação
 - **Bloqueios:** nenhum
 - **Arquivos sem commit:** nenhum
 - **Branch / worktree:** `feat/core-and-ipc` (sem push)
-- **Aguardando revisão visual:** T14, T16, T18, T19, T20, T22 (`/tmp/quire-shots/T14-*.png` … `T22-*.png`)
+- **Aguardando revisão visual:** T14, T16, T18, T19, T20, T22, T24 (capturas listadas no "Relatório da manhã")
 
 ## Resultados dos spikes
 
@@ -136,6 +177,26 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 | btrfs | só as pastas `.specs`, recursivo | 250 | 4.2–8.1 ms |
 | tmpfs | raiz / só `.specs` | 4601 / 250 | 41.7 / 4.5 ms |
 
+### T24: roteiro E2E executado (2026-11-15)
+
+Roteiro em `docs/e2e.md` (42 passos, todos os critérios P1). Execução sem interação humana: os testes automáticos cobrem os passos marcados "sim" (92 testes Rust, 91 vitest), e um script dirigiu o **binário de produção** (`tauri build`, com a CSP) sobre `fixtures/workspace`, com a janela num workspace oculto do Hyprland e capturas só do buffer dela (`grim -T`).
+
+| Passo | Critério | Resultado na janela real | Evidência |
+| --- | --- | --- | --- |
+| 1, 3, 5, 6 | DSC-01, DSC-04, DUP-01..03 | 2 projetos, 6 specs, nenhuma isca; badge de 3 versões na ACME-170; rodapé "Varredura concluída" | `e2e-01-lista.png` |
+| 4 | DSC-05 | Pasta inexistente com o motivo nas Preferências e no rodapé | `T23-dark.png` |
+| 38 | CLI-05 | `--help` (18 linhas) e `--version` (`quire 0.1.0`) com saída 0 e **0 janelas**, com o app fechado e aberto | log do script |
+| 39 | CLI-01, CLI-04 | `quire .` na worktree externa: saída 0, continua **1 janela**, "3 specs nesta worktree" destacadas | `e2e-39-quire-ponto.png` |
+| 40 | CLI-02 | `quire open acme-200`: seletor com as duas specs | `e2e-40-seletor.png` |
+| 41 | CLI-02 | `quire open ACME-142`: abre a spec e fecha o seletor que estava aberto | `e2e-41-spec.png` |
+| 42 | CLI-03 | `quire open …/tasks.md`: abre na aba tasks da cópia indicada | `e2e-42-tasks.png` |
+| 32 | WAT-01 | T6 marcada por fora: 8/8 em menos de 2 s | `e2e-32-ao-vivo.png` |
+| 33 | WAT-01 | Pasta `acme-300-nova` criada com o arquivo: aparece (7 specs); removida: some (6) | `e2e-33-nova.png`, `e2e-33-removida.png` |
+| 36 | WAT-04 | Worktree externa removida com a ACME-170 aberta nela: troca para outra cópia com o aviso "A cópia aberta foi removida; mostrando…"; status "Observando 3 repositórios" | `e2e-36-antes.png`, `e2e-36-depois.png` |
+| 18, 22 | VIW-03, VIW-08, CSP | Produção com CSP: Mermaid desenhado, ASCII alinhado, JSON realçado (Shiki/WASM) | `T24-prod-csp-dark.png` |
+
+**Sobrou para revisão humana** (passos marcados "parcial" no roteiro): fluidez da rolagem e da seção ativa do outline (19), clique no link da issue abrindo o navegador (21), manter a posição de rolagem numa recarga (34, coberto por teste de store mas não por olho), polling forçado na janela real (35; testado só no núcleo e no IPC), e tudo de WSL e Windows nativo.
+
 ## Journal
 
 - 2026-11-15 · planejamento · ideação concluída: nome Quire, MoSCoW, wireframe v1 (três colunas, neutro moderno, escuro primeiro) e decisões fechadas em `docs/ideation/moscow.md`
@@ -189,3 +250,4 @@ A latência do `PollWatcher` é de uma amostra por intervalo; o limite teórico 
 - 2026-11-15 · T22 · CLI com single-instance (b4d523a); gate verde, **aguardando revisão visual**. TD-10 seguido à risca: `tauri-plugin-cli` (a gramática fica em `plugins.cli` do `tauri.conf.json`; o `matches_from` do plugin também interpreta o argv da segunda instância) e `tauri-plugin-single-instance`. **Ordem no setup**, para `--help`/`--version` nunca abrirem janela: (1) ler a CLI e responder; (2) só então registrar o single-instance; (3) criar a janela à mão (`create: false` no config). **Verificado no Linux com o binário real** e o app aberto: `--help` e `--version` imprimem e saem com 0, sem janela, inclusive com o app fechado (CLI-05); `quire .` dentro de `external/acme-170/acme_gateway` saiu em 69 ms, continuou existindo 1 janela, e o app destacou as 3 specs da worktree (CLI-01, CLI-04); `quire open acme-200` abriu o seletor com as duas specs de projetos diferentes (CLI-02); flag inválida sai com 2. Testes IPC com a config real do plugin cobrem chave única, chave ambígua, `quire .`, caminho de arquivo (CLI-03) e não encontrado. Screenshots: `/tmp/quire-shots/T22-here-dark.png` (destaque) e `T22-pick-dark.png` (seletor). **Decisões:** a chave casa com o começo da pasta só em fronteira de palavra (`acme-14` não abre `acme-142-…`); se o índice ainda está vazio na primeira abertura, a navegação espera o primeiro scan; um "não encontrado" tenta de novo depois do próximo scan. **NÃO VERIFICADO:** Windows nativo (console anexado ao binário GUI, P2 da spec); a instalação do binário no PATH fica documentada na T24
 - 2026-11-15 · T23 · pausada a pedido do autor com o trabalho sem commit (ver "Onde parou"). Até aqui: 85+ testes Rust e 90 testes vitest passando; o salvar do `config.toml` preserva comentários e outras seções, valida antes de gravar e grava de forma atômica; recusa salvar se o arquivo atual estiver inválido
 - 2026-11-15 · T23 · preferências concluídas (26d0369; ajuste da largura do seletor de tema em f17acce). `save_settings` no núcleo edita com `toml_edit` só os campos da tela (scan paths, intervalo de polling, tema e preset/apelido/URL do tracker por projeto), **preservando comentários e as outras seções** (`[presets]`, `[watch]`), valida o resultado antes de gravar e substitui o arquivo de forma atômica. `set_config` recusa salvar se o `config.toml` atual já estiver inválido (para não sobrescrever o arquivo do usuário) e aplica sem reiniciar: config em memória, rescan e watcher reiniciado se o intervalo mudar. `get_config` traz o status de cada scan path com o motivo (DSC-05). O `config.toml` ganhou `theme = dark | light`, aplicado na abertura (`?theme=` continua tendo prioridade). Screenshot: `/tmp/quire-shots/T23-dark.png`. **Decisões:** a pasta de busca é digitada (sem diálogo de escolha de pasta, para não adicionar o `tauri-plugin-dialog`); "Salvar" é a única ação que escreve. **Limitação conhecida:** as mensagens de erro vindas do backend ("path does not exist: …") aparecem em inglês; traduzi-las exige expor o código do erro até a UI. **Achado do ambiente:** o `/tmp` foi limpo durante a pausa, e com ele as screenshots da T14 à T22; foram recriadas no fim da sessão
+- 2026-11-15 · T24 · documentação, empacotamento e roteiro E2E (79ae831, 36609d2); gate final verde, **aguardando revisão visual**. **CSP** saiu de `null` para uma política estrita (`default-src 'self'`; `'wasm-unsafe-eval'` porque o Shiki usa o motor Oniguruma em WASM; `style-src 'unsafe-inline'` porque o Mermaid injeta estilo no SVG; imagens `data:`/`blob:`; `connect-src ipc:`), verificada no binário de produção: Mermaid, ASCII e JSON realçado renderizam (`/tmp/quire-shots/T24-prod-csp-dark.png`). **CLI-03 completo:** `CliOpen::Spec` ganhou `file`; `quire open <arquivo>` abre a spec na aba do arquivo, ou na aba outros com o arquivo selecionado (antes a T22 abria só a pasta). Um pedido novo do CLI fecha um seletor que tinha ficado aberto. **Gate final corrigido no tasks.md:** `cargo build --workspace --release` gera um binário em modo dev (sem `tauri/custom-protocol`), que abre com "Could not connect to localhost"; o binário de produção sai do `pnpm --filter desktop tauri build`, agora parte do gate final (`--bundles deb`; o `.deb` instala `/usr/bin/quire`, o atalho e os ícones). **release.yml não executado:** dispara só com tag `v*` (nenhuma criada); AppImage e .deb em ubuntu-22.04, .msi em windows-latest, release em rascunho; validado com actionlint 1.7.12. README de uso (inclui pôr o `quire` no PATH), CONTRIBUTING e `docs/e2e.md` (42 passos) escritos; o resultado da execução automática está em "Resultados dos spikes › T24".

@@ -28,7 +28,7 @@ Siga o `AGENTS.md`. Implemente **uma tarefa por vez, na ordem das fases**. Antes
 ## Comandos de gate
 
 - **fase:** `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && pnpm -r typecheck && pnpm -r test`
-- **final:** o gate de fase + `pnpm --filter desktop build` + `cargo build --workspace --release`
+- **final:** o gate de fase + `pnpm --filter desktop build` + `cargo build --workspace --release` + `pnpm --filter desktop tauri build --bundles deb` (ver a nota da T24 abaixo)
 - **e2e:** roteiro manual de T24 sobre `fixtures/workspace`
 
 Confirmados em T1 (Linux, Rust 1.100, Node 26, pnpm 12), rodando da raiz do repositório:
@@ -37,6 +37,7 @@ Confirmados em T1 (Linux, Rust 1.100, Node 26, pnpm 12), rodando da raiz do repo
 - **dev:** `pnpm --filter desktop tauri dev` (ou `pnpm dev` na raiz); Vite fixo na porta 1420
 - `pnpm -r test` usa `vitest run --passWithNoTests`, então passa enquanto não houver testes de frontend
 - No gate final, `pnpm --filter desktop build` precisa rodar **antes** de `cargo build --workspace --release`: o `tauri::generate_context!` embute `apps/desktop/dist` no binário de release
+- **Nota da T24:** `cargo build --workspace --release` só prova que tudo compila. Sem a feature `tauri/custom-protocol` (que só o `tauri build` liga), o binário roda em modo dev e procura o servidor do Vite. O binário de produção e o pacote saem do `pnpm --filter desktop tauri build` (`target/release/quire` e `target/release/bundle/`); o `.AppImage` exige baixar o linuxdeploy e é gerado no `release.yml`
 - Pré-requisitos no Linux (Arch/CachyOS): `webkit2gtk-4.1` e `rustup` com os componentes `clippy` e `rustfmt`
 
 ## Plano de execução
@@ -105,7 +106,7 @@ T23 → T24
 ```
 
 - [x] T23: Preferências (scan paths, preset por projeto, tema) (26d0369)
-- [ ] T24: Documentação de uso, empacotamento e roteiro E2E
+- [ ] T24: Documentação de uso, empacotamento e roteiro E2E (79ae831, 36609d2) (gate passou, aguardando revisão visual)
 
 ## Detalhamento das tarefas
 
