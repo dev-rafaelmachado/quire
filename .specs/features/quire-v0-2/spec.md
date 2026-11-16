@@ -4,7 +4,7 @@
 
 **Repositório:** `quire`: `crates/quire-core` (escrita, conflito, busca), `apps/desktop` (editor, busca, palette, shell Tauri), `fixtures/`
 **Data:** 2026-11-16
-**Status:** rascunho, aguardando aprovação do autor
+**Status:** rascunho com as decisões do autor de 2026-11-16 aplicadas (P1–P10), aguardando aprovação
 **Complexidade:** Large. Verificação: `full` (escreve nos arquivos do usuário; edição concorrente com agentes; vários sistemas de arquivos).
 
 ## Fontes
@@ -27,41 +27,49 @@ A v0.1 lê specs de vários repositórios e worktrees, mas toda alteração aind
 - Marcar tarefas no `tasks.md` quando o projeto optar por isso, com a mesma segurança da edição.
 - Fechar as dívidas da v0.1 que atrapalham o uso diário.
 
-## Fora do escopo
+## Fora de escopo da v0.2
 
+- **Adiado para a v0.3 por decisão do autor (2026-11-16):**
+  - **Criar spec ou arquivo novo** (P1), inclusive a partir de template e um `validation.md` que ainda não existe. Na v0.2 só arquivos existentes são editáveis. As duas únicas escritas que criam arquivo são a cópia de conflito (CNF-08) e a recriação confirmada de um arquivo apagado durante a edição (CNF-07), e as duas partem de um arquivo que o usuário já estava editando.
+  - **Alerta de divergência entre o progresso do `tasks.md` e a tabela do `summary.md`** (P5), junto do lint de estrutura. O ID PRG-02 fica reservado para ele e não é reaproveitado.
 - **Edição de `gates.jsonl` e `lessons.jsonl`:** continuam somente leitura (escritos por agente; Won't do MoSCoW).
+- **Busca no texto de `gates.jsonl` e `lessons.jsonl`** (P7): a busca indexa só markdown.
 - **Edição de arquivos que não são `.md`:** `.json`, `.txt` e outros continuam somente leitura.
+- **Autosave**, inclusive opcional (P2), e **rascunhos fora do disco ou recuperação do buffer depois de um crash** (P3). A proteção é a guarda de alterações não salvas (SAV-06) e o histórico em memória do editor (EDT-07).
+- **Anotação ao marcar tarefa** (P4): o checkbox muda só o caractere; o hash do commit continua sendo escrito pelo agente.
 - **Itens de outras releases:**
-  - **Should do MoSCoW fora do fatiamento da v0.2:** criar spec ou arquivo a partir de template (ver P1), `arquivo:linha` clicável, abrir no `$EDITOR`, diff entre instâncias, journal com quick-add, copiar contexto para um agente, indicadores de git.
-  - **v0.3+:** lint de estrutura, backlinks, histórico git por spec, export PDF/HTML.
+  - **Should do MoSCoW fora do fatiamento da v0.2:** `arquivo:linha` clicável, abrir no `$EDITOR`, diff entre instâncias, journal com quick-add, copiar contexto para um agente, indicadores de git.
+  - **v0.3+:** os dois itens adiados acima, lint de estrutura, backlinks, histórico git por spec, export PDF/HTML.
   - **Won't:** kanban, Jira por API, MCP, sync em nuvem, colaboração em tempo real, editor WYSIWYG.
-- **Autosave e rascunhos:** autosave fica desligado e não há opção para ligá-lo (ver P2); rascunhos fora do disco não existem (ver P3).
 - **Trava cooperativa com agentes** (lock de arquivo): os agentes não respeitam nenhuma; a proteção é a detecção de conflito (CNF).
 
-## Premissas e perguntas em aberto
+## Premissas
 
 - **A1:** só arquivos `.md` são editáveis. JSONL é sempre somente leitura, inclusive no núcleo (o comando de escrita recusa), não só na UI.
-- **A2:** o app não guarda o conteúdo de um buffer fora do disco (nada em `localStorage`, nada no índice), seguindo o `AGENTS.md`. Fechar o app com alterações não salvas exige confirmação (SAV-06).
+- **A2:** o app não guarda o conteúdo de um buffer fora do disco (nada em `localStorage`, `sessionStorage`, IndexedDB ou no índice), seguindo o `AGENTS.md` (P3). O histórico de desfazer do editor vive só em memória. Um crash perde as alterações não salvas. Fechar o app com alterações não salvas exige confirmação (SAV-06).
 - **A3:** a identidade do conteúdo carregado é o hash do conteúdo bruto (xxh3-128 dos bytes). `mtime` e tamanho servem só como atalho. Um `mtime` igual não prova que o conteúdo é o mesmo, e um diferente não prova que mudou.
 - **A4:** quando um arquivo tem fins de linha mistos (CRLF e LF), salvar normaliza para o tipo predominante. O editor avisa ao abrir e o primeiro save pede confirmação (SAV-03).
 - **A5:** a busca ignora acentos e maiúsculas, sem stemming: "ação" acha "acao", mas "tarefa" não acha "tarefas" sem o prefixo (a busca é por prefixo no último termo).
 - **A6:** não existe trava compartilhada com agentes. Resta uma janela de corrida entre a última verificação e o rename (CNF-03), que é documentada e reduzida ao mínimo, mas não pode ser eliminada.
 - **A7:** a edição sempre escreve na instância exibida (a do seletor da v0.1); nada se propaga para outras cópias.
 - **A8:** o limite de tamanho para edição começa no mesmo da v0.1 (`LARGE_FILE_BYTES` = 2 MB) e o spike T9 confirma ou ajusta.
-- **A9:** o idioma da interface é escolhido em `config.toml` (`language`). Sem valor, segue o idioma do sistema: `pt*` usa pt-BR e os demais usam inglês (ver P8).
+- **A9:** o idioma da interface é escolhido nas Preferências e gravado em `config.toml` (`language`). Sem valor, segue o idioma do sistema: a primeira preferência do sistema que seja `pt*` ou `en*` decide, e o resto cai em inglês (P8, DEB-10).
+- **A10:** as classes de caminho da SAV-11 são reconhecidas sem `unsafe`: no Linux (inclusive dentro do WSL) pelo tipo do sistema de arquivos em `/proc/self/mountinfo` (`9p`, `drvfs`, `v9fs`), no Windows pelo prefixo do caminho (`\\wsl$\`, `\\wsl.localhost\`). O spike T11 confirma como cada classe aparece de fato.
 
-**Perguntas em aberto (decisões do autor; alteram escopo ou comportamento visível):**
+## Decisões do autor
 
-- **P1 (aberta):** "editar uma spec do começo ao fim" inclui **criar** a spec ou um arquivo novo dentro dela (`validation.md` que ainda não existe, por exemplo)? O MoSCoW põe "criar spec a partir de template" em Should, fora do fatiamento da v0.2. Esta spec assume que não: só arquivos existentes são editáveis.
-- **P2 (aberta):** deve existir autosave **opcional** (opt-in por projeto, desligado por padrão), ou nenhum autosave na v0.2? Esta spec assume nenhum.
-- **P3 (aberta):** recuperação do buffer após um crash do app exigiria guardar o texto fora do disco, o que conflita com o `AGENTS.md` ("o app nunca guarda estado de spec fora do disco"). Abrir exceção para rascunhos temporários (apagados ao salvar ou descartar), ou manter a regra e aceitar a perda do buffer num crash?
-- **P4 (aberta):** marcar uma tarefa pelo app muda **só** o caractere do checkbox, ou também acrescenta uma anotação (por exemplo, `(marcada no Quire)`)? No fluxo de origem quem marca é o agente, com o hash do commit. Esta spec assume só o caractere.
-- **P5 (aberta):** o alerta de divergência entre o progresso do `tasks.md` e a tabela de progresso do `summary.md` (Should do MoSCoW, PRG-02) entra na v0.2? O parser (`parse::summary_progress`) já existe e não é usado.
-- **P6 (aberta, depende do spike T11):** se o rename atômico não for confiável em `\\wsl$`, DrvFs ou 9p, as opções são (a) edição somente leitura nesses caminhos, com aviso, ou (b) escrita não atômica com aviso explícito e confirmação. Esta spec assume (a) até a decisão.
-- **P7 (aberta):** a busca indexa também o texto de `lessons.jsonl` e `gates.jsonl` (campo `text`, comando, `tail`), ou só markdown? Esta spec assume só markdown.
-- **P8 (aberta):** o idioma padrão segue o sistema (A9) ou é pt-BR sempre, com inglês só por escolha?
-- **P9 (aberta):** para o console do CLI no Windows (DEB-06), vale incluir no instalador um segundo binário pequeno (console) ao lado do `quire.exe`? A alternativa é uma dependência que anexa o console ao processo pai. Detalhes em TD-20.
-- **P10 (aberta):** as revisões visuais pendentes da v0.1 (T14, T16, T18, T19, T20, T22, T24), o merge do PR e a tag `v0.1.0` precisam terminar antes de a v0.2 começar? Esta spec assume que sim para o merge e que não para a tag.
+Registradas em 2026-11-16, sobre as perguntas P1 a P10 do primeiro rascunho desta spec. O autor aceitou as recomendações. Não há perguntas em aberto.
+
+- **P1 → criar arquivo ou spec novos fica fora da v0.2 (backlog da v0.3).** Motivo: o MoSCoW põe "criar spec a partir de template" em Should, fora do fatiamento da v0.2, e criar arquivo traz decisões de template e de nome que não cabem aqui. "Editar do começo ao fim" vale para arquivos existentes. Efeito: "Fora de escopo da v0.2"; CNF-07 e CNF-08 continuam, porque partem de um arquivo que o usuário já editava.
+- **P2 → sem autosave, nem opcional.** Motivo: o `AGENTS.md` só permite escrita por ação explícita do usuário, e um autosave gravaria por cima do agente sem o usuário ter visto a mudança. Efeito: SAV-07 sem exceções; TD-24.
+- **P3 → sem recuperação de rascunho depois de um crash e sem exceção à regra do `AGENTS.md`.** Motivo: guardar o buffer fora do disco quebraria a regra de que os arquivos são a fonte da verdade. Valem a guarda de alterações não salvas (SAV-06) e o histórico em memória do CodeMirror (EDT-07). Efeito: A2; EDT-07; TD-24.
+- **P4 → o checkbox altera só o caractere; o hash do commit continua sendo do agente.** Motivo: no fluxo spec-driven quem fecha a tarefa com o hash é o agente, depois do gate; o app não deve inventar anotação. Efeito: CHK-02; TD-18.
+- **P5 → o alerta de divergência entre `tasks.md` e `summary.md` fica para a v0.3, junto do lint de estrutura.** Motivo: é uma regra de consistência da estrutura e pertence ao lint. Efeito: PRG-02 removido (ID reservado); T25 sem a parte condicional.
+- **P6 → escrita em `\\wsl$`, DrvFs e 9p condicionada ao spike T11.** Cada classe fica liberada se o spike mostrar rename atômico confiável nela, e somente leitura se mostrar que não é. Uma classe sem dado do spike conta como não confiável. A decisão final vem do dado registrado no Journal. Motivo: perda de dados é o risco crítico da v0.2, e escrita não atômica com aviso transfere esse risco ao usuário. Efeito: SAV-11, EDT-08, A10; TD-22; T11 e T28.
+- **P7 → a busca indexa só markdown.** Motivo: `gates.jsonl` e `lessons.jsonl` já têm filtros próprios nas abas da v0.1, e o texto deles, com saída de comandos, encheria os resultados de ruído. Efeito: SRC-01; TD-15.
+- **P8 → o idioma padrão segue o do sistema, com fallback em inglês e troca manual nas Preferências.** Motivo: o projeto é open source, e inglês é o idioma comum para quem não fala português. Efeito: A9; DEB-01 e DEB-10; TD-19 e TD-23; T1 e T27.
+- **P9 → CLI no console do Windows por um binário auxiliar pequeno no instalador, no estilo do `code.cmd`, sem `unsafe`.** Motivo: não depende de FFI (o workspace proíbe `unsafe`), funciona igual em `cmd` e PowerShell e não muda nada no Linux. Efeito: DEB-06; TD-20; T5.
+- **P10 → o merge do PR da v0.1 vem antes da v0.2; a tag `v0.1.0` não bloqueia.** Motivo: a v0.2 parte de `main` com a v0.1 integrada, e a tag depende de revisão humana que não precisa travar o trabalho. O merge já aconteceu: PR #1, `f256af3`, e esta branch está rebaseada sobre ele. As revisões visuais pendentes da v0.1 não foram citadas na decisão e continuam como pendência da v0.1, fora do caminho crítico da v0.2.
 
 ## Histórias de usuário
 
@@ -77,8 +85,8 @@ A v0.1 lê specs de vários repositórios e worktrees, mas toda alteração aind
 4. QUANDO o usuário rola o editor ou o preview no modo Dividir ENTÃO o outro lado DEVE acompanhar, alinhando o bloco correspondente (título, parágrafo, tabela ou bloco de código). <!-- EDT-04 -->
 5. QUANDO o usuário pressiona Ctrl+S (ou o botão Salvar) com alterações ENTÃO o sistema DEVE salvar pela escrita segura (SAV) e conflito (CNF); sem alterações, NÃO DEVE escrever nada nem alterar o `mtime`. <!-- EDT-05 -->
 6. QUANDO há alterações não salvas ENTÃO o sistema DEVE indicá-las na aba do arquivo e no título da janela. <!-- EDT-06 -->
-7. QUANDO o usuário edita ENTÃO o editor DEVE oferecer realce de markdown, quebra de linha, desfazer/refazer, localizar e substituir no arquivo, e aceitar entrada em pt-BR (acentos por tecla morta, composição e IME) sem perder caracteres. <!-- EDT-07 -->
-8. QUANDO o arquivo não é `.md`, é `gates.jsonl` ou `lessons.jsonl`, não é UTF-8 válido, é binário ou passa do limite de tamanho (A8) ENTÃO os modos Editar e Dividir DEVEM ficar desabilitados, com cadeado e o motivo. <!-- EDT-08 -->
+7. QUANDO o usuário edita ENTÃO o editor DEVE oferecer realce de markdown, quebra de linha, desfazer/refazer, localizar e substituir no arquivo, e aceitar entrada em pt-BR (acentos por tecla morta, composição e IME) sem perder caracteres. O histórico de desfazer DEVE valer enquanto o arquivo estiver aberto no editor, inclusive depois de salvar, e DEVE ficar só em memória: ele se perde ao trocar de arquivo (depois da guarda) ou ao fechar o app (P3). <!-- EDT-07 -->
+8. QUANDO o arquivo não é `.md`, é `gates.jsonl` ou `lessons.jsonl`, não é UTF-8 válido, é binário, passa do limite de tamanho (A8) ou está num caminho com escrita bloqueada pela SAV-11 ENTÃO os modos Editar e Dividir DEVEM ficar desabilitados, com cadeado e o motivo. <!-- EDT-08 -->
 9. QUANDO o editor está aberto num arquivo de 40 KB ENTÃO a latência de tecla até a tela DEVE ficar em p95 ≤ 50 ms, e abrir o editor DEVE levar menos de 500 ms com o código já carregado (medidos no spike T9 e na T16). <!-- EDT-09 -->
 
 ### P1: Escrita segura ⭐ MVP
@@ -93,10 +101,11 @@ A v0.1 lê specs de vários repositórios e worktrees, mas toda alteração aind
 4. QUANDO o sistema salva ENTÃO DEVE preservar as permissões do arquivo (modo no Unix, atributo somente leitura no Windows); QUANDO o arquivo é somente leitura ou pertence a outro usuário ENTÃO o sistema NÃO DEVE salvar e DEVE oferecer "Salvar como cópia". <!-- SAV-04 -->
 5. QUANDO o arquivo é um link simbólico ENTÃO o sistema DEVE escrever no arquivo de destino, mantendo o link; o temporário DEVE ficar na pasta do destino. <!-- SAV-05 -->
 6. QUANDO há alterações não salvas e o usuário troca de arquivo, de aba, de spec ou de instância, ou fecha a janela, ou uma navegação chega pelo CLI ENTÃO o sistema DEVE perguntar: Salvar, Descartar ou Cancelar. NADA DEVE ser escrito sem a escolha explícita. <!-- SAV-06 -->
-7. QUANDO o sistema roda ENTÃO NÃO DEVE escrever em arquivos de spec por conta própria: sem autosave, sem escrita ao trocar de tela, sem escrita ao recarregar. Só Ctrl+S, o botão Salvar, uma escolha no diálogo de conflito ou de saída, ou o clique no checkbox (CHK) escrevem. <!-- SAV-07 -->
+7. QUANDO o sistema roda ENTÃO NÃO DEVE escrever em arquivos de spec por conta própria: sem autosave (nem opcional, P2), sem escrita ao trocar de tela, sem escrita ao recarregar, sem rascunho em nenhum armazenamento (P3). Só Ctrl+S, o botão Salvar, uma escolha no diálogo de conflito ou de saída, ou o clique no checkbox (CHK) escrevem. <!-- SAV-07 -->
 8. QUANDO o rename falha no Windows porque outro processo está com o arquivo aberto ENTÃO o sistema DEVE tentar de novo por até 1 s e, persistindo, DEVE falhar como em SAV-02 com o motivo "arquivo em uso". <!-- SAV-08 -->
 9. QUANDO um comando de escrita chega ao núcleo para um arquivo que não é `.md` dentro da pasta da instância, ou para `gates.jsonl`/`lessons.jsonl`, ou com um caminho que sai da pasta da spec ENTÃO o núcleo DEVE recusar, independentemente da UI. <!-- SAV-09 -->
 10. QUANDO sobra um arquivo temporário do Quire na pasta (um crash entre a escrita e o rename) ENTÃO o sistema NÃO DEVE listá-lo como arquivo da spec nem apagá-lo sozinho; DEVE mostrar um aviso na spec com a ação explícita de remover. <!-- SAV-10 -->
+11. QUANDO o arquivo está num caminho de uma classe de sistema de arquivos coberta pelo spike T11 (`\\wsl$`/`\\wsl.localhost`, DrvFs ou 9p, reconhecida como em A10) ENTÃO o sistema DEVE seguir a decisão registrada no Journal para essa classe: se o rename atômico foi verificado como confiável, a escrita segue SAV-01 como em qualquer caminho; se não foi, ou se não há dado do spike, a edição, a cópia de conflito e o checkbox DEVEM ficar desabilitados com o motivo (EDT-08) e o núcleo DEVE recusar a escrita, independentemente da UI (P6). <!-- SAV-11 -->
 
 ### P1: Conflito com edições externas ⭐ MVP
 
@@ -120,7 +129,7 @@ A v0.1 lê specs de vários repositórios e worktrees, mas toda alteração aind
 
 **Critérios de aceite**:
 
-1. QUANDO o índice é construído ou reconciliado ENTÃO o sistema DEVE indexar o texto dos arquivos `.md` das specs no próprio cache SQLite, que continua descartável (IDX-01). <!-- SRC-01 -->
+1. QUANDO o índice é construído ou reconciliado ENTÃO o sistema DEVE indexar o texto dos arquivos `.md` das specs no próprio cache SQLite, que continua descartável (IDX-01); `gates.jsonl`, `lessons.jsonl` e os demais arquivos que não são `.md` NÃO DEVEM ser indexados (P7). <!-- SRC-01 -->
 2. QUANDO um arquivo muda ENTÃO o sistema DEVE reindexar só esse arquivo, na mesma reconciliação incremental da v0.1 (IDX-02). <!-- SRC-02 -->
 3. QUANDO o usuário busca ENTÃO o sistema DEVE ignorar maiúsculas e acentos ("acao" acha "ação"), casar o último termo por prefixo e exigir todos os termos (E). <!-- SRC-03 -->
 4. QUANDO há resultados ENTÃO o sistema DEVE agrupá-los por spec, mostrar projeto, chave, arquivo, seção e um trecho com os termos destacados, ordenados por relevância; cópias idênticas da mesma spec DEVEM aparecer uma vez só. <!-- SRC-04 -->
@@ -148,7 +157,7 @@ A v0.1 lê specs de vários repositórios e worktrees, mas toda alteração aind
 **Critérios de aceite**:
 
 1. QUANDO um projeto não tem a opção ligada (padrão) ENTÃO a aba tasks DEVE continuar somente leitura, como em TSK-05 da v0.1; QUANDO o usuário liga a opção nas Preferências (por projeto) ENTÃO ela DEVE ser gravada no `config.toml` e valer sem reiniciar. <!-- CHK-01 -->
-2. QUANDO a opção está ligada e o usuário clica no checkbox de uma tarefa ENTÃO o sistema DEVE alternar só os caracteres do checkbox dessa linha (`[ ]` ↔ `[x]`); o resto do arquivo DEVE continuar idêntico byte a byte, inclusive fins de linha, BOM e newline final. <!-- CHK-02 -->
+2. QUANDO a opção está ligada e o usuário clica no checkbox de uma tarefa ENTÃO o sistema DEVE alternar só o caractere entre os colchetes dessa linha (`[ ]` ↔ `[x]`); o resto do arquivo DEVE continuar idêntico byte a byte, inclusive fins de linha, BOM e newline final. O sistema NÃO DEVE acrescentar hash, data nem anotação: o hash do commit continua sendo escrito pelo agente (P4). <!-- CHK-02 -->
 3. QUANDO o checkbox é alternado ENTÃO a escrita DEVE seguir SAV-01, SAV-02 e SAV-04; QUANDO o `tasks.md` mudou desde que a aba foi carregada, ou a linha não é mais a da tarefa com aquele id e aquele estado ENTÃO o sistema NÃO DEVE escrever: DEVE recarregar a aba e avisar. <!-- CHK-03 -->
 4. QUANDO o `tasks.md` está aberto no editor com alterações não salvas ENTÃO os checkboxes DEVEM ficar desabilitados, com o motivo. <!-- CHK-04 -->
 5. QUANDO o checkbox é alternado ENTÃO o progresso da fase, da aba, da lista e do cabeçalho DEVE se atualizar em até 1 s, sem aviso de conflito (CNF-06). <!-- CHK-05 -->
@@ -157,12 +166,11 @@ A v0.1 lê specs de vários repositórios e worktrees, mas toda alteração aind
 
 **User Story**: Como dev, quero confiar no progresso que o app mostra enquanto edito e marco tarefas.
 
-A v0.1 já entrega o progresso x/y: barra e contagem por spec na sidebar (T15), contagem na aba (`tasks 7/8`, T17), faixa x/y com fases e cartões por fase na aba tasks (T18) e chips do cabeçalho do `summary.md` (T17). Os critérios abaixo cobrem só o que é novo.
+A v0.1 já entrega o progresso x/y: barra e contagem por spec na sidebar (T15), contagem na aba (`tasks 7/8`, T17), faixa x/y com fases e cartões por fase na aba tasks (T18) e chips do cabeçalho do `summary.md` (T17). O critério abaixo cobre só o que é novo. O alerta de divergência com a tabela do `summary.md` (PRG-02) foi para a v0.3 (P5).
 
 **Critérios de aceite**:
 
 1. QUANDO o próprio app altera um `tasks.md` (save no editor ou checkbox) ENTÃO todos os pontos que mostram progresso DEVEM se atualizar a partir do conteúdo salvo, sem depender do evento do watcher (que pode demorar o intervalo de polling em WSL). <!-- PRG-01 -->
-2. **(depende de P5)** QUANDO a tabela de progresso do `summary.md` diverge das contagens do `tasks.md` da mesma instância ENTÃO a aba tasks e a faixa de metadados DEVEM mostrar um aviso com os dois valores. <!-- PRG-02 -->
 
 ### P1: Edição com várias instâncias ⭐ MVP
 
@@ -181,15 +189,16 @@ A v0.1 já entrega o progresso x/y: barra e contagem por spec na sidebar (T15), 
 
 **Critérios de aceite**:
 
-1. QUANDO o idioma configurado (ou do sistema, A9) é inglês ENTÃO toda a interface DEVE aparecer em inglês, com o catálogo `en` cobrindo todas as chaves do `pt-BR` (verificado em teste). <!-- DEB-01 -->
+1. QUANDO o idioma em uso é inglês ENTÃO toda a interface DEVE aparecer em inglês, com o catálogo `en` cobrindo todas as chaves do `pt-BR` (verificado em teste); plurais, datas e números DEVEM seguir o idioma em uso. <!-- DEB-01 -->
 2. QUANDO o backend devolve um erro ENTÃO a UI DEVE mostrar a mensagem no idioma da interface, a partir de um código de erro, e não do texto em inglês do backend (limitação registrada na T23 da v0.1). <!-- DEB-02 -->
 3. QUANDO um projeto usa o preset `generic` e a estrutura do `exban` é reconhecida (PST-01) ENTÃO a UI DEVE mostrar a sugestão, com uma ação explícita "Usar exban" que grava o preset no `config.toml`. <!-- DEB-03 -->
 4. QUANDO a janela é estreita ENTÃO os chips de requisito das linhas de tarefa NÃO DEVEM passar da borda da linha: cedem espaço e mostram "+N" com a lista completa no painel da tarefa. <!-- DEB-04 -->
 5. QUANDO `QUIRE_CONFIG` ou `QUIRE_INDEX` é um caminho relativo ENTÃO o sistema DEVE recusá-lo com uma mensagem clara e NÃO DEVE criar nem gravar arquivo em lugar nenhum por causa dele. <!-- DEB-05 -->
-6. **(P2)** QUANDO o CLI roda no Windows a partir de um terminal ENTÃO `--help`, `--version` e os erros DEVEM aparecer nesse terminal (P2 da spec da v0.1). <!-- DEB-06 -->
+6. QUANDO o usuário roda `quire` num terminal do Windows (`cmd` ou PowerShell) depois de instalar o MSI ENTÃO `--help`, `--version` e os erros de argumento DEVEM aparecer nesse terminal, com os mesmos textos e códigos de saída do Linux; `quire`, `quire .` e `quire open …` DEVEM abrir ou focar o app como na v0.1 sem prender o terminal. A solução é um binário auxiliar de console no instalador (P9), sem `unsafe` no código do projeto; no Linux nada muda (P2 da spec da v0.1). <!-- DEB-06 -->
 7. QUANDO uma spec de 40 KB está aberta (modo Ler e modo Dividir) ENTÃO o consumo de memória DEVE ser medido no build de produção e DEVE ficar dentro do orçamento definido na T6. <!-- DEB-07 -->
 8. QUANDO existe versão estável de `tauri-specta`/`specta` ENTÃO o projeto DEVE usá-la; senão, a verificação e a data DEVEM ficar registradas no Journal. <!-- DEB-08 -->
 9. QUANDO o autor roda as rodadas pendentes no WSL (spikes T2 e T3 da v0.1) ENTÃO os resultados DEVEM ser registrados e a regra do TD-05 confirmada ou ajustada; a pasta `apps/desktop/src/spike/` DEVE ser removida depois disso. <!-- DEB-09 -->
+10. QUANDO não há `language` no `config.toml` ENTÃO a interface DEVE seguir o idioma do sistema (A9), com inglês para qualquer idioma que não seja português nem inglês; QUANDO o usuário escolhe nas Preferências entre "Sistema", "Português (Brasil)" e "English" ENTÃO a interface DEVE mudar sem reiniciar e a escolha DEVE ser gravada no `config.toml` preservando os comentários, com "Sistema" removendo a chave; QUANDO `language` tem um valor desconhecido ENTÃO o sistema DEVE tratá-lo como ausente e avisar nas Preferências, sem regravar o arquivo (P8). <!-- DEB-10 -->
 
 ### P2: Projeto open source
 
@@ -197,7 +206,7 @@ A v0.1 já entrega o progresso x/y: barra e contagem por spec na sidebar (T15), 
 
 **Critérios de aceite**:
 
-1. O README DEVE documentar edição, conflito, busca, palette e checkbox opt-in, com as garantias e os limites de escrita (inclusive os de A6 e P6). <!-- OSS-05 -->
+1. O README DEVE documentar edição, conflito, busca, palette, checkbox opt-in, escolha de idioma e o comando `quire` no Windows, com as garantias e os limites de escrita (inclusive a janela residual de A6 e as classes de caminho bloqueadas pela SAV-11). <!-- OSS-05 -->
 2. QUANDO há push ou PR ENTÃO o CI DEVE rodar os testes de escrita segura em Linux e Windows, inclusive os de fim de linha, BOM, permissões e arquivo em uso. <!-- OSS-06 -->
 
 ## Casos de borda
@@ -218,7 +227,15 @@ A v0.1 já entrega o progresso x/y: barra e contagem por spec na sidebar (T15), 
 - **Arquivo apagado durante a edição:** CNF-07. **Instância removida durante a edição:** INS-04.
 - **Mesmo arquivo aberto em outro editor que guarda o próprio buffer:** o Quire não sabe disso; ver risco "edição concorrente".
 - **Arquivo grande (> limite) ou não UTF-8:** edição desabilitada (EDT-08); a leitura continua como na v0.1.
-- **Caminho com acentos, espaços, em `\\wsl$` ou em unidade do Windows:** escrita testada nos sistemas do spike T11; `\\wsl$` depende de P6.
+- **Caminho com acentos, espaços ou em unidade do Windows:** escrita testada nos sistemas do spike T11.
+- **Caminho em `\\wsl$`, `\\wsl.localhost`, DrvFs (`/mnt/c` dentro do WSL) ou 9p:** segue a decisão do spike para a classe (SAV-11). Sem dado do spike, por exemplo `\\wsl$` enquanto ninguém rodar o roteiro num Windows, a classe fica somente leitura, com o motivo no cadeado.
+- **Ponto de montagem dentro de outro** (bind mount, `/mnt/c/x` montado por cima): vale a montagem mais específica, ou seja, o prefixo mais longo em `mountinfo` (A10).
+- **Crash do app com alterações não salvas:** as alterações se perdem; o arquivo no disco fica como estava no último save, e nada do buffer fica em nenhum armazenamento (A2, P3).
+- **Arquivo que ainda não existe na spec** (um `validation.md` previsto pelo preset, por exemplo): não há como criá-lo pelo app na v0.2 (P1).
+- **Busca por um texto que só existe em `lessons.jsonl` ou `gates.jsonl`:** nenhum resultado; essas abas têm filtros próprios (P7).
+- **Sistema em idioma que não é português nem inglês** (`es-ES`, por exemplo): interface em inglês. Com `es-ES` e `pt-BR` nas preferências do sistema, vale pt-BR, a primeira suportada (A9).
+- **`language = "fr"` no `config.toml`:** tratado como ausente, com aviso nas Preferências e sem regravar (DEB-10).
+- **`quire .` no Windows com o app fechado:** o binário auxiliar abre o app e devolve o terminal na hora (DEB-06).
 - **Windows: arquivo aberto por outro processo sem compartilhamento de exclusão:** nova tentativa por até 1 s, depois erro (SAV-08).
 - **Consulta com operadores do FTS, aspas desbalanceadas, só espaços ou um termo muito comum:** sem erro (SRC-07); resultados limitados (os primeiros 200) com "refine a busca".
 - **Spec com cópias idênticas em 3 worktrees:** um resultado de busca só (SRC-04); o save numa delas a torna divergente (INS-03).
@@ -238,23 +255,42 @@ A v0.1 já entrega o progresso x/y: barra e contagem por spec na sidebar (T15), 
 | DEB-07 | T6, T26 |
 | DEB-08 | T7 |
 | DEB-09 | T8 |
-| EDT-01, EDT-02, EDT-05 a EDT-08 | T9, T16 |
+| DEB-10 | T27 |
+| EDT-01 | T16 |
+| EDT-02 | T9, T16 |
 | EDT-03, EDT-04 | T17 |
+| EDT-05, EDT-06 | T16 |
+| EDT-07 | T9, T16 |
+| EDT-08 | T16 |
 | EDT-09 | T9, T16 |
-| SAV-01 a SAV-05, SAV-08 | T11, T12 |
+| SAV-01 | T11, T12 |
+| SAV-02, SAV-03 | T12 |
+| SAV-04, SAV-05 | T11, T12 |
 | SAV-06 | T18 |
-| SAV-07 | T12, T15, T18 |
+| SAV-07 | T15, T18 |
+| SAV-08 | T11, T12 |
 | SAV-09 | T12, T15 |
 | SAV-10 | T12, T15, T19 |
-| CNF-01, CNF-03 | T13 |
-| CNF-02, CNF-05, CNF-07 a CNF-09 | T19 |
-| CNF-04, CNF-06 | T13, T19 |
-| SRC-01 a SRC-03, SRC-07, SRC-08 | T10, T21 |
+| SAV-11 | T11, T16, T24, T28 |
+| CNF-01 | T13 |
+| CNF-02 | T19 |
+| CNF-03 | T13 |
+| CNF-04 | T13, T19 |
+| CNF-05 | T19 |
+| CNF-06 | T13, T15, T19 |
+| CNF-07 | T19 |
+| CNF-08 | T13, T19 |
+| CNF-09 | T19 |
+| SRC-01, SRC-02 | T21 |
+| SRC-03 | T10, T21 |
 | SRC-04 a SRC-06 | T22 |
+| SRC-07 | T21 |
+| SRC-08 | T10, T21 |
 | CMD-01 a CMD-05 | T23 |
-| CHK-01 a CHK-05 | T14, T24 |
+| CHK-01 | T24 |
+| CHK-02, CHK-03 | T14, T24 |
+| CHK-04, CHK-05 | T24 |
 | PRG-01 | T25 |
-| PRG-02 | T25 (se P5 for aprovada) |
 | INS-01 a INS-04 | T20 |
 | OSS-05 | T26 |
 | OSS-06 | T12, T26 |
@@ -266,4 +302,6 @@ A v0.1 já entrega o progresso x/y: barra e contagem por spec na sidebar (T15), 
 - `git diff` depois de um save mostra só as linhas que o usuário mudou: nenhuma mudança de fim de linha, BOM ou newline final.
 - Marcar uma tarefa pelo app (num projeto com a opção ligada) produz um diff de exatamente um caractere.
 - Uma busca em ~300 specs responde em menos de 100 ms e leva ao trecho certo.
+- Nenhum caminho de uma classe sem rename atômico verificado aceita escrita (SAV-11).
+- No Windows, `quire --help` no `cmd` mostra a ajuda no próprio terminal.
 - Tudo o que a v0.1 fazia continua funcionando, com o CI verde em Linux e Windows.
