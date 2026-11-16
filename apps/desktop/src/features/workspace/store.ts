@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { applyConfiguredTheme } from "../../app/theme";
 import { asCmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type WatchStatus } from "../../lib/ipc";
 import type { StatusFilter } from "./model";
 
@@ -15,6 +16,10 @@ interface WorkspaceState {
   status: StatusFilter;
   collapsed: Readonly<Record<number, true>>;
   selectedSpecId: number | null;
+  /** The preferences screen is open in the center column (T23). */
+  prefsOpen: boolean;
+  setPrefsOpen: (open: boolean) => void;
+  setConfig: (config: ConfigView) => void;
   /** Specs of the worktree `quire .` ran in (CLI-01). */
   highlight: { query: string; specIds: number[] } | null;
   /** Specs a command-line key matched in several places (CLI-02). */
@@ -49,6 +54,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   status: "all",
   collapsed: {},
   selectedSpecId: null,
+  // `?prefs` opens the preferences on start (screenshots and demos).
+  prefsOpen: typeof window !== "undefined" && new URLSearchParams(window.location.search).has("prefs"),
+  setPrefsOpen: (prefsOpen) => set({ prefsOpen }),
+  setConfig: (config) => set({ config }),
   highlight: null,
   pick: null,
   setHighlight: (highlight) => set({ highlight }),
@@ -62,7 +71,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       else next[id] = true;
       return { collapsed: next };
     }),
-  select: (selectedSpecId) => set({ selectedSpecId }),
+  select: (selectedSpecId) => set({ selectedSpecId, prefsOpen: false }),
   reload: async () => {
     try {
       const projects = await commands.listProjects(null);
@@ -102,7 +111,9 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         }, 150);
       });
       try {
-        set({ config: await commands.getConfig(), watch: await commands.getWatchStatus() });
+        const config = await commands.getConfig();
+        applyConfiguredTheme(config.theme);
+        set({ config, watch: await commands.getWatchStatus() });
       } catch (e) {
         set({ error: asCmdError(e).message });
       }

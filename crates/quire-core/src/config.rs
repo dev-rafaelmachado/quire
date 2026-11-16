@@ -50,6 +50,22 @@ impl WatchMode {
     }
 }
 
+/// UI theme saved in `config.toml` (T23). Dark is the default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Theme {
+    Dark,
+    Light,
+}
+
+impl Theme {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Dark => "dark",
+            Self::Light => "light",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProjectConfig {
     pub preset: Option<String>,
@@ -67,6 +83,7 @@ pub struct Config {
     pub watch_mode: WatchMode,
     /// Per-path overrides (`[watch.paths]`); the longest matching prefix wins.
     pub watch_paths: BTreeMap<PathBuf, WatchMode>,
+    pub theme: Option<Theme>,
     presets: BTreeMap<String, Preset>,
 }
 
@@ -78,6 +95,7 @@ impl Default for Config {
             projects: BTreeMap::new(),
             watch_mode: WatchMode::Auto,
             watch_paths: BTreeMap::new(),
+            theme: None,
             presets: builtin_presets(),
         }
     }
@@ -101,6 +119,7 @@ struct RawConfig {
     #[serde(default)]
     presets: BTreeMap<String, RawPreset>,
     watch: Option<RawWatch>,
+    theme: Option<Spanned<String>>,
 }
 
 #[derive(Deserialize)]
@@ -278,7 +297,22 @@ impl Config {
             }
             None => (WatchMode::Auto, BTreeMap::new()),
         };
+        let theme = match &raw.theme {
+            None => None,
+            Some(t) => Some(match t.get_ref().as_str() {
+                "dark" => Theme::Dark,
+                "light" => Theme::Light,
+                other => {
+                    return Err(invalid(
+                        text,
+                        t.span(),
+                        format!("theme must be \"dark\" or \"light\", got \"{other}\""),
+                    ));
+                }
+            }),
+        };
         Ok(Self {
+            theme,
             watch_mode,
             watch_paths,
             scan_paths: raw.scan_paths.iter().map(|p| expand_home(p)).collect(),
@@ -368,6 +402,114 @@ impl Config {
                 .any(|p| files.iter().any(|f| p.is_primary(f)))
         }
     }
+}
+
+/// The part of `config.toml` the preferences screen edits (T23).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Settings {
+    /// As the user typed them (`~` allowed).
+    pub scan_paths: Vec<String>,
+    pub poll_interval_ms: u64,
+    pub theme: Option<Theme>,
+    /// Projects to write; a project with no setting is removed from the file.
+    pub projects: Vec<(String, ProjectConfig)>,
+}
+
+/// Sets `key` to `value`, keeping the comments around an existing entry (they belong to the
+/// key's and the value's decor in toml_edit).
+fn put(table: &mut toml_edit::Table, key: &str, value: impl Into<toml_edit::Value>) {
+    let mut value: toml_edit::Value = value.into();
+    match table.get_mut(key) {
+        Some(toml_edit::Item::Value(old)) => {
+            let decor = old.decor().clone();
+            *value.decor_mut() = decor;
+            *old = value;
+        }
+        _ => {
+            table.insert(key, toml_edit::Item::Value(value));
+        }
+    }
+}
+
+fn set_or_remove(table: &mut toml_edit::Table, key: &str, value: Option<&str>) {
+    match value {
+        Some(v) => put(table, key, v),
+        None => {
+            table.remove(key);
+        }
+    }
+}
+
+/// Writes `settings` into the `config.toml` at `path`, keeping comments and every other
+/// section as they were. The result is validated before anything is written, and the file
+/// is replaced atomically. Only called on an explicit save by the user.
+pub fn save_settings(path: &Path, settings: &Settings) -> Result<Config, ConfigError> {
+    let io = |e: std::io::Error| ConfigError::Io {
+        path: path.to_path_buf(),
+        message: e.to_string(),
+    };
+    let current = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(io(e)),
+    };
+    let mut doc: toml_edit::DocumentMut = current.parse().map_err(|e: toml_edit::TomlError| {
+        let (line, column) = e.span().map_or((0, 0), |s| position(&current, s.start));
+        ConfigError::Parse {
+            line,
+            column,
+            message: e.message().to_owned(),
+        }
+    })?;
+    let root = doc.as_table_mut();
+    let mut paths = toml_edit::Array::new();
+    for p in &settings.scan_paths {
+        paths.push(p.as_str());
+    }
+    put(root, "scan_paths", paths);
+    put(
+        root,
+        "poll_interval_ms",
+        i64::try_from(settings.poll_interval_ms).unwrap_or(i64::MAX),
+    );
+    set_or_remove(root, "theme", settings.theme.map(Theme::as_str));
+    if !root.contains_key("projects") {
+        let mut t = toml_edit::Table::new();
+        t.set_implicit(true);
+        root.insert("projects", toml_edit::Item::Table(t));
+    }
+    if let Some(projects) = root
+        .get_mut("projects")
+        .and_then(toml_edit::Item::as_table_mut)
+    {
+        for (name, pc) in &settings.projects {
+            let empty = pc.preset.is_none() && pc.alias.is_none() && pc.issue_url_base.is_none();
+            if empty {
+                projects.remove(name);
+                continue;
+            }
+            if !projects.contains_key(name) {
+                projects.insert(name, toml_edit::Item::Table(toml_edit::Table::new()));
+            }
+            if let Some(t) = projects
+                .get_mut(name)
+                .and_then(toml_edit::Item::as_table_mut)
+            {
+                set_or_remove(t, "preset", pc.preset.as_deref());
+                set_or_remove(t, "alias", pc.alias.as_deref());
+                set_or_remove(t, "issue_url_base", pc.issue_url_base.as_deref());
+            }
+        }
+    }
+    let text = doc.to_string();
+    Config::parse(&text)?;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(io)?;
+    }
+    let tmp = path.with_extension("toml.tmp");
+    fs::write(&tmp, &text).map_err(io)?;
+    fs::rename(&tmp, path).map_err(io)?;
+    Config::load(path)
 }
 
 /// `generic` is always registered; this only exists to avoid an `unwrap` on that invariant.
@@ -523,6 +665,85 @@ preset = "team"
         let err = Config::parse("[watch]\nmode = \"sometimes\"\n").unwrap_err();
         assert!(
             matches!(err, ConfigError::Invalid { line: 2, .. }),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn saving_settings_keeps_comments_and_other_sections() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("quire").join("config.toml");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            "# my config\nscan_paths = [\"/old\"]\n\n[projects.a]\npreset = \"exban\" # team\n\n[projects.gone]\nalias = \"x\"\n\n[watch]\nmode = \"poll\"\n",
+        )
+        .unwrap();
+        let settings = Settings {
+            scan_paths: vec!["~/code".into(), "/srv/specs".into()],
+            poll_interval_ms: 2000,
+            theme: Some(Theme::Light),
+            projects: vec![
+                (
+                    "a".into(),
+                    ProjectConfig {
+                        preset: Some("generic".into()),
+                        alias: Some("A".into()),
+                        issue_url_base: None,
+                    },
+                ),
+                ("gone".into(), ProjectConfig::default()),
+                (
+                    "new".into(),
+                    ProjectConfig {
+                        preset: None,
+                        alias: None,
+                        issue_url_base: Some("https://t.example/".into()),
+                    },
+                ),
+            ],
+        };
+        let c = save_settings(&path, &settings).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.starts_with("# my config"), "{text}");
+        assert!(text.contains("preset = \"generic\" # team"), "{text}");
+        assert!(text.contains("mode = \"poll\""), "{text}");
+        assert!(!text.contains("[projects.gone]"), "{text}");
+        assert_eq!(c.poll_interval_ms, 2000);
+        assert_eq!(c.theme, Some(Theme::Light));
+        assert_eq!(c.preset_for("a").name, "generic");
+        assert_eq!(c.alias_for("a"), Some("A"));
+        assert_eq!(
+            c.projects["new"].issue_url_base.as_deref(),
+            Some("https://t.example/")
+        );
+        assert_eq!(c.watch_mode, WatchMode::Poll);
+        assert_eq!(c.scan_paths[1], PathBuf::from("/srv/specs"));
+    }
+
+    #[test]
+    fn invalid_settings_are_rejected_before_writing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("config.toml");
+        fs::write(&path, "scan_paths = []\n").unwrap();
+        let bad = Settings {
+            scan_paths: vec![],
+            poll_interval_ms: 3000,
+            theme: None,
+            projects: vec![(
+                "a".into(),
+                ProjectConfig {
+                    preset: Some("nope".into()),
+                    alias: None,
+                    issue_url_base: None,
+                },
+            )],
+        };
+        assert!(save_settings(&path, &bad).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "scan_paths = []\n");
+        let err = Config::parse("theme = \"blue\"\n").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::Invalid { line: 1, .. }),
             "{err:?}"
         );
     }

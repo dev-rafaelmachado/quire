@@ -7,8 +7,9 @@ export interface Literal {
 const TEXT_ATTRS = /\b(aria-label|placeholder|title|alt|label)="([^"]*)"/g;
 const JSX_TEXT = />([^<>{}]*)</g;
 const LETTER = /\p{L}/u;
-// JSX text never looks like code; these mark a `a > b ... c < d` expression instead.
-const CODE_HINT = /&&|\|\||=|;|\(|\)/;
+// JSX text never looks like code; these mark a `a > b ... c < d` expression or a ternary
+// between elements (`/> : cond ? <`) instead. A colon attached to a word ("Status:") is text.
+const CODE_HINT = /&&|\|\||=|;|\(|\)|(^|\s)[?:](\s|$)/;
 
 function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " ")).replace(/\/\/[^\n]*/g, "");

@@ -66,7 +66,7 @@ pub fn scan(
     let mut report = ScanReport::default();
     let mut seen: HashSet<PathBuf> = HashSet::new();
     for path in paths {
-        if let Err(error) = check_root(path) {
+        if let Err(error) = check_scan_path(path) {
             report.path_errors += 1;
             on_event(ScanEvent::PathError {
                 path: path.clone(),
@@ -140,7 +140,8 @@ pub fn scan_with_worktrees(
     report
 }
 
-fn check_root(path: &Path) -> Result<(), ScanError> {
+/// Whether a scan path can be scanned: it exists, is a directory and is readable (DSC-05).
+pub fn check_scan_path(path: &Path) -> Result<(), ScanError> {
     let meta = fs::metadata(path).map_err(|e| ScanError::from_io(path.to_path_buf(), &e))?;
     if !meta.is_dir() {
         return Err(ScanError::NotADirectory(path.to_path_buf()));

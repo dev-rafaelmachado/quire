@@ -1,4 +1,4 @@
-import { Layers, Moon, Sun } from "lucide-react";
+import { Layers, Moon, SlidersHorizontal, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import { t } from "../lib/i18n";
 import { IconButton } from "../ui";
@@ -9,9 +9,10 @@ interface TopBarProps {
   crumbs?: { project: string; spec: string } | undefined;
   /** Instance badge (T20) and other actions. */
   actions?: ReactNode;
+  onPreferences?: () => void;
 }
 
-export function TopBar({ crumbs, actions }: TopBarProps) {
+export function TopBar({ crumbs, actions, onPreferences }: TopBarProps) {
   const theme = useTheme((s) => s.theme);
   const toggle = useTheme((s) => s.toggle);
   return (
@@ -36,6 +37,9 @@ export function TopBar({ crumbs, actions }: TopBarProps) {
         icon={theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
         onClick={toggle}
       />
+      {onPreferences ? (
+        <IconButton label={t("prefs.open")} icon={<SlidersHorizontal className="size-4" />} onClick={onPreferences} />
+      ) : null}
     </>
   );
 }

@@ -46,7 +46,7 @@ fn lock(m: &Mutex<Index>) -> MutexGuard<'_, Index> {
 
 // ------------------------------------------------------------------ config
 
-#[derive(Debug, Clone, Serialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectConfigView {
     pub name: String,
@@ -65,16 +65,37 @@ pub struct ConfigView {
     pub poll_interval_ms: u32,
     pub projects: Vec<ProjectConfigView>,
     pub presets: Vec<String>,
+    /// `dark`, `light` or none (dark).
+    pub theme: Option<String>,
+    /// One entry per scan path, with the reason when it cannot be scanned (DSC-05).
+    pub scan_path_status: Vec<ScanPathStatus>,
+    /// Saving is possible: there is a config location and the current file is valid.
+    pub editable: bool,
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn get_config(state: State<'_, AppState>) -> Result<ConfigView, CmdError> {
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanPathStatus {
+    pub path: String,
+    pub error: Option<String>,
+}
+
+/// What the preferences screen saves (T23).
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsInput {
+    pub scan_paths: Vec<String>,
+    pub poll_interval_ms: u32,
+    pub theme: Option<String>,
+    pub projects: Vec<ProjectConfigView>,
+}
+
+fn config_view(state: &AppState) -> ConfigView {
     let config = state
         .config
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    Ok(ConfigView {
+    ConfigView {
         path: state.config_path.as_ref().map(|p| p.display().to_string()),
         error: state.config_error.clone(),
         scan_paths: config
@@ -94,7 +115,89 @@ pub async fn get_config(state: State<'_, AppState>) -> Result<ConfigView, CmdErr
             })
             .collect(),
         presets: config.preset_names().map(str::to_owned).collect(),
-    })
+        theme: config.theme.map(|t| t.as_str().to_owned()),
+        scan_path_status: config
+            .scan_paths
+            .iter()
+            .map(|p| ScanPathStatus {
+                path: p.display().to_string(),
+                error: quire_core::scan::check_scan_path(p)
+                    .err()
+                    .map(|e| e.to_string()),
+            })
+            .collect(),
+        editable: state.config_path.is_some() && state.config_error.is_none(),
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_config(state: State<'_, AppState>) -> Result<ConfigView, CmdError> {
+    Ok(config_view(&state))
+}
+
+/// Saves the preferences into `config.toml` (an explicit user action) and applies them
+/// without a restart: new scan paths, presets and watch interval trigger a rescan (T23).
+#[tauri::command]
+#[specta::specta]
+pub async fn set_config<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    settings: SettingsInput,
+) -> Result<ConfigView, CmdError> {
+    use quire_core::config::{ProjectConfig, Settings, Theme, save_settings};
+    if let Some(e) = &state.config_error {
+        return Err(err(
+            "config_invalid",
+            format!("fix config.toml by hand first: {e}"),
+        ));
+    }
+    let path = state
+        .config_path
+        .clone()
+        .ok_or_else(|| err("no_config_dir", "no configuration directory"))?;
+    if !(500..=60_000).contains(&settings.poll_interval_ms) {
+        return Err(err(
+            "invalid",
+            "the polling interval must be between 0.5 and 60 seconds",
+        ));
+    }
+    let theme = match settings.theme.as_deref() {
+        None => None,
+        Some("dark") => Some(Theme::Dark),
+        Some("light") => Some(Theme::Light),
+        Some(other) => return Err(err("invalid", format!("unknown theme {other}"))),
+    };
+    let clean = |v: Option<String>| v.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
+    let next = Settings {
+        scan_paths: settings
+            .scan_paths
+            .iter()
+            .map(|p| p.trim().to_owned())
+            .filter(|p| !p.is_empty())
+            .collect(),
+        poll_interval_ms: u64::from(settings.poll_interval_ms),
+        theme,
+        projects: settings
+            .projects
+            .into_iter()
+            .map(|p| {
+                let config = ProjectConfig {
+                    preset: clean(p.preset),
+                    alias: clean(p.alias),
+                    issue_url_base: clean(p.issue_url_base),
+                };
+                (p.name, config)
+            })
+            .collect(),
+    };
+    let config = save_settings(&path, &next).map_err(|e| err("invalid", e))?;
+    *state
+        .config
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = config;
+    crate::live::request_scan(&app, Vec::new()).map_err(|e| err("scan", e))?;
+    Ok(config_view(&state))
 }
 
 // ------------------------------------------------------------------ scan

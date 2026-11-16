@@ -9,9 +9,9 @@ const sources = import.meta.glob<string>(["/src/**/*.tsx", "!/src/**/*.test.tsx"
 
 describe("UI strings come from the catalog", () => {
   it("detects literals (self-test)", () => {
-    const bad = `<p>Olá mundo</p>\n<input placeholder="Buscar" />\n<button aria-label="Fechar"><X /></button>`;
-    expect(findLiterals(bad).map((l) => l.text)).toEqual(["Olá mundo", "Buscar", "Fechar"]);
-    const good = `<p>{t("a.b")}</p>\n<span aria-hidden="true">/</span>\n{a > b && c < d ? x : y}\n<i>{n}/{m}</i>`;
+    const bad = `<p>Olá mundo</p>\n<input placeholder="Buscar" />\n<button aria-label="Fechar"><X /></button>\n<b>Status:</b>`;
+    expect(findLiterals(bad).map((l) => l.text)).toEqual(["Olá mundo", "Status:", "Buscar", "Fechar"]);
+    const good = `<p>{t("a.b")}</p>\n<span aria-hidden="true">/</span>\n{a > b && c < d ? x : y}\n<i>{n}/{m}</i>\n{x ? <A /> : y ? <B /> : <C />}`;
     expect(findLiterals(good)).toEqual([]);
   });
 

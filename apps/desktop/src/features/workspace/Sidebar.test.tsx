@@ -55,7 +55,7 @@ beforeEach(() => {
     status: "all",
     collapsed: {},
     selectedSpecId: null,
-    config: { path: null, error: null, scanPaths: ["/ws"], pollIntervalMs: 3000, projects: [], presets: [] },
+    config: { path: null, error: null, scanPaths: ["/ws"], pollIntervalMs: 3000, projects: [], presets: [], theme: null, scanPathStatus: [], editable: true },
     scan: { phase: "done", found: 2, processed: 2, total: 2, errors: [{ path: "/missing", message: "path does not exist: /missing" }], message: null },
   });
 });

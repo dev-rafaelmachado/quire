@@ -29,7 +29,7 @@ struct Queue {
 #[derive(Default)]
 pub struct Live {
     queue: Mutex<Queue>,
-    watcher: Mutex<Option<(Vec<WatchTarget>, SpecWatcher)>>,
+    watcher: Mutex<Option<(Vec<WatchTarget>, u64, SpecWatcher)>>,
     pub status: Mutex<WatchStatus>,
 }
 
@@ -115,7 +115,10 @@ fn refresh_watcher<R: Runtime>(app: &AppHandle<R>) {
     };
     let targets = watch::plan(&roots, &config);
     let mut slot = lock(&state.live.watcher);
-    if slot.as_ref().is_some_and(|(t, _)| *t == targets) {
+    if slot
+        .as_ref()
+        .is_some_and(|(t, ms, _)| *t == targets && *ms == config.poll_interval_ms)
+    {
         return;
     }
     *slot = None; // stop the old watcher before starting the new one
@@ -156,7 +159,7 @@ fn refresh_watcher<R: Runtime>(app: &AppHandle<R>) {
         },
     };
     if let Ok(w) = started {
-        *slot = Some((targets, w));
+        *slot = Some((targets, config.poll_interval_ms, w));
     }
     drop(slot);
     *lock(&state.live.status) = status.clone();

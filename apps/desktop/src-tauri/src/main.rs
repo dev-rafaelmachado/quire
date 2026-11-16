@@ -20,6 +20,7 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
     tauri_specta::Builder::<Rt>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_config,
+            commands::set_config::<Rt>,
             commands::start_scan::<Rt>,
             commands::get_watch_status,
             commands::take_cli_open::<Rt>,
@@ -426,6 +427,79 @@ mod tests {
         cli_delivery::deliver(app.handle(), parse(&app, &["open", "NOPE-1"], &ws));
         assert_eq!(take(), json!({ "kind": "notFound", "query": "NOPE-1" }));
         assert_eq!(take(), Value::Null, "taking clears it");
+    }
+
+    #[test]
+    fn preferences_are_saved_and_applied_without_restart() {
+        let (app, webview, tmp) = app_on_fixtures("prefs");
+        scan_and_wait(&app, &webview);
+        let config = invoke(&webview, "get_config", json!({})).unwrap();
+        assert_eq!(config["editable"], true);
+        let missing = tmp.path().join("missing").display().to_string();
+        let saved = invoke(
+            &webview,
+            "set_config",
+            json!({ "settings": {
+                "scanPaths": ["ws/projects", missing],
+                "pollIntervalMs": 2000,
+                "theme": "light",
+                "projects": [
+                    { "name": "acme_gateway", "preset": "exban", "alias": "gateway", "issueUrlBase": "https://tracker.example/browse/" },
+                    { "name": "acme_billing", "preset": "generic", "alias": null, "issueUrlBase": null }
+                ]
+            }}),
+        )
+        .unwrap();
+        assert_eq!(saved["theme"], "light");
+        assert_eq!(saved["pollIntervalMs"], 2000);
+        let status = saved["scanPathStatus"].as_array().unwrap();
+        assert_eq!(status[0]["error"], Value::Null);
+        assert!(
+            status[1]["error"]
+                .as_str()
+                .unwrap()
+                .contains("does not exist"),
+            "{status:?}"
+        );
+        let text = std::fs::read_to_string(tmp.path().join("quire.toml")).unwrap();
+        assert!(
+            text.contains("alias = \"gateway\"") && text.contains("theme = \"light\""),
+            "{text}"
+        );
+
+        // Applied without restart: the rescan picks up the alias and the new preset.
+        scan_and_wait(&app, &webview);
+        wait_for("the alias in the list", Duration::from_secs(5), || {
+            let list = invoke(&webview, "list_projects", json!({})).unwrap();
+            list.as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["alias"] == "gateway")
+                && list
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|p| p["name"] == "acme_billing" && p["preset"] == "generic")
+        });
+
+        let bad = invoke(
+            &webview,
+            "set_config",
+            json!({ "settings": { "scanPaths": [], "pollIntervalMs": 10, "theme": null, "projects": [] } }),
+        );
+        assert_eq!(bad.unwrap_err()["code"], "invalid");
+        let bad_preset = invoke(
+            &webview,
+            "set_config",
+            json!({ "settings": { "scanPaths": [], "pollIntervalMs": 3000, "theme": null,
+                "projects": [{ "name": "x", "preset": "nope", "alias": null, "issueUrlBase": null }] } }),
+        );
+        assert_eq!(bad_preset.unwrap_err()["code"], "invalid");
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join("quire.toml")).unwrap(),
+            text,
+            "nothing written on error"
+        );
     }
 
     #[test]

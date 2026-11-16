@@ -11,6 +11,11 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 export const commands = {
 	getConfig: (options?: InvokeOptions) => __TAURI_INVOKE<ConfigView_Serialize>("get_config", undefined, options),
 	/**
+	 *  Saves the preferences into `config.toml` (an explicit user action) and applies them
+	 *  without a restart: new scan paths, presets and watch interval trigger a rescan (T23).
+	 */
+	setConfig: (settings: SettingsInput_Deserialize, options?: InvokeOptions) => __TAURI_INVOKE<ConfigView_Serialize>("set_config", { settings }, options),
+	/**
 	 *  Starts a background scan and index reconciliation; progress arrives as `scan://progress`
 	 *  events and the list as `specs://changed` (DSC-04). A call during a scan queues one rerun.
 	 */
@@ -94,6 +99,12 @@ export type ConfigView_Deserialize = {
 	pollIntervalMs: number,
 	projects: ProjectConfigView_Deserialize[],
 	presets: string[],
+	/**  `dark`, `light` or none (dark). */
+	theme?: string | null,
+	/**  One entry per scan path, with the reason when it cannot be scanned (DSC-05). */
+	scanPathStatus: ScanPathStatus_Deserialize[],
+	/**  Saving is possible: there is a config location and the current file is valid. */
+	editable: boolean,
 };
 
 export type ConfigView_Serialize = {
@@ -104,6 +115,12 @@ export type ConfigView_Serialize = {
 	pollIntervalMs: number,
 	projects: ProjectConfigView_Serialize[],
 	presets: string[],
+	/**  `dark`, `light` or none (dark). */
+	theme: string | null,
+	/**  One entry per scan path, with the reason when it cannot be scanned (DSC-05). */
+	scanPathStatus: ScanPathStatus_Serialize[],
+	/**  Saving is possible: there is a config location and the current file is valid. */
+	editable: boolean,
 };
 
 export type DetailField = {
@@ -441,6 +458,18 @@ export type ScanPathError = {
 	message: string,
 };
 
+export type ScanPathStatus = ScanPathStatus_Serialize | ScanPathStatus_Deserialize;
+
+export type ScanPathStatus_Deserialize = {
+	path: string,
+	error?: string | null,
+};
+
+export type ScanPathStatus_Serialize = {
+	path: string,
+	error: string | null,
+};
+
 export type ScanPhase = "scanning" | "indexing" | "done" | "failed";
 
 /**  Progress of a scan (DSC-04): spec folders found, folders indexed, and per-path errors (DSC-05). */
@@ -466,6 +495,25 @@ export type ScanProgress_Serialize = {
 	errors: ScanPathError[],
 	/**  Set when `phase` is `failed`. */
 	message: string | null,
+};
+
+/**  What the preferences screen saves (T23). */
+export type SettingsInput = SettingsInput_Serialize | SettingsInput_Deserialize;
+
+/**  What the preferences screen saves (T23). */
+export type SettingsInput_Deserialize = {
+	scanPaths: string[],
+	pollIntervalMs: number,
+	theme?: string | null,
+	projects: ProjectConfigView_Deserialize[],
+};
+
+/**  What the preferences screen saves (T23). */
+export type SettingsInput_Serialize = {
+	scanPaths: string[],
+	pollIntervalMs: number,
+	theme: string | null,
+	projects: ProjectConfigView_Serialize[],
 };
 
 /**  Files of these spec folders changed on disk (WAT-01); the index is already updated. */

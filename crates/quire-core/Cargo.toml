@@ -22,6 +22,7 @@ thiserror = "2"
 toml = "1.2.1"
 xxhash-rust = { version = "0.8.19", features = ["xxh3"] }
 notify = "8.2.2"
+toml_edit = "0.25"
 
 [lints]
 workspace = true

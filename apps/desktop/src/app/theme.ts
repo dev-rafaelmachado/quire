@@ -4,12 +4,21 @@ export type Theme = "dark" | "light";
 
 const CLASS: Record<Theme, string> = { dark: "qd", light: "ql" };
 
+const URL_THEME = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("theme");
+
 function initialTheme(): Theme {
-  // Dark is the default; `?theme=light` exists for screenshots until preferences (T23).
-  return new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark";
+  // Dark is the default; `?theme=light|dark` (screenshots and demos) wins over config.toml.
+  return URL_THEME === "light" ? "light" : "dark";
+}
+
+/** Applies the theme saved in config.toml unless the URL forces one. */
+export function applyConfiguredTheme(theme: string | null): void {
+  if (URL_THEME === "light" || URL_THEME === "dark") return;
+  useTheme.getState().setTheme(theme === "light" ? "light" : "dark");
 }
 
 function apply(theme: Theme): void {
+  if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.classList.remove(CLASS.dark, CLASS.light);
   root.classList.add(CLASS[theme]);
