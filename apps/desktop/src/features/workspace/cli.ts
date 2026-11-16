@@ -8,6 +8,8 @@ import { useWorkspace } from "./store";
 export function applyCliOpen(open: CliOpen): void {
   const ws = useWorkspace.getState();
   const view = useSpecView.getState();
+  // A new command-line request replaces a picker that is still open.
+  if (open.kind !== "pick") ws.setPick(null);
   switch (open.kind) {
     case "spec": {
       const instanceId = open.instanceId ?? null;

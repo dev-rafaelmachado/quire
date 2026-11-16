@@ -92,6 +92,12 @@ describe("command line navigation", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("a new request closes a picker left open", () => {
+    applyCliOpen({ kind: "pick", query: "acme-200", specIds: [1, 3] });
+    applyCliOpen({ kind: "spec", specId: 2, instanceId: null, file: null });
+    expect(useWorkspace.getState().pick).toBeNull();
+  });
+
   it("says when nothing matches", () => {
     applyCliOpen({ kind: "notFound", query: "NOPE-1" });
     expect(useSpecView.getState().notice).toBe("Nenhuma spec encontrada para NOPE-1.");
