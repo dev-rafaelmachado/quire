@@ -1,6 +1,6 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 9/28 tarefas
+**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 10/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -14,25 +14,25 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 |---|---|---|
 | 0: Dívidas da v0.1 | quire | 5/9 |
 | 1: Spikes | quire | 2/3 |
-| 2: Escrita segura no núcleo | quire | 2/5 |
+| 2: Escrita segura no núcleo | quire | 3/5 |
 | 3: Editor | quire | 0/5 |
 | 4: Busca e command palette | quire | 0/3 |
 | 5: Tasks e progresso | quire | 0/2 |
 | 6: Fechamento da v0.2 | quire | 0/1 |
 
-**Total:** 9/28 tarefas
+**Total:** 10/28 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 2, T28 (escrita por classe de sistema de arquivos)
-- **Concluídas:** T1, T27, T2, T4, T7, T10, T11, T12, T13
-- **Em andamento:** T28
+- **Fase / tarefa:** Fase 2, T14 (alternância de checkbox)
+- **Concluídas:** T1, T27, T2, T4, T7, T10, T11, T12, T13, T28
+- **Em andamento:** T14
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
 - **Aguardando decisão do autor:** T6 (orçamento de memória do modo Dividir: ≤ 456 MB, ver "Medições")
 - **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`); T11 (passo "rename spike (T11)" em ext4 e NTFS: leia o log e preencha as linhas da tabela)
 - **NÃO VERIFICADO (depende de ambiente que não há aqui):** teclas mortas, composição e IME no Wayland com teclado pt-BR, e o editor no WebView2 (T9: roteiro manual em `apps/desktop/src/spike-editor/README.md`); idioma pelo sistema no WebView2 (T27); rename atômico em DrvFs, 9p e `\\wsl$` (T11: as três classes ficam somente leitura até alguém medir); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
-- **Próximo passo:** T28, depois T14
+- **Próximo passo:** T14, depois T15
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** T8 (precisa do autor numa máquina com WSL: spike T2 da v0.1 no WSLg e T3 em WSL2 ext4, DrvFs e `\\wsl$`; a pasta `apps/desktop/src/spike/` só sai depois disso). Também dependem de máquina partes de T9 (teclas mortas/IME com o autor; WebView2) e T11 (WSL, DrvFs, 9p, `\\wsl$`)
 - **Arquivos sem commit:** nenhum
@@ -172,3 +172,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · T11 · spike de rename (18bcfc6), tabela em "Medições". btrfs e tmpfs: 0 leituras ruins em 400 trocas com leitor concorrente; o rename não preserva o modo, passa por cima de alvo somente leitura e troca o link por arquivo comum, tudo já previsto nos passos 1, 2 e 5 do TD-12. ext4 e NTFS rodam no CI (passo "rename spike (T11)", `continue-on-error`), **NÃO VERIFICADOS** até o push. **Decisão da P6 pelo dado:** `\\\\wsl$`, DrvFs e 9p não foram medidos (sem WSL nem Windows aqui), então ficam **somente leitura** na v0.2 (`VERIFIED_ATOMIC` vazia na T28), o padrão conservador da spec
 - 2026-11-16 · T12 · pipeline de escrita no núcleo (c56adbd): `write::{decode, encode, save, editable_path, orphan_temps, remove_orphan_temp, is_quire_temp}` e `fingerprint::Fingerprint` (tamanho + xxh3-128, igualdade sem `mtime`, token `<len>-<hash>` para a UI). Testes: as 8 combinações BOM × EOL × newline final voltam byte a byte; fins de linha mistos (inclusive CR solto) marcados e normalizados para o predominante, empate pelo primeiro; propriedade com 3.000 textos aleatórios (pedaços com acento, emoji, CR, LF, CRLF, BOM); falha injetada em criar, escrever (metade dos bytes), permissões, fsync e rename, e dono diferente: o original fica igual e nenhum `.tmp` sobra; somente leitura recusado; modos 0600/0644/0755/0640 mantidos; link simbólico continua link e o destino recebe o conteúdo; link quebrado recusado; arquivo de 2 MB inteiro; `Expect::Absent` nunca sobrescreve; arquivo sumido vira conflito (não é recriado em silêncio); nomes `.jsonl`, `../x.md`, `a/b.md`, `a\\b.md`, não listados e temporários recusados. **Decisões de implementação:** (1) dono diferente é detectado comparando o `uid` do temporário recém-criado com o do original, sem `geteuid` (que exigiria `unsafe`/libc); (2) falha no fsync da pasta depois do rename não vira erro, porque o conteúdo já está no lugar e um erro faria a UI achar que nada mudou; (3) sem o atalho por `mtime` do A3: o hash é sempre calculado (arquivos ≤ 2 MB, microssegundos). **Só o CI do Windows confirma:** o teste de arquivo segurado sem `FILE_SHARE_DELETE` (`InUse` depois de 1 s), o rename por cima no NTFS e a cópia de permissões no Windows
 - 2026-11-16 · T13 · conflito por impressão digital (2785f30): `Unchanged` compara tamanho + hash do disco com a base nos dois pontos (antes do temporário e logo antes do rename); `save_over`, `save_new` e `save_conflict_copy` (`<stem>.conflito-AAAAMMDD-HHMMSS[-n].md`, carimbo vindo da UI em hora local, validado). Testes: escrita do agente antes do save e entre o temporário e o rename vira `Conflict` com o conteúdo do agente intacto e sem temporário; `mtime` igual com bytes diferentes (`File::set_modified`, sem dependência nova) é conflito, e `mtime` diferente com bytes iguais não é; a impressão devolvida é a próxima base; cópias com nome livre, inclusive pulando um nome que outro processo criou. **Decisões de implementação:** (1) criar arquivo novo (cópia de conflito, recriação) usa `hard_link` do temporário para o nome final, que falha de forma atômica se o nome existir; onde link não é suportado, cai para checar e renomear (janela residual do A6); (2) o temporário é fechado antes do rename, porque o Windows recusa mover arquivo com handle aberto sem compartilhamento. **Só o CI do Windows confirma:** `hard_link` e `set_modified` no NTFS
+- 2026-11-16 · T28 · escrita condicionada à classe do sistema de arquivos (92abad6): `fs_kind::{classify, classify_mountinfo, classify_windows_path, writable, VERIFIED_ATOMIC}`; `write::save` recusa com `UnreliableFs` antes de criar qualquer arquivo, inclusive cópia de conflito. `VERIFIED_ATOMIC` vazia, igual à decisão da T11 (comentário com a data). Testes com `mountinfo` sintético (ext4, btrfs, tmpfs, 9p com `aname=drvfs`, tipo `drvfs`, 9p sem drvfs, bind mount ext4 dentro de `/mnt/c`, ponto de montagem com `\\040`, prefixo por componente e não por texto) e com as linhas reais vistas no spike; prefixos do Windows rodando em todos os sistemas (`\\\\wsl$`, `\\\\wsl.localhost`, `\\\\?\\UNC\\…`, barras e maiúsculas trocadas → `WslUnc`; `C:\\`, `\\\\?\\C:`, `\\\\server\\share` → `Local`). `mountinfo` ilegível vira `Local` (as outras garantias continuam). **NÃO VERIFICADO:** como o WSL2 atual escreve o `mountinfo` de `/mnt/c` (as duas formas conhecidas estão cobertas)
