@@ -83,7 +83,7 @@ T16 → T17 → T18 → T19 → T20
 
 - [ ] T16: Editor CodeMirror e modos Ler, Editar e Dividir (c5eba1d) (gate passou, aguardando revisão visual)
 - [ ] T17: Preview ao vivo e rolagem sincronizada (bc9af81) (gate passou, aguardando revisão visual)
-- [ ] T18: Guarda de alterações não salvas
+- [ ] T18: Guarda de alterações não salvas (ff3cef7) (gate passou, aguardando revisão visual)
 - [ ] T19: Conflito: diálogo, diff, mudança no disco e supressão da própria escrita
 - [ ] T20: Edição com várias instâncias
 
