@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { t } from "../../lib/i18n";
 import { events, type InstanceSummary, type ProjectSummary, type SpecDetail } from "../../lib/ipc";
+import { useConflict } from "../conflict/store";
+import { useEditor } from "../editor/store";
 import { useLogs } from "../logs-view/store";
 import { useTasks } from "../tasks-view/store";
 import { useWorkspace } from "../workspace/store";
@@ -50,6 +52,9 @@ export function useLiveUpdates(): void {
         const view = useSpecView.getState();
         if (!affects(e.payload.specDirs, view.detail)) return;
         void view.refresh();
+        // The buffer follows the TD-14 rule: its own save is ignored, an outside change reloads
+        // a clean buffer and only warns over a dirty one (CNF-04..07).
+        void useConflict.getState().onDiskChange();
         const id = view.detail ? displayed(view.detail)?.id : undefined;
         if (id !== undefined && useTasks.getState().instanceId === id) void useTasks.getState().reload();
         if (id !== undefined && useLogs.getState().instanceId === id) void useLogs.getState().reload();
@@ -58,6 +63,14 @@ export function useLiveUpdates(): void {
         if (cancelled) fn();
         else unlisten = fn;
       });
+    // After the app's own save the read view and the tasks follow at once (PRG-01).
+    const unsubscribeSaves = useEditor.subscribe((state, prev) => {
+      if (state.lastSaved === prev.lastSaved) return;
+      const view = useSpecView.getState();
+      void view.refresh();
+      const id = view.detail ? displayed(view.detail)?.id : undefined;
+      if (id !== undefined && useTasks.getState().instanceId === id) void useTasks.getState().reload();
+    });
     const unsubscribe = useWorkspace.subscribe((state, prev) => {
       if (state.projects === prev.projects || !state.loaded) return;
       const view = useSpecView.getState();
@@ -77,6 +90,7 @@ export function useLiveUpdates(): void {
       cancelled = true;
       unlisten?.();
       unsubscribe();
+      unsubscribeSaves();
     };
   }, []);
 }

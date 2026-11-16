@@ -19,6 +19,8 @@ import { t, useLocale } from "./lib/i18n";
 import { setWindowTitle, onWindowClose } from "./lib/window";
 import { guard, hasUnsaved } from "./features/unsaved/store";
 import { UnsavedDialog } from "./features/unsaved/UnsavedDialog";
+import { ConflictDialog } from "./features/conflict/ConflictDialog";
+import { startConflictDemo } from "./features/conflict/demo";
 
 export function App() {
   // Subscribing here re-renders the whole tree when the language changes (no restart).
@@ -45,6 +47,8 @@ export function App() {
     setWindowTitle(dirtyName ? `• ${dirtyName} — ${t("app.name")}` : t("app.name"));
   }, [dirtyName]);
 
+  useEffect(() => startConflictDemo(), []);
+
   // Closing the window with unsaved changes asks first (SAV-06).
   useEffect(() => onWindowClose(hasUnsaved, (close) => guard(close)), []);
   useCliNavigation();
@@ -66,6 +70,7 @@ export function App() {
       main={
         <>
           <UnsavedDialog />
+          <ConflictDialog />
           <Notice />
           <CliPicker />
           {showPrefs ? <Preferences config={config} /> : selected ? <SpecView /> : <EmptyView />}

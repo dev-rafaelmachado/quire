@@ -2,6 +2,7 @@ import { Lock, Save, TriangleAlert } from "lucide-react";
 import { t } from "../../lib/i18n";
 import { errorText } from "../../lib/i18n/errors";
 import { Button, Chip, ErrorText, Segmented } from "../../ui";
+import { useConflict } from "../conflict/store";
 import { guard } from "../unsaved/store";
 import { type EditMode, useEditor } from "./store";
 
@@ -67,8 +68,12 @@ export function EditBar() {
         </div>
       ) : null}
       {error ? (
-        <p role="alert" className="m-0 bg-warn-bg px-6 py-2 text-[12.5px] text-warn">
-          <ErrorText error={error} />
+        <p role="alert" className="m-0 flex flex-wrap items-center gap-3 bg-warn-bg px-6 py-2 text-[12.5px] text-warn">
+          <ErrorText error={error} className="min-w-0 flex-1" />
+          {/* A read-only or foreign file is never overwritten: offer a copy (SAV-04). */}
+          {error.code === "write_read_only" || error.code === "write_foreign_owner" ? (
+            <Button onClick={() => void useConflict.getState().saveCopy()}>{t("conflict.saveCopy")}</Button>
+          ) : null}
         </p>
       ) : null}
     </div>

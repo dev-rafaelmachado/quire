@@ -12,6 +12,8 @@ import { EditBar } from "../editor/EditBar";
 import { SplitView } from "../editor/SplitView";
 import { useEditor } from "../editor/store";
 import { guard } from "../unsaved/store";
+import { DiskNotice } from "../conflict/DiskNotice";
+import { OrphanNotice } from "../conflict/OrphanNotice";
 import { FileView } from "./FileView";
 import { displayed } from "./labels";
 import { MetaStrip } from "./MetaStrip";
@@ -133,13 +135,16 @@ export function SpecView() {
     if (onLogs && instanceId !== undefined) void loadLogs(instanceId, { gates: hasGates, lessons: hasLessons });
   }, [onLogs, instanceId, hasGates, hasLessons, loadLogs]);
 
+  const orphans = detail && instanceId !== undefined ? <OrphanNotice instanceId={instanceId} version={detail} /> : null;
   const tabs = detail ? <Tabs detail={detail} counts={counts} tab={tab} unsaved={unsaved} onSelect={(next) => guard(() => selectTab(next))} /> : null;
   const editing = mode !== "read" && buffer !== null && buffer.name === file && buffer.locked === null && buffer.format !== null;
   if (detail && editing && file !== null) {
     return (
       <>
         {tabs}
+        {orphans}
         <EditBar />
+        <DiskNotice />
         <div role="tabpanel" className="min-h-0 flex-1">
           <SplitView key={`${buffer.instanceId}\u0000${file}`} name={file} header={detail.headerFiles.includes(file)} preview={mode === "split"} />
         </div>
@@ -163,6 +168,7 @@ export function SpecView() {
     return (
       <>
         {tabs}
+        {orphans}
         <EditBar />
         <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
           <TasksPanel view={tasksView} />
@@ -174,6 +180,7 @@ export function SpecView() {
   return (
     <>
       {tabs}
+      {orphans}
       {tab === OTHERS ? <OthersBar /> : null}
       {file !== null ? <EditBar /> : null}
       {detail && tab !== OTHERS ? <MetaStrip detail={detail} /> : null}

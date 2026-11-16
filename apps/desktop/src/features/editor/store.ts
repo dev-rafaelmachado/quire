@@ -20,6 +20,19 @@ export interface Buffer {
 
 export type SaveResult = "saved" | "unchanged" | "failed" | "needs-confirm";
 
+export interface SaveOptions {
+  confirmMixed?: boolean;
+  /** Base to save against instead of the buffer's: the disk the user chose to overwrite
+   *  (CNF-02). `null` re-creates a file deleted during the edit (CNF-07). */
+  base?: string | null;
+}
+
+let onConflict: (() => void) | null = null;
+/** Who handles a `write_conflict` (the conflict dialog, T19). */
+export function setConflictHandler(fn: (() => void) | null): void {
+  onConflict = fn;
+}
+
 interface EditorState {
   mode: EditMode;
   buffer: Buffer | null;
@@ -31,6 +44,10 @@ interface EditorState {
   confirmingMixed: boolean;
   /** Bumped when the saved text changes, so the open editor resets what "clean" means. */
   savedVersion: number;
+  /** Bumped after each successful save only (the read view and the lists follow it). */
+  lastSaved: number;
+  /** Replaces the buffer with what is on disk now (CNF-04, "Recarregar"). */
+  adopt: (disk: { text: string; fingerprint: string; format: TextFormat }) => void;
   /** Set by the mounted editor; the store pulls the text only when saving. */
   getText: (() => string) | null;
   setGetText: (fn: (() => string) | null) => void;
@@ -40,7 +57,7 @@ interface EditorState {
   load: (instanceId: number, name: string) => Promise<void>;
   clear: () => void;
   /** Saves the buffer (EDT-05): nothing is written when it is clean. */
-  save: (opts?: { confirmMixed?: boolean }) => Promise<SaveResult>;
+  save: (opts?: SaveOptions) => Promise<SaveResult>;
   cancelMixed: () => void;
 }
 
@@ -70,7 +87,18 @@ export const useEditor = create<EditorState>((set, get) => ({
   error: null,
   confirmingMixed: false,
   savedVersion: 0,
+  lastSaved: 0,
   getText: null,
+  adopt: (disk) => {
+    const buffer = get().buffer;
+    if (!buffer) return;
+    set({
+      buffer: { ...buffer, savedText: disk.text, base: disk.fingerprint, format: disk.format },
+      dirty: false,
+      error: null,
+      savedVersion: get().savedVersion + 1,
+    });
+  },
   setGetText: (getText) => set({ getText }),
   setDirty: (dirty) => set({ dirty }),
   setMode: (mode) => {
@@ -114,7 +142,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   save: async (opts = {}) => {
     const { buffer, dirty, getText, saving } = get();
     if (!buffer || !buffer.format || !getText || saving || buffer.locked) return "unchanged";
-    if (!dirty) return "unchanged";
+    const forced = opts.base !== undefined;
+    if (!dirty && !forced) return "unchanged";
     if (buffer.format.mixed && !opts.confirmMixed) {
       set({ confirmingMixed: true });
       return "needs-confirm";
@@ -127,7 +156,7 @@ export const useEditor = create<EditorState>((set, get) => ({
         name: buffer.name,
         text,
         format: buffer.format,
-        base: buffer.base,
+        base: forced ? (opts.base ?? null) : buffer.base,
         confirmMixed: opts.confirmMixed ?? false,
       });
       const current = get().buffer;
@@ -137,10 +166,12 @@ export const useEditor = create<EditorState>((set, get) => ({
           savedVersion: get().savedVersion + 1,
         });
       }
-      set({ saving: false });
+      set({ saving: false, lastSaved: get().lastSaved + 1 });
       return "saved";
     } catch (e) {
-      set({ saving: false, error: asCmdError(e) });
+      const error = asCmdError(e);
+      set({ saving: false, error });
+      if (error.code === "write_conflict") onConflict?.();
       return "failed";
     }
   },

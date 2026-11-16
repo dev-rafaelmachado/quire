@@ -465,6 +465,65 @@ mod tests {
     }
 
     #[test]
+    fn a_save_settles_without_a_reload_cycle() {
+        // T19 / TD-14: the app's own write is reconciled (by the write itself and maybe once
+        // more by the watcher, merged when they overlap), and then everything stays quiet.
+        use tauri::Listener;
+        let (app, webview, _tmp) = app_on_fixtures("no-cycle");
+        scan_and_wait(&app, &webview);
+        let (instance_id, dir) = acme_142(&webview);
+        // Let the watcher start and the first events of the scan pass.
+        std::thread::sleep(Duration::from_millis(800));
+        wait_scan(&app);
+        let changed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = changed.clone();
+        app.listen("spec://changed", move |_| {
+            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        });
+        let state = app.state::<state::AppState>();
+        let runs = |s: &state::AppState| s.live.runs.load(std::sync::atomic::Ordering::SeqCst);
+        let before = runs(&state);
+        let file = invoke(
+            &webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_id, "name": "spec.md" }),
+        )
+        .unwrap();
+        let text = format!("{}\nOutra linha.\n", file["text"].as_str().unwrap());
+        invoke(
+            &webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": text, "format": file["format"],
+            "base": file["fingerprint"], "confirmMixed": false } }),
+        )
+        .unwrap();
+        std::thread::sleep(Duration::from_secs(3));
+        wait_scan(&app);
+        let after_save = runs(&state);
+        let events = changed.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            (1..=2).contains(&(after_save - before)),
+            "{} reconciliations",
+            after_save - before
+        );
+        assert!((1..=2).contains(&events), "{events} spec://changed events");
+        // Quiet afterwards: nothing writes again, so nothing reconciles again.
+        std::thread::sleep(Duration::from_secs(3));
+        assert_eq!(
+            runs(&state),
+            after_save,
+            "reconciliation cycle after a save"
+        );
+        assert_eq!(changed.load(std::sync::atomic::Ordering::SeqCst), events);
+        assert!(
+            std::fs::read_to_string(dir.join("spec.md"))
+                .unwrap()
+                .ends_with("Outra linha.\n")
+        );
+    }
+
+    #[test]
     fn checkbox_and_progress_without_the_watcher() {
         // Polling every 60 s: within this test, only the write itself can update the list.
         let cfg = "scan_paths = [\"ws/projects\"]\npoll_interval_ms = 60000\n\n[watch]\nmode = \"poll\"\n\n[projects.acme_gateway]\npreset = \"exban\"\ntasks_checkbox = true\n\n[projects.acme_billing]\npreset = \"exban\"\n";
