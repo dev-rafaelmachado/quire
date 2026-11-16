@@ -1,6 +1,6 @@
 # QUIRE v0.2 — Escrita segura, busca e command palette
 
-**Status:** Execução · 0 de 7 fases completas · branch `feat/v0-2` · 11/28 tarefas
+**Status:** Execução · 1 de 7 fases completas · branch `feat/v0-2` · 12/28 tarefas
 **Spec:** `spec.md` · **Design:** `design.md` · **Tarefas:** `tasks.md` · **Idioma:** pt-BR
 
 ## Em uma frase
@@ -14,25 +14,25 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 |---|---|---|
 | 0: Dívidas da v0.1 | quire | 5/9 |
 | 1: Spikes | quire | 2/3 |
-| 2: Escrita segura no núcleo | quire | 4/5 |
+| 2: Escrita segura no núcleo | quire | 5/5 |
 | 3: Editor | quire | 0/5 |
 | 4: Busca e command palette | quire | 0/3 |
 | 5: Tasks e progresso | quire | 0/2 |
 | 6: Fechamento da v0.2 | quire | 0/1 |
 
-**Total:** 11/28 tarefas
+**Total:** 12/28 tarefas
 <!-- progress:end -->
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 2, T15 (comandos de escrita no shell)
-- **Concluídas:** T1, T27, T2, T4, T7, T10, T11, T12, T13, T28, T14
-- **Em andamento:** T15
+- **Fase / tarefa:** Fase 3, T16 (editor e modos)
+- **Concluídas:** T1, T27, T2, T4, T7, T10, T11, T12, T13, T28, T14, T15
+- **Em andamento:** T16
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
 - **Aguardando decisão do autor:** T6 (orçamento de memória do modo Dividir: ≤ 456 MB, ver "Medições")
 - **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`); T11 (passo "rename spike (T11)" em ext4 e NTFS: leia o log e preencha as linhas da tabela)
 - **NÃO VERIFICADO (depende de ambiente que não há aqui):** teclas mortas, composição e IME no Wayland com teclado pt-BR, e o editor no WebView2 (T9: roteiro manual em `apps/desktop/src/spike-editor/README.md`); idioma pelo sistema no WebView2 (T27); rename atômico em DrvFs, 9p e `\\wsl$` (T11: as três classes ficam somente leitura até alguém medir); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
-- **Próximo passo:** T15, depois T16
+- **Próximo passo:** T16, depois T17
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** T8 (precisa do autor numa máquina com WSL: spike T2 da v0.1 no WSLg e T3 em WSL2 ext4, DrvFs e `\\wsl$`; a pasta `apps/desktop/src/spike/` só sai depois disso). Também dependem de máquina partes de T9 (teclas mortas/IME com o autor; WebView2) e T11 (WSL, DrvFs, 9p, `\\wsl$`)
 - **Arquivos sem commit:** nenhum
@@ -174,3 +174,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · T13 · conflito por impressão digital (2785f30): `Unchanged` compara tamanho + hash do disco com a base nos dois pontos (antes do temporário e logo antes do rename); `save_over`, `save_new` e `save_conflict_copy` (`<stem>.conflito-AAAAMMDD-HHMMSS[-n].md`, carimbo vindo da UI em hora local, validado). Testes: escrita do agente antes do save e entre o temporário e o rename vira `Conflict` com o conteúdo do agente intacto e sem temporário; `mtime` igual com bytes diferentes (`File::set_modified`, sem dependência nova) é conflito, e `mtime` diferente com bytes iguais não é; a impressão devolvida é a próxima base; cópias com nome livre, inclusive pulando um nome que outro processo criou. **Decisões de implementação:** (1) criar arquivo novo (cópia de conflito, recriação) usa `hard_link` do temporário para o nome final, que falha de forma atômica se o nome existir; onde link não é suportado, cai para checar e renomear (janela residual do A6); (2) o temporário é fechado antes do rename, porque o Windows recusa mover arquivo com handle aberto sem compartilhamento. **Só o CI do Windows confirma:** `hard_link` e `set_modified` no NTFS
 - 2026-11-16 · T28 · escrita condicionada à classe do sistema de arquivos (92abad6): `fs_kind::{classify, classify_mountinfo, classify_windows_path, writable, VERIFIED_ATOMIC}`; `write::save` recusa com `UnreliableFs` antes de criar qualquer arquivo, inclusive cópia de conflito. `VERIFIED_ATOMIC` vazia, igual à decisão da T11 (comentário com a data). Testes com `mountinfo` sintético (ext4, btrfs, tmpfs, 9p com `aname=drvfs`, tipo `drvfs`, 9p sem drvfs, bind mount ext4 dentro de `/mnt/c`, ponto de montagem com `\\040`, prefixo por componente e não por texto) e com as linhas reais vistas no spike; prefixos do Windows rodando em todos os sistemas (`\\\\wsl$`, `\\\\wsl.localhost`, `\\\\?\\UNC\\…`, barras e maiúsculas trocadas → `WslUnc`; `C:\\`, `\\\\?\\C:`, `\\\\server\\share` → `Local`). `mountinfo` ilegível vira `Local` (as outras garantias continuam). **NÃO VERIFICADO:** como o WSL2 atual escreve o `mountinfo` de `/mnt/c` (as duas formas conhecidas estão cobertas)
 - 2026-11-16 · T14 · checkbox sobre bytes (b80ac6e): `tasks_edit::{toggle, toggle_file}` e `parse::tasks::checkbox_offset` (a mesma regex do parser). Testes: em 8 layouts (CRLF × BOM × newline final), marcar muda exatamente 1 byte e desmarcar devolve os bytes originais; `[X]` desmarca para `[ ]` e marcar grava `x`; nada é acrescentado à linha (P4); linha movida, outro id, outro estado, linha dentro de bloco de código, linha 0 ou além do fim → `Moved` sem escrita; `tasks.md` alterado pelo agente depois da carga → `Conflict` com o arquivo do agente intacto; caso real: cópia temporária do `tasks.md` da v0.1, marcar a primeira tarefa pendente muda 1 byte e preserva título, commits e nota, e o arquivo do repositório não é tocado
+- 2026-11-16 · T15 · comandos de escrita no shell (a3f0085), em `src-tauri/src/edit.rs`: `open_for_edit` (texto sem BOM e com LF, formato, base, `locked` com código: `edit_jsonl`, `edit_not_markdown`, `edit_not_utf8`, `edit_binary`, `edit_too_large`, `write_unreliable_fs`; `readOnly`), `file_fingerprint`, `save_file` (base `None` = recriar sem nunca substituir; `write_mixed_eol` sem confirmação), `save_copy`, `toggle_task` (recusa `checkbox_off` sem o opt-in; devolve a `TasksView` nova), `orphan_temps`, `remove_orphan_temp`. `TasksView` ganhou `fingerprint` (base do checkbox) e `checkbox`. `scan::list_files` deixa de listar os temporários do Quire. Testes IPC sobre fixtures geradas por teste: abrir, salvar, conflito com base velha, nomes recusados (`.jsonl`, `payload.json`, `../spec.md`, `a/b.md`, não listado), mistos sem confirmação, cópia, checkbox desligado, temporário órfão listado/fora da aba "outros"/removido só por nome; e, com o watcher em polling de 60 s, marcar uma tarefa muda 1 byte e a lista mostra 8/8 em < 5 s só pela reconciliação da própria escrita. Única busca de escrita no shell: `edit.rs`. **Decisões fora do design:** (1) o `tasks_checkbox` entrou no `config.toml` aqui, e não na T24, porque o `toggle_task` precisa dele; para não perder a opção, o `save_settings` passou a gravá-lo (e não apaga um projeto que só tenha ele), e o `set_config` mantém o valor atual quando a UI não o envia; (2) a impressão digital cruza o IPC como token de texto (`<len>-<hash>`), porque `u64`/`u128` não passam bem para o TypeScript

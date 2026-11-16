@@ -73,7 +73,7 @@ T12 → T13 → T28 → T14 → T15
 - [x] T13: Impressão digital e detecção de conflito (2785f30)
 - [x] T28: Escrita condicionada à classe do sistema de arquivos (P6) (92abad6)
 - [x] T14: Alternância de checkbox por linha (b80ac6e)
-- [ ] T15: Comandos de escrita no shell e bindings
+- [x] T15: Comandos de escrita no shell e bindings (a3f0085)
 
 ### Fase 3: Editor
 
