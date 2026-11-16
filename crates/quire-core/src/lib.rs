@@ -4,6 +4,7 @@
 
 pub mod config;
 pub mod error;
+pub mod fingerprint;
 pub mod git;
 pub mod index;
 pub mod model;
@@ -11,6 +12,7 @@ pub mod parse;
 pub mod preset;
 pub mod scan;
 pub mod watch;
+pub mod write;
 
 pub use config::Config;
 pub use error::{ConfigError, GitError, IndexError, ScanError, WatchError};
