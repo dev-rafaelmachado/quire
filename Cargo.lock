@@ -3027,7 +3027,7 @@ dependencies = [
 
 [[package]]
 name = "quire-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "serde",
@@ -3036,7 +3036,7 @@ dependencies = [
 
 [[package]]
 name = "quire-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cpu-time",
  "dirs",
@@ -3056,7 +3056,7 @@ dependencies = [
 
 [[package]]
 name = "quire-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "quire-cli",
  "quire-core",

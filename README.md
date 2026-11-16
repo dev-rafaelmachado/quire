@@ -38,14 +38,14 @@ Everything comes from disk: Quire keeps no state of its own except a disposable 
 Download the `.deb` or the `.AppImage` from the [releases page](https://github.com/dev-rafaelmachado/quire/releases).
 
 ```bash
-sudo apt install ./Quire_0.1.0_amd64.deb      # installs /usr/bin/quire and a menu entry
+sudo apt install ./Quire_0.2.0_amd64.deb      # installs /usr/bin/quire and a menu entry
 ```
 
 For the AppImage, make it executable and put it on your `PATH` as `quire`:
 
 ```bash
-chmod +x Quire_0.1.0_amd64.AppImage
-mkdir -p ~/.local/bin && mv Quire_0.1.0_amd64.AppImage ~/.local/bin/quire
+chmod +x Quire_0.2.0_amd64.AppImage
+mkdir -p ~/.local/bin && mv Quire_0.2.0_amd64.AppImage ~/.local/bin/quire
 ```
 
 Quire needs WebKitGTK 4.1 (`libwebkit2gtk-4.1`), present on current desktop distributions.
