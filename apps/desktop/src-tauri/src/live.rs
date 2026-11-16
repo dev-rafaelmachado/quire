@@ -28,6 +28,9 @@ struct Queue {
 
 #[derive(Default)]
 pub struct Live {
+    /// Reconciliations run so far (tests: no reload cycle after a save, T19).
+    #[cfg(test)]
+    pub runs: std::sync::atomic::AtomicUsize,
     queue: Mutex<Queue>,
     watcher: Mutex<Option<(Vec<WatchTarget>, u64, SpecWatcher)>>,
     pub status: Mutex<WatchStatus>,
@@ -73,6 +76,11 @@ pub fn request_scan<R: Runtime>(app: &AppHandle<R>, changed: Vec<PathBuf>) -> st
                     q.rerun = false;
                     std::mem::take(&mut q.dirs)
                 };
+                #[cfg(test)]
+                state
+                    .live
+                    .runs
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 run_scan(&app);
                 if !dirs.is_empty() {
                     let spec_dirs = dirs.iter().map(|d| d.display().to_string()).collect();
@@ -156,6 +164,7 @@ fn refresh_watcher<R: Runtime>(app: &AppHandle<R>) {
                 .iter()
                 .map(|(p, m)| ScanPathError {
                     path: p.display().to_string(),
+                    code: "watch_fallback".to_owned(),
                     message: m.clone(),
                 })
                 .collect(),
@@ -163,6 +172,7 @@ fn refresh_watcher<R: Runtime>(app: &AppHandle<R>) {
         Err(e) => WatchStatus {
             fallbacks: vec![ScanPathError {
                 path: String::new(),
+                code: "watch_start".to_owned(),
                 message: e.to_string(),
             }],
             ..WatchStatus::default()

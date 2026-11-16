@@ -4,6 +4,7 @@
 
 /* The T2 spike is a separate Vite project; keep its files out of the app's class scan. */
 @source not "./spike";
+@source not "./spike-editor";
 
 /* Tailwind utilities read the design tokens, so switching .qd/.ql on <html> switches the theme
    (TD-09). Names avoid the tokens' own variables (e.g. --font-ui) to prevent self-references. */
@@ -237,4 +238,10 @@
   .md-mermaid-pending .md-code {
     margin: 0;
   }
+}
+
+/* Occurrences of the last search in the opened file (SRC-06). */
+::highlight(quire-search) {
+  background-color: var(--warn-bg);
+  color: var(--text);
 }

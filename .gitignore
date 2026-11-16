@@ -2,12 +2,15 @@
 node_modules/
 dist/
 dist-spike/
+dist-spike-editor/
 target/
 .vite/
 *.log
 
 # tauri
 apps/desktop/src-tauri/gen/
+# console helper staged for the Windows bundle (scripts/stage-quire-cli.sh)
+apps/desktop/src-tauri/binaries/
 
 # env and editor
 .env

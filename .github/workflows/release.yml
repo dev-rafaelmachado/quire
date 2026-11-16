@@ -1,6 +1,7 @@
 # Builds the installers when a version tag is pushed (OSS-04) and attaches them to a draft
-# GitHub release: Linux .AppImage and .deb, Windows .msi.
-# Not executed yet: it runs only on a pushed tag, and no tag has been created.
+# GitHub release: Linux .AppImage and .deb, Windows .msi. A tag with a suffix (v0.2.0-rc.1)
+# makes a pre-release; the installers carry the numeric version of tauri.conf.json, since the
+# MSI accepts only numbers. The release always stays a draft: publishing is manual.
 name: Release
 
 on:
@@ -48,6 +49,12 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
+      # The MSI ships the console helper behind the quire command (TD-20).
+      - name: Stage the console helper (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: scripts/stage-quire-cli.sh
+
       # tauri build compiles the frontend (beforeBuildCommand) and the binary with the
       # custom protocol, then bundles.
       - uses: tauri-apps/tauri-action@v1
@@ -56,9 +63,11 @@ jobs:
         with:
           projectPath: apps/desktop
           tauriScript: pnpm tauri
-          args: --bundles ${{ matrix.bundles }}
+          # Windows: the console helper and its WiX fragment come from a config passed only to
+          # the bundling build (TD-20), after "Stage the console helper".
+          args: --bundles ${{ matrix.bundles }}${{ matrix.os == 'windows-latest' && format(' --config {0}/apps/desktop/src-tauri/tauri.bundle-windows.conf.json', github.workspace) || '' }}
           tagName: ${{ github.ref_name }}
           releaseName: Quire ${{ github.ref_name }}
-          releaseBody: See README.md for installation and docs/e2e.md for the test script.
+          releaseBody: See CHANGELOG.md for what changed, README.md for installation and docs/e2e.md for the test script.
           releaseDraft: true
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

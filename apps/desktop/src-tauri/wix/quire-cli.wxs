@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The `quire` command for Windows terminals (DEB-06, TD-20): installs bin\quire.cmd, which
+     calls the console helper quire-cli.exe (bundle.externalBin, next to quire.exe), and adds
+     only the bin folder to the system PATH, so `quire` never resolves to the GUI quire.exe.
+     Referenced from tauri.bundle-windows.conf.json (fragmentPaths and componentRefs), which
+     is passed only to the bundling build (the config option of tauri build). -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Directory Id="QuireBinDir" Name="bin">
+        <Component Id="QuireCliCmd" Guid="7C4E2F1A-3B9D-4E8A-9C61-0D2F5A7B8E13">
+          <File Id="QuireCmdFile" Name="quire.cmd" Source="$(sys.SOURCEFILEDIR)quire.cmd" KeyPath="yes" />
+        </Component>
+        <Component Id="QuireCliPath" Guid="B1D93E57-6A2C-4F0B-8E74-5C19A3D2F680" KeyPath="yes">
+          <Environment Id="QuireBinOnPath" Name="PATH" Value="[QuireBinDir]" Action="set" Part="last" Permanent="no" System="yes" />
+        </Component>
+      </Directory>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

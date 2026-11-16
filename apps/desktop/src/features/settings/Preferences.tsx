@@ -1,9 +1,10 @@
 import { CircleCheck, Plus, TriangleAlert, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTheme } from "../../app/theme";
-import { t } from "../../lib/i18n";
-import { asCmdError, commands, type ConfigView, type ProjectSummary } from "../../lib/ipc";
-import { Button, Chip, IconButton, Segmented } from "../../ui";
+import { isLocale, t } from "../../lib/i18n";
+import { errorText } from "../../lib/i18n/errors";
+import { asCmdError, type CmdError, commands, type ConfigView, type ProjectSummary } from "../../lib/ipc";
+import { Button, Chip, ErrorDetail, ErrorText, IconButton, Segmented } from "../../ui";
 import { useWorkspace } from "../workspace/store";
 
 interface ProjectDraft {
@@ -11,13 +12,15 @@ interface ProjectDraft {
   preset: string;
   alias: string;
   issueUrlBase: string;
+  /** Checking tasks from the app (CHK-01), off by default. */
+  tasksCheckbox: boolean;
 }
 
 function draftProjects(config: ConfigView, projects: readonly ProjectSummary[]): ProjectDraft[] {
   const names = [...new Set([...projects.map((p) => p.name), ...config.projects.map((p) => p.name)])].sort();
   return names.map((name) => {
     const c = config.projects.find((p) => p.name === name);
-    return { name, preset: c?.preset ?? "", alias: c?.alias ?? "", issueUrlBase: c?.issueUrlBase ?? "" };
+    return { name, preset: c?.preset ?? "", alias: c?.alias ?? "", issueUrlBase: c?.issueUrlBase ?? "", tasksCheckbox: c?.tasksCheckbox ?? false };
   });
 }
 
@@ -47,10 +50,11 @@ export function Preferences({ config }: { config: ConfigView }) {
   const [newPath, setNewPath] = useState("");
   const [interval, setIntervalSeconds] = useState(String(config.pollIntervalMs / 1000));
   const [theme, setThemeDraft] = useState<"dark" | "light">(config.theme === "light" ? "light" : "dark");
+  const [language, setLanguage] = useState<string | null>(config.language);
   const [rows, setRows] = useState<ProjectDraft[]>(() => draftProjects(config, projects));
-  const [state, setState] = useState<{ kind: "idle" | "saving" | "saved" } | { kind: "error"; message: string }>({ kind: "idle" });
+  const [state, setState] = useState<{ kind: "idle" | "saving" | "saved" } | { kind: "error"; error: CmdError }>({ kind: "idle" });
   const editable = config.editable;
-  const reason = config.error ?? t("prefs.noConfigDir");
+  const reason = config.error ? errorText(config.error) : t("prefs.noConfigDir");
 
   const statusOf = (path: string) => config.scanPathStatus.find((s) => s.path === path);
   const update = (name: string, patch: Partial<ProjectDraft>) => setRows((r) => r.map((x) => (x.name === name ? { ...x, ...patch } : x)));
@@ -69,11 +73,13 @@ export function Preferences({ config }: { config: ConfigView }) {
         scanPaths: paths,
         pollIntervalMs: Math.round(Number(interval) * 1000),
         theme,
+        language,
         projects: rows.map((r) => ({
           name: r.name,
           preset: r.preset || null,
           alias: r.alias || null,
           issueUrlBase: r.issueUrlBase || null,
+          tasksCheckbox: r.tasksCheckbox,
         })),
       });
       setConfig(next);
@@ -81,7 +87,7 @@ export function Preferences({ config }: { config: ConfigView }) {
       setTheme(theme);
       setState({ kind: "saved" });
     } catch (e) {
-      setState({ kind: "error", message: asCmdError(e).message });
+      setState({ kind: "error", error: asCmdError(e) });
     }
   };
 
@@ -98,6 +104,7 @@ export function Preferences({ config }: { config: ConfigView }) {
         {!editable ? (
           <p role="alert" className="m-0 rounded-[var(--radius-md)] bg-warn-bg px-3 py-2 text-[12.5px] text-warn">
             {t("prefs.readOnly", { reason })}
+            {config.error ? <ErrorDetail error={config.error} /> : null}
           </p>
         ) : null}
 
@@ -114,7 +121,7 @@ export function Preferences({ config }: { config: ConfigView }) {
                     <Chip>{t("prefs.pathUnsaved")}</Chip>
                   ) : status.error ? (
                     <Chip tone="warn" icon={<TriangleAlert aria-hidden="true" className="size-3" />}>
-                      {status.error}
+                      {errorText(status.error)}
                     </Chip>
                   ) : (
                     <Chip tone="ok" icon={<CircleCheck aria-hidden="true" className="size-3" />}>
@@ -151,6 +158,7 @@ export function Preferences({ config }: { config: ConfigView }) {
                   <th className="pb-2 font-semibold">{t("prefs.preset")}</th>
                   <th className="pb-2 font-semibold">{t("prefs.alias")}</th>
                   <th className="pb-2 font-semibold">{t("prefs.trackerUrl")}</th>
+                  <th className="pb-2 pl-3 font-semibold">{t("prefs.tasksCheckbox")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -166,6 +174,19 @@ export function Preferences({ config }: { config: ConfigView }) {
                           </option>
                         ))}
                       </select>
+                      {(() => {
+                        const suggested = projects.find((p) => p.name === r.name)?.suggestedPreset;
+                        return suggested && r.preset === "" ? (
+                          <button
+                            type="button"
+                            disabled={!editable}
+                            onClick={() => update(r.name, { preset: suggested })}
+                            className="mt-1 block text-[11.5px] text-acc underline decoration-dotted disabled:opacity-60"
+                          >
+                            {t("prefs.suggested", { preset: suggested })}
+                          </button>
+                        ) : null;
+                      })()}
                     </td>
                     <td className="py-2 pr-3">
                       <input aria-label={t("prefs.aliasFor", { name: r.name })} value={r.alias} onChange={(e) => update(r.name, { alias: e.target.value })} disabled={!editable} className={`${input} w-28`} />
@@ -178,6 +199,16 @@ export function Preferences({ config }: { config: ConfigView }) {
                         onChange={(e) => update(r.name, { issueUrlBase: e.target.value })}
                         disabled={!editable}
                         className={`${input} w-full font-code`}
+                      />
+                    </td>
+                    <td className="py-2 pl-3 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={t("prefs.tasksCheckboxFor", { name: r.name })}
+                        checked={r.tasksCheckbox}
+                        onChange={(e) => update(r.name, { tasksCheckbox: e.target.checked })}
+                        disabled={!editable}
+                        className="size-4 accent-[var(--acc)]"
                       />
                     </td>
                   </tr>
@@ -195,17 +226,40 @@ export function Preferences({ config }: { config: ConfigView }) {
         </Section>
 
         <Section title={t("prefs.appearance")}>
-          <div className="flex">
+          <div className="flex items-center gap-3 text-[12.5px]">
+            <span aria-hidden="true" className="w-56">
+              {t("prefs.theme")}
+            </span>
             <Segmented
-            label={t("prefs.theme")}
-            value={theme}
-            onChange={setThemeDraft}
-            options={[
-              { value: "dark", label: t("prefs.themeDark") },
-              { value: "light", label: t("prefs.themeLight") },
-            ]}
+              label={t("prefs.theme")}
+              value={theme}
+              onChange={setThemeDraft}
+              options={[
+                { value: "dark", label: t("prefs.themeDark") },
+                { value: "light", label: t("prefs.themeLight") },
+              ]}
             />
           </div>
+          <div className="flex items-center gap-3 text-[12.5px]">
+            <span aria-hidden="true" className="w-56">
+              {t("prefs.language")}
+            </span>
+            <Segmented
+              label={t("prefs.language")}
+              value={isLocale(language) ? language : "system"}
+              onChange={(v) => setLanguage(v === "system" ? null : v)}
+              options={[
+                { value: "system", label: t("prefs.languageSystem") },
+                { value: "pt-BR", label: t("prefs.languagePt") },
+                { value: "en", label: t("prefs.languageEn") },
+              ]}
+            />
+          </div>
+          {language !== null && !isLocale(language) ? (
+            <p role="status" className="m-0 text-[12px] text-warn">
+              {t("prefs.languageUnknown", { value: language })}
+            </p>
+          ) : null}
         </Section>
 
         <div className="flex items-center gap-3 border-t border-line pt-5">
@@ -222,7 +276,7 @@ export function Preferences({ config }: { config: ConfigView }) {
           ) : null}
           {state.kind === "error" ? (
             <span role="alert" className="text-[12.5px] text-warn">
-              {state.message}
+              <ErrorText error={state.error} />
             </span>
           ) : null}
         </div>

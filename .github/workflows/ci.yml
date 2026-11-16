@@ -50,7 +50,7 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
-      # Same commands as the phase gate in .specs/features/quire-v0-1/tasks.md
+      # Same commands as the phase gate in .specs/features/quire-v0-2/tasks.md
       - name: cargo fmt
         run: cargo fmt --all --check
 
@@ -65,3 +65,93 @@ jobs:
 
       - name: test (frontend)
         run: pnpm -r test
+
+      # v0.2 T11 spike: rename semantics on the runner's file system (ext4 on Linux, NTFS on
+      # Windows). A measurement for the Journal, so it never blocks the build.
+      - name: rename spike (T11)
+        continue-on-error: true
+        shell: bash
+        run: cargo run --release -p quire-core --example rename_spike -- "$RUNNER_TEMP"
+
+      # DEB-06, TD-20: the console helper answers in the terminal through bin\quire.cmd, in cmd
+      # and in PowerShell, with the same exit codes as the app on Linux.
+      - name: console helper (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo build --release -p quire-cli
+          $dir = Join-Path $env:RUNNER_TEMP 'quire-layout'
+          New-Item -ItemType Directory -Force (Join-Path $dir 'bin') | Out-Null
+          Copy-Item target\release\quire-cli.exe $dir
+          Copy-Item apps\desktop\src-tauri\wix\quire.cmd (Join-Path $dir 'bin')
+          $cmdFile = Join-Path $dir 'bin\quire.cmd'
+          $help = (& $cmdFile --help) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "pwsh --help exited $LASTEXITCODE" }
+          if ($help -notmatch 'Usage: quire \[path\]') { throw "unexpected help: $help" }
+          $version = (& $cmdFile --version) -join ''
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^quire \d') { throw "pwsh --version: $version ($LASTEXITCODE)" }
+          & $cmdFile --bogus 2>$null
+          if ($LASTEXITCODE -ne 2) { throw "pwsh --bogus exited $LASTEXITCODE" }
+          $cmdHelp = (cmd /c "`"$cmdFile`" --help") -join "`n"
+          if ($LASTEXITCODE -ne 0 -or $cmdHelp -notmatch 'Usage: quire \[path\]') { throw "cmd --help: $LASTEXITCODE" }
+          cmd /c "`"$cmdFile`" --bogus 2>nul"
+          if ($LASTEXITCODE -ne 2) { throw "cmd --bogus exited $LASTEXITCODE" }
+          # Without quire.exe next to it, a valid call explains and exits 1 (no window).
+          cmd /c "`"$cmdFile`" . 2>nul"
+          if ($LASTEXITCODE -ne 1) { throw "cmd . without the app exited $LASTEXITCODE" }
+          Write-Output "pwsh and cmd: --help, --version ($version) exit 0; --bogus exit 2; '.' without the app exit 1"
+          # The runner ends a pwsh step with the last native exit code (1, expected above).
+          exit 0
+
+  # DEB-06, TD-20: the MSI installs quire-cli.exe and bin\quire.cmd and puts only bin on the
+  # PATH; `quire --version` must answer in a fresh shell after a silent install.
+  msi:
+    name: msi install (windows-latest)
+    runs-on: windows-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Stage the console helper
+        shell: bash
+        run: scripts/stage-quire-cli.sh
+
+      # The helper is declared only here (not in a tauri.windows.conf.json, which Tauri would
+      # merge into every build, cargo check included, before the helper exists).
+      - name: Build the MSI
+        run: pnpm --filter desktop tauri build --bundles msi --config "${{ github.workspace }}/apps/desktop/src-tauri/tauri.bundle-windows.conf.json"
+
+      - name: Install silently and run quire from the PATH
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem target\release\bundle\msi\*.msi | Select-Object -First 1
+          $p = Start-Process msiexec -ArgumentList '/i', "`"$($msi.FullName)`"", '/qn', '/l*v', 'install.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "msiexec exited $($p.ExitCode)" }
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+          $found = Get-Command quire
+          Write-Output "quire resolves to $($found.Source)"
+          if ($found.Source -notmatch 'quire\.cmd$') { throw "quire resolves to $($found.Source), not bin\quire.cmd" }
+          $version = (quire --version) -join ''
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^quire \d') { throw "quire --version: $version ($LASTEXITCODE)" }
+          Write-Output $version
+
+      - name: Upload the install log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: msi-install-log
+          path: install.log

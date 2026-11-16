@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui";
 import { specTitle } from "./model";
+import { guard } from "../unsaved/store";
 import { useWorkspace } from "./store";
 
 /** Chooser for a command-line key found in more than one project (CLI-02). */
@@ -37,7 +38,7 @@ export function CliPicker() {
                 type="button"
                 onClick={() => {
                   setPick(null);
-                  select(spec.id);
+                  guard(() => select(spec.id));
                 }}
                 className="flex w-full flex-col items-start gap-0.5 rounded-[var(--radius-md)] px-3 py-2 text-left hover:bg-raise"
               >

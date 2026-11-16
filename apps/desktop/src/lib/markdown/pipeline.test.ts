@@ -53,3 +53,19 @@ describe("markdown pipeline", () => {
     expect(pre && pre.type === "element" ? codeOf(pre) : null).toEqual({ lang: "ts", code: "const a = 1;" });
   });
 });
+
+describe("source lines (EDT-04)", () => {
+  it("marks each top-level block with its first line, through the header mapping", async () => {
+    const { stripHeaderMapped } = await import("./header");
+    const md = "# Título\n\n**Status:** ok\n**Issue:** X\n\nParágrafo.\n\n## Seção\n\n| a |\n| - |\n| 1 |\n";
+    const { text, mapLine } = stripHeaderMapped(md);
+    const root = toHast(text, mapLine);
+    const lines = root.children.flatMap((n) => (n.type === "element" ? [[n.tagName, n.properties["dataLine"]]] : []));
+    expect(lines).toEqual([
+      ["h1", 1],
+      ["p", 6],
+      ["h2", 8],
+      ["table", 10],
+    ]);
+  });
+});

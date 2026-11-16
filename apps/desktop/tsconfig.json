@@ -20,5 +20,5 @@
     "noEmit": true
   },
   "include": ["src"],
-  "exclude": ["src/spike/vite.config.ts", "src/**/*.test.ts", "src/**/*.test.tsx"]
+  "exclude": ["src/spike/vite.config.ts", "src/spike-editor/vite.config.ts", "src/**/*.test.ts", "src/**/*.test.tsx"]
 }

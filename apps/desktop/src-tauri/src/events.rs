@@ -9,6 +9,8 @@ use tauri_specta::Event;
 #[serde(rename_all = "camelCase")]
 pub struct ScanPathError {
     pub path: String,
+    /// Stable code the UI translates (DEB-02); `message` is the backend detail.
+    pub code: String,
     pub message: String,
 }
 

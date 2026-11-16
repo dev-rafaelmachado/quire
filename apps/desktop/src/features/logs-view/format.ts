@@ -1,12 +1,13 @@
-const PT_MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+import { t } from "../../lib/i18n";
 
-/** `2026-11-04T17:42:00Z` -> `04 nov · 17:42` in local time (wireframe 3). */
+/** `2026-11-04T17:42:00Z` -> `04 nov · 17:42` in local time (wireframe 3), month names from
+ *  the catalog of the language in use. */
 export function formatWhen(ts: string | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return ts;
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())} ${PT_MONTHS[d.getMonth()] ?? ""} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${pad(d.getDate())} ${t("format.months").split(",")[d.getMonth()] ?? ""} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /** Seconds -> `42s`, `4m 12s`, `1h 03m`. */

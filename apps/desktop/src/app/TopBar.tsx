@@ -1,4 +1,4 @@
-import { Layers, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { Layers, Moon, Search, SlidersHorizontal, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import { t } from "../lib/i18n";
 import { IconButton } from "../ui";
@@ -10,9 +10,10 @@ interface TopBarProps {
   /** Instance badge (T20) and other actions. */
   actions?: ReactNode;
   onPreferences?: () => void;
+  onSearch?: () => void;
 }
 
-export function TopBar({ crumbs, actions, onPreferences }: TopBarProps) {
+export function TopBar({ crumbs, actions, onPreferences, onSearch }: TopBarProps) {
   const theme = useTheme((s) => s.theme);
   const toggle = useTheme((s) => s.toggle);
   return (
@@ -32,6 +33,7 @@ export function TopBar({ crumbs, actions, onPreferences }: TopBarProps) {
       ) : null}
       <div className="flex-1" />
       {actions}
+      {onSearch ? <IconButton label={t("search.open")} icon={<Search className="size-4" />} onClick={onSearch} /> : null}
       <IconButton
         label={theme === "dark" ? t("topbar.themeToLight") : t("topbar.themeToDark")}
         icon={theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}

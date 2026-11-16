@@ -3,6 +3,8 @@ import { cx } from "./cx";
 export interface SegmentOption<V extends string> {
   value: V;
   label: string;
+  /** Shown as disabled (with the group's reason nearby, EDT-08). */
+  disabled?: boolean;
 }
 
 interface SegmentedProps<V extends string> {
@@ -25,10 +27,11 @@ export function Segmented<V extends string>({ label, options, value, onChange }:
           key={o.value}
           type="button"
           aria-pressed={o.value === value}
+          disabled={o.disabled}
           onClick={() => onChange(o.value)}
           className={cx(
-            "h-6 rounded-[5px] px-2.5 text-xs font-medium whitespace-nowrap",
-            o.value === value ? "bg-raise text-text" : "text-muted hover:text-text",
+            "h-6 rounded-[5px] px-2.5 text-xs font-medium whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50",
+            o.value === value ? "bg-raise text-text" : "text-muted hover:text-text disabled:hover:text-muted",
           )}
         >
           {o.label}

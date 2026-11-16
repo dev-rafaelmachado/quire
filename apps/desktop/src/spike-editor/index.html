@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Quire — spike do editor</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font: 13px system-ui, sans-serif; }
+      #bar { padding: 6px 10px; border-bottom: 1px solid #2a2e37; white-space: pre; font-family: monospace; font-size: 11px; }
+      #host { height: calc(100% - 60px); }
+      #host .cm-editor { height: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">loading…</div>
+    <div id="host"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -65,10 +65,29 @@ commit "2026-01-12T15:00:00Z" "$wt" "feat: answer 429 with Retry-After"
 # --- acme_billing: no origin -------------------------------------------------------------
 bl="$out/projects/acme_billing"
 cp -R "$tpl/acme_billing" "$bl"
+# Text formats for the v0.2 write tests and E2E (T26). Made byte by byte here, because
+# .gitattributes forces LF on every file of this repository.
+fmt="$bl/.specs/features/bill-40-refunds"
+printf '\357\273\277# Formato: BOM e CRLF\r\n\r\nLinha com acentuação.\r\n\r\n- [ ] T1: conferir o diff\r\n' > "$fmt/formato-crlf-bom.md"
+printf '# Formato: sem newline final\n\nA última linha não termina com quebra.' > "$fmt/formato-sem-newline.md"
+printf '# Formato: fins de linha mistos\r\n\r\nEsta linha usa CRLF.\r\nEsta usa LF.\nE esta CRLF de novo.\r\n' > "$fmt/formato-misto.md"
+unix_only=1
+case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) unix_only=0 ;; esac
+if [ "$unix_only" = 1 ]; then
+  # A link to a file outside the spec folder: a save must write the target and keep the link.
+  mkdir -p "$bl/docs"
+  printf '# Alvo do link\n\nEste arquivo é editado pelo link formato-link.md.\n' > "$bl/docs/link-alvo.md"
+  ln -s ../../../docs/link-alvo.md "$fmt/formato-link.md"
+  printf '# Formato: somente leitura\n\nSalvar tem de oferecer uma cópia.\n' > "$fmt/formato-somente-leitura.md"
+fi
 g init -q "$bl"
 g -C "$bl" add -A
 commit "2026-01-03T09:00:00Z" "$bl" "chore: initial synthetic content"
 decoy "$bl/dist/.specs/features/decoy-3-dist"
+
+# Read-only after the commit (git keeps only the executable bit); Unix only, so tests that
+# delete fixture folders keep working on Windows.
+if [ "$unix_only" = 1 ]; then chmod 444 "$fmt/formato-somente-leitura.md"; fi
 
 # --- deterministic mtimes ----------------------------------------------------------------
 find "$out" -name .git -prune -o -exec touch -t 202601101000 {} +

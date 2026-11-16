@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { t } from "../../lib/i18n";
 import { type CliOpen, commands, events } from "../../lib/ipc";
 import { useSpecView } from "../spec-view/store";
+import { guard } from "../unsaved/store";
 import { useWorkspace } from "./store";
 
 /** Applies navigation asked on the command line (CLI-01..04). */
@@ -51,7 +52,8 @@ export function useCliNavigation(): void {
     let cancelled = false;
     void events.cliOpen
       .listen((e) => {
-        applyCliOpen(e.payload.open);
+        // A navigation from the command line passes the same guard; Cancel keeps the screen.
+        guard(() => applyCliOpen(e.payload.open));
         void commands.takeCliOpen();
       })
       .then((fn) => {
@@ -59,7 +61,7 @@ export function useCliNavigation(): void {
         else unlisten = fn;
       });
     void commands.takeCliOpen().then((pending) => {
-      if (pending && !cancelled) applyCliOpen(pending);
+      if (pending && !cancelled) guard(() => applyCliOpen(pending));
     });
     return () => {
       cancelled = true;

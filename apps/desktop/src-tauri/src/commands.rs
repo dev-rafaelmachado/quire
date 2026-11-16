@@ -25,14 +25,16 @@ use crate::state::AppState;
 /// Files above this size open with a warning and without syntax highlighting.
 pub const LARGE_FILE_BYTES: u64 = 2 * 1024 * 1024;
 
-#[derive(Debug, Clone, Serialize, Type)]
+/// Error of a command, or a problem shown in a view: `code` is stable and translated by the
+/// UI (DEB-02); `message` is the backend detail, in English, shown only as detail.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CmdError {
     pub code: String,
     pub message: String,
 }
 
-fn err(code: &str, message: impl ToString) -> CmdError {
+pub(crate) fn err(code: &str, message: impl ToString) -> CmdError {
     CmdError {
         code: code.to_owned(),
         message: message.to_string(),
@@ -53,6 +55,8 @@ pub struct ProjectConfigView {
     pub preset: Option<String>,
     pub alias: Option<String>,
     pub issue_url_base: Option<String>,
+    /// Checking tasks from the app (CHK-01); absent in input means off.
+    pub tasks_checkbox: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -60,13 +64,15 @@ pub struct ProjectConfigView {
 pub struct ConfigView {
     pub path: Option<String>,
     /// Why `config.toml` was ignored, if it was.
-    pub error: Option<String>,
+    pub error: Option<CmdError>,
     pub scan_paths: Vec<String>,
     pub poll_interval_ms: u32,
     pub projects: Vec<ProjectConfigView>,
     pub presets: Vec<String>,
     /// `dark`, `light` or none (dark).
     pub theme: Option<String>,
+    /// UI language as written in `config.toml`; none = the system's (DEB-10).
+    pub language: Option<String>,
     /// One entry per scan path, with the reason when it cannot be scanned (DSC-05).
     pub scan_path_status: Vec<ScanPathStatus>,
     /// Saving is possible: there is a config location and the current file is valid.
@@ -77,7 +83,7 @@ pub struct ConfigView {
 #[serde(rename_all = "camelCase")]
 pub struct ScanPathStatus {
     pub path: String,
-    pub error: Option<String>,
+    pub error: Option<CmdError>,
 }
 
 /// What the preferences screen saves (T23).
@@ -87,6 +93,7 @@ pub struct SettingsInput {
     pub scan_paths: Vec<String>,
     pub poll_interval_ms: u32,
     pub theme: Option<String>,
+    pub language: Option<String>,
     pub projects: Vec<ProjectConfigView>,
 }
 
@@ -112,10 +119,12 @@ fn config_view(state: &AppState) -> ConfigView {
                 preset: p.preset.clone(),
                 alias: p.alias.clone(),
                 issue_url_base: p.issue_url_base.clone(),
+                tasks_checkbox: Some(p.tasks_checkbox),
             })
             .collect(),
         presets: config.preset_names().map(str::to_owned).collect(),
         theme: config.theme.map(|t| t.as_str().to_owned()),
+        language: config.language.clone(),
         scan_path_status: config
             .scan_paths
             .iter()
@@ -123,7 +132,7 @@ fn config_view(state: &AppState) -> ConfigView {
                 path: p.display().to_string(),
                 error: quire_core::scan::check_scan_path(p)
                     .err()
-                    .map(|e| e.to_string()),
+                    .map(|e| err(e.code(), e)),
             })
             .collect(),
         editable: state.config_path.is_some() && state.config_error.is_none(),
@@ -147,9 +156,10 @@ pub async fn set_config<R: Runtime>(
 ) -> Result<ConfigView, CmdError> {
     use quire_core::config::{ProjectConfig, Settings, Theme, save_settings};
     if let Some(e) = &state.config_error {
+        // Same code as the reason it is not editable, so the UI says what to fix.
         return Err(err(
-            "config_invalid",
-            format!("fix config.toml by hand first: {e}"),
+            &e.code,
+            format!("fix this first, by hand: {}", e.message),
         ));
     }
     let path = state
@@ -158,7 +168,7 @@ pub async fn set_config<R: Runtime>(
         .ok_or_else(|| err("no_config_dir", "no configuration directory"))?;
     if !(500..=60_000).contains(&settings.poll_interval_ms) {
         return Err(err(
-            "invalid",
+            "poll_interval_range",
             "the polling interval must be between 0.5 and 60 seconds",
         ));
     }
@@ -166,9 +176,14 @@ pub async fn set_config<R: Runtime>(
         None => None,
         Some("dark") => Some(Theme::Dark),
         Some("light") => Some(Theme::Light),
-        Some(other) => return Err(err("invalid", format!("unknown theme {other}"))),
+        Some(other) => return Err(err("unknown_theme", format!("unknown theme {other}"))),
     };
     let clean = |v: Option<String>| v.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
+    let current = state
+        .config
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
     let next = Settings {
         scan_paths: settings
             .scan_paths
@@ -178,6 +193,7 @@ pub async fn set_config<R: Runtime>(
             .collect(),
         poll_interval_ms: u64::from(settings.poll_interval_ms),
         theme,
+        language: clean(settings.language),
         projects: settings
             .projects
             .into_iter()
@@ -186,12 +202,19 @@ pub async fn set_config<R: Runtime>(
                     preset: clean(p.preset),
                     alias: clean(p.alias),
                     issue_url_base: clean(p.issue_url_base),
+                    // Not sent: keep what config.toml has (an older UI must not turn it off).
+                    tasks_checkbox: p.tasks_checkbox.unwrap_or_else(|| {
+                        current
+                            .projects
+                            .get(&p.name)
+                            .is_some_and(|c| c.tasks_checkbox)
+                    }),
                 };
                 (p.name, config)
             })
             .collect(),
     };
-    let config = save_settings(&path, &next).map_err(|e| err("invalid", e))?;
+    let config = save_settings(&path, &next).map_err(|e| err(e.code(), &e))?;
     *state
         .config
         .write()
@@ -264,6 +287,7 @@ pub(crate) fn run_scan<R: Runtime>(app: &AppHandle<R>) {
                 IndexEvent::PathError { path, error } => {
                     progress.errors.push(ScanPathError {
                         path: path.display().to_string(),
+                        code: error.code().to_owned(),
                         message: error.to_string(),
                     });
                     let _ = progress.emit(app);
@@ -472,7 +496,7 @@ pub async fn get_spec(
     })
 }
 
-fn instance(state: &AppState, instance_id: u32) -> Result<InstanceInfo, CmdError> {
+pub(crate) fn instance(state: &AppState, instance_id: u32) -> Result<InstanceInfo, CmdError> {
     lock(&state.index)
         .instance_info(id(instance_id))
         .map_err(|e| err("index", e))?
@@ -481,7 +505,7 @@ fn instance(state: &AppState, instance_id: u32) -> Result<InstanceInfo, CmdError
 
 /// Reads a file of an instance. Only names recorded for that instance are accepted, so no
 /// path can escape the spec folder.
-fn read_known(info: &InstanceInfo, name: &str) -> Result<Option<Vec<u8>>, CmdError> {
+pub(crate) fn read_known(info: &InstanceInfo, name: &str) -> Result<Option<Vec<u8>>, CmdError> {
     if !info.files.iter().any(|f| f.0 == name) || Path::new(name).components().count() != 1 {
         return Err(err(
             "not_found",
@@ -583,9 +607,16 @@ pub struct TasksView {
     pub details: Vec<TaskDetail>,
     pub done: u32,
     pub total: u32,
+    /// Fingerprint token of the `tasks.md` this view was built from: the base of a checkbox
+    /// write (CHK-03).
+    pub fingerprint: Option<String>,
+    /// The project opted in to checking tasks from the app (CHK-01).
+    pub checkbox: bool,
+    /// Why the checkboxes are disabled even though the project opted in (SAV-11).
+    pub locked: Option<CmdError>,
 }
 
-/// `tasks.md` by phase (TSK-01..04). Read-only (TSK-05).
+/// `tasks.md` by phase (TSK-01..04).
 #[tauri::command]
 #[specta::specta]
 pub async fn get_tasks(
@@ -593,21 +624,52 @@ pub async fn get_tasks(
     instance_id: u32,
 ) -> Result<TasksView, CmdError> {
     let info = instance(&state, instance_id)?;
+    tasks_view(&state, &info)
+}
+
+/// The tasks view of an instance, read from disk now.
+pub(crate) fn tasks_view(state: &AppState, info: &InstanceInfo) -> Result<TasksView, CmdError> {
+    let bytes = match info.files.iter().any(|f| f.0 == "tasks.md") {
+        true => read_known(info, "tasks.md")?,
+        false => None,
+    };
+    Ok(tasks_view_of(state, info, bytes.as_deref()))
+}
+
+/// The tasks view of `bytes` as the `tasks.md` of `info` (also used right after a write, so
+/// progress updates without waiting for the watcher, PRG-01).
+pub(crate) fn tasks_view_of(
+    state: &AppState,
+    info: &InstanceInfo,
+    bytes: Option<&[u8]>,
+) -> TasksView {
     let config = state
         .config
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let preset = config.preset_for(&info.project_name);
-    let text = match info.files.iter().any(|f| f.0 == "tasks.md") {
-        true => read_known(&info, "tasks.md")?.map(|b| String::from_utf8_lossy(&b).into_owned()),
-        false => None,
-    };
+    let checkbox = config
+        .projects
+        .get(&info.project_name)
+        .is_some_and(|p| p.tasks_checkbox);
+    let fingerprint = bytes.map(|b| quire_core::fingerprint::Fingerprint::of_bytes(b).token());
+    let class = quire_core::fs_kind::classify(&info.path.join("tasks.md"));
+    let locked = (checkbox && !quire_core::fs_kind::writable(class)).then(|| {
+        err(
+            "write_unreliable_fs",
+            format!(
+                "writes are disabled on this file system ({})",
+                class.as_str()
+            ),
+        )
+    });
+    let text = bytes.map(|b| String::from_utf8_lossy(b).into_owned());
     let doc = match (preset.tasks, text) {
         (TasksGrammar::Phases, Some(t)) => parse::tasks(&t, preset.id_pattern.as_ref()),
         _ => parse::TasksDoc::default(),
     };
     let (done, total) = doc.progress();
-    Ok(TasksView {
+    TasksView {
         structured: !doc.is_empty(),
         phases: doc
             .phases
@@ -622,7 +684,10 @@ pub async fn get_tasks(
         details: doc.details,
         done: u32::try_from(done).unwrap_or(u32::MAX),
         total: u32::try_from(total).unwrap_or(u32::MAX),
-    })
+        fingerprint,
+        checkbox,
+        locked,
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Type)]

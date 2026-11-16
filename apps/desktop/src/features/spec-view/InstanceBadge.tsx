@@ -1,9 +1,11 @@
+import { devParam } from "../../lib/devParams";
 import { GitBranch, Layers } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../../lib/i18n";
 import type { InstanceSummary, SpecDetail } from "../../lib/ipc";
 import { Button, Chip, cx } from "../../ui";
 import { ago, displayed, shortInstancePath, worktreeName } from "./labels";
+import { guard } from "../unsaved/store";
 import { useSpecView } from "./store";
 
 type State = "open" | "diverges" | "identical";
@@ -85,7 +87,7 @@ function Popover({ detail, onClose }: { detail: SpecDetail; onClose: () => void 
           disabled={picked === shown.id}
           onClick={() => {
             onClose();
-            void switchInstance(picked);
+            guard(() => switchInstance(picked));
           }}
         >
           {t("instances.openThis")}
@@ -100,7 +102,7 @@ function Popover({ detail, onClose }: { detail: SpecDetail; onClose: () => void 
 export function InstanceBadge() {
   const detail = useSpecView((s) => s.detail);
   // `?picker` opens the switcher on first render (screenshots and demos).
-  const [open, setOpen] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("picker"));
+  const [open, setOpen] = useState(() => devParam("picker") !== null);
   const instance = detail ? displayed(detail) : undefined;
   if (!detail || !instance) return null;
   const branch = instance.branch ?? t("specView.detached");

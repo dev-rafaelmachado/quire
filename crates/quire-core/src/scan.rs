@@ -226,8 +226,16 @@ pub fn list_files(dir: &Path) -> Vec<String> {
         .into_iter()
         .flatten()
         .flatten()
-        .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+        // Files, and links to files (a save writes the target and keeps the link, SAV-05);
+        // a broken link is not a file of the spec.
+        .filter(|e| {
+            e.file_type().is_ok_and(|t| t.is_file())
+                || (e.file_type().is_ok_and(|t| t.is_symlink())
+                    && fs::metadata(e.path()).is_ok_and(|m| m.is_file()))
+        })
         .filter_map(|e| e.file_name().into_string().ok())
+        // Temporary files of the write pipeline are not files of the spec (SAV-10).
+        .filter(|n| !crate::write::is_quire_temp(n))
         .collect();
     files.sort();
     files

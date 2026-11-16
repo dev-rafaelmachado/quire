@@ -86,7 +86,7 @@ describe("spec view", () => {
     const { rerender } = render(<FileView content={file({ name: "img.png", kind: "binary", text: null })} doc={null} collapsed={new Set()} onToggle={() => {}} />);
     expect(screen.getByText(/img\.png é binário/)).toBeTruthy();
     rerender(<FileView content={file({ kind: "json", text: "{}", size: 3 * 1024 * 1024, large: true })} doc={null} collapsed={new Set()} onToggle={() => {}} />);
-    expect(screen.getByRole("status").textContent).toContain("3.0 MB");
+    expect(screen.getByRole("status").textContent).toContain("3,0 MB");
   });
 
   it("shows branch and worktree of the displayed instance (DUP-06)", () => {

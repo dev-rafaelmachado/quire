@@ -3,7 +3,7 @@ import { type Components, toJsxRuntime } from "hast-util-to-jsx-runtime";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { type MouseEvent, type ReactNode, memo, useMemo } from "react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
-import { t } from "../i18n";
+import { t, useLocale } from "../i18n";
 import { commands } from "../ipc";
 import { CodeBlock, MermaidBlock } from "./CodeBlock";
 import { codeOf, type Doc, type Section } from "./pipeline";
@@ -72,6 +72,7 @@ const SectionView = memo(function SectionView({
   onToggle: (id: string) => void;
   plain: boolean;
 }) {
+  useLocale((s) => s.locale); // memo would otherwise keep the labels of the old language
   const closed = collapsed.has(section.id);
   const heading = useMemo(() => render(section.heading.children as RootContent[], plain), [section, plain]);
   const body = useMemo(() => render(section.body, plain), [section, plain]);
@@ -91,7 +92,7 @@ const SectionView = memo(function SectionView({
     ) : null;
   return (
     <section className="md-section" data-collapsed={closed || undefined}>
-      <Tag id={section.id} className="md-heading">
+      <Tag id={section.id} className="md-heading" data-line={section.heading.properties["dataLine"] as number | undefined}>
         {toggle}
         {heading}
       </Tag>

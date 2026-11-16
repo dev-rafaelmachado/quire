@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { asCmdError, commands, type GatesView, type LessonsView } from "../../lib/ipc";
+import { asCmdError, type CmdError, commands, type GatesView, type LessonsView } from "../../lib/ipc";
 
 export type LevelFilter = "all" | "fase" | "final" | "e2e";
 export type StatusFilter = "all" | "pass" | "fail";
@@ -12,7 +12,7 @@ interface LogsState {
   status: StatusFilter;
   /** Index (in `gates.runs`) of expanded failed runs. */
   open: ReadonlySet<number>;
-  error: string | null;
+  error: CmdError | null;
   load: (instanceId: number, files: { gates: boolean; lessons: boolean }) => Promise<void>;
   /** Re-reads after a change on disk, keeping filters and expanded runs. */
   reload: () => Promise<void>;
@@ -42,7 +42,7 @@ export const useLogs = create<LogsState>((set, get) => ({
       const open = new Set((gates?.runs ?? []).flatMap((r, i) => (isFail(r) ? [i] : [])).slice(0, 1));
       set({ gates, lessons, open });
     } catch (e) {
-      set({ error: asCmdError(e).message });
+      set({ error: asCmdError(e) });
     }
   },
   reload: async () => {

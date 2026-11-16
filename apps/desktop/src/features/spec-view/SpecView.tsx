@@ -1,13 +1,22 @@
 import { useEffect, useRef } from "react";
 import { t } from "../../lib/i18n";
 import { Outline } from "../../lib/markdown/Outline";
-import { cx } from "../../ui";
+import { cx, ErrorText } from "../../ui";
 import { GatesPanel } from "../logs-view/GatesPanel";
 import { LessonsAside, LessonsPanel } from "../logs-view/Lessons";
 import { useLogs } from "../logs-view/store";
 import { TaskDetailPanel } from "../tasks-view/TaskDetailPanel";
 import { TasksPanel } from "../tasks-view/TasksPanel";
 import { useTasks } from "../tasks-view/store";
+import { EditBar } from "../editor/EditBar";
+import { SplitView } from "../editor/SplitView";
+import { useEditor } from "../editor/store";
+import { guard } from "../unsaved/store";
+import { clearHighlights, highlightTerms } from "../search/highlight";
+import { useSearch } from "../search/store";
+import { DiskNotice } from "../conflict/DiskNotice";
+import { GoneNotice } from "../conflict/GoneNotice";
+import { OrphanNotice } from "../conflict/OrphanNotice";
 import { FileView } from "./FileView";
 import { displayed } from "./labels";
 import { MetaStrip } from "./MetaStrip";
@@ -27,7 +36,7 @@ function OthersBar() {
           key={name}
           type="button"
           aria-pressed={name === file}
-          onClick={() => void show(name)}
+          onClick={() => guard(() => show(name))}
           className={cx(
             "h-6 rounded-[var(--radius-md)] px-2 font-code text-xs",
             name === file ? "bg-acc-bg text-acc" : "bg-raise text-muted hover:text-text",
@@ -54,7 +63,13 @@ export function SpecView() {
   const setActive = useSpecView((s) => s.setActive);
   const scrollRequest = useSpecView((s) => s.scrollRequest);
   const error = useSpecView((s) => s.error);
+  const navigate = useSpecView((s) => s.navigate);
+  const file = useSpecView((s) => s.file);
   const scroller = useRef<HTMLDivElement>(null);
+  const mode = useEditor((s) => s.mode);
+  const buffer = useEditor((s) => s.buffer);
+  const dirty = useEditor((s) => s.dirty);
+  const unsaved = dirty && buffer ? buffer.name : null;
 
   // Active section: the last heading whose top has passed the top of the scroll area (VIW-05).
   useEffect(() => {
@@ -87,6 +102,43 @@ export function SpecView() {
     document.getElementById(active)?.scrollIntoView({ block: "start" });
   }, [scrollRequest, active]);
 
+  // A search result: scroll to its section and highlight the terms (SRC-06).
+  const pendingLine = useSpecView((s) => s.pendingLine);
+  const terms = useSearch((s) => s.terms);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || !doc) return;
+    if (terms.length > 0) highlightTerms(el, terms);
+    if (pendingLine === null) return;
+    const target = [...el.querySelectorAll<HTMLElement>(".md [data-line]")]
+      .filter((n) => Number(n.dataset["line"]) <= pendingLine)
+      .at(-1);
+    const heading = target?.closest("section")?.querySelector<HTMLElement>(".md-heading[id]") ?? (target?.matches(".md-heading[id]") ? target : null);
+    useSpecView.getState().requestLine(null);
+    if (heading?.id) navigate(heading.id);
+    else target?.scrollIntoView({ block: "start" });
+  }, [doc, pendingLine, terms, navigate]);
+  useEffect(() => () => clearHighlights(), []);
+
+  // The editor follows the file of the center column (its buffer, lock and base).
+  const editorInstance = detail ? displayed(detail)?.id : undefined;
+  useEffect(() => {
+    const editor = useEditor.getState();
+    if (editorInstance === undefined || file === null) editor.clear();
+    else void editor.load(editorInstance, file);
+  }, [editorInstance, file]);
+
+  // Ctrl+S saves in Editar and Dividir (EDT-05); in Ler it does nothing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "s") return;
+      e.preventDefault();
+      if (useEditor.getState().mode !== "read") void useEditor.getState().save();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const tasksView = useTasks((s) => s.view);
   const loadTasks = useTasks((s) => s.load);
   const instanceId = detail ? displayed(detail)?.id : undefined;
@@ -105,10 +157,28 @@ export function SpecView() {
     if (onLogs && instanceId !== undefined) void loadLogs(instanceId, { gates: hasGates, lessons: hasLessons });
   }, [onLogs, instanceId, hasGates, hasLessons, loadLogs]);
 
+  const orphans = detail && instanceId !== undefined ? <OrphanNotice instanceId={instanceId} version={detail} /> : null;
+  const tabs = detail ? <Tabs detail={detail} counts={counts} tab={tab} unsaved={unsaved} onSelect={(next) => guard(() => selectTab(next))} /> : null;
+  const editing = mode !== "read" && buffer !== null && buffer.name === file && buffer.locked === null && buffer.format !== null;
+  if (detail && editing && file !== null) {
+    return (
+      <>
+        {tabs}
+        {orphans}
+        <EditBar />
+        <GoneNotice />
+        <DiskNotice />
+        <div role="tabpanel" className="min-h-0 flex-1">
+          <SplitView key={`${buffer.instanceId}\u0000${file}`} name={file} header={detail.headerFiles.includes(file)} preview={mode === "split"} />
+        </div>
+      </>
+    );
+  }
+
   if (detail && onLogs && (tab === "gates.jsonl" ? logsGates : logsLessons)) {
     return (
       <>
-        <Tabs detail={detail} counts={counts} tab={tab} onSelect={(next) => void selectTab(next)} />
+        {tabs}
         <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
           {tab === "gates.jsonl" && logsGates ? <GatesPanel gates={logsGates} /> : null}
           {tab === "lessons.jsonl" && logsLessons ? <LessonsPanel lessons={logsLessons} /> : null}
@@ -120,7 +190,9 @@ export function SpecView() {
   if (detail && onTasks && tasksView?.structured) {
     return (
       <>
-        <Tabs detail={detail} counts={counts} tab={tab} onSelect={(next) => void selectTab(next)} />
+        {tabs}
+        {orphans}
+        <EditBar />
         <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
           <TasksPanel view={tasksView} />
         </div>
@@ -130,14 +202,16 @@ export function SpecView() {
 
   return (
     <>
-      {detail ? <Tabs detail={detail} counts={counts} tab={tab} onSelect={(next) => void selectTab(next)} /> : null}
-      {detail && tab !== OTHERS ? <MetaStrip detail={detail} /> : null}
+      {tabs}
+      {orphans}
       {tab === OTHERS ? <OthersBar /> : null}
+      {file !== null ? <EditBar /> : null}
+      {detail && tab !== OTHERS ? <MetaStrip detail={detail} /> : null}
       <div ref={scroller} role="tabpanel" className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-10 pt-9 pb-24">
           {error ? (
             <p role="alert" className="m-0 text-warn">
-              {error}
+              <ErrorText error={error} />
             </p>
           ) : null}
           {content ? <FileView content={content} doc={doc} collapsed={collapsed} onToggle={toggle} /> : null}
@@ -156,6 +230,9 @@ export function useRightColumn(): { kind: "tasks" | "lessons" | "outline" | null
   const hasOutline = useSpecView((s) => s.outline.length > 0);
   const structured = useTasks((s) => s.view?.structured ?? false);
   const lessons = useLogs((s) => s.lessons);
+  // Editar and Dividir use the whole width; the outline navigates the Ler view.
+  const editing = useEditor((s) => s.mode !== "read" && s.buffer !== null && s.buffer.locked === null);
+  if (editing) return { kind: null, width: 248 };
   if (tab === "tasks.md") return { kind: structured ? "tasks" : hasOutline ? "outline" : null, width: structured ? 320 : 248 };
   if (tab === "gates.jsonl") return { kind: lessons ? "lessons" : null, width: 320 };
   if (tab === "lessons.jsonl") return { kind: null, width: 248 };
@@ -168,7 +245,7 @@ export function SpecRight() {
   const lessons = useLogs((s) => s.lessons);
   const selectTab = useSpecView((s) => s.selectTab);
   if (kind === "tasks") return <TaskDetailPanel />;
-  if (kind === "lessons" && lessons) return <LessonsAside lessons={lessons} onOpen={() => void selectTab("lessons.jsonl")} />;
+  if (kind === "lessons" && lessons) return <LessonsAside lessons={lessons} onOpen={() => guard(() => selectTab("lessons.jsonl"))} />;
   return <SpecOutline />;
 }
 

@@ -1,8 +1,11 @@
 import { useEffect } from "react";
 import { t } from "../../lib/i18n";
 import { events, type InstanceSummary, type ProjectSummary, type SpecDetail } from "../../lib/ipc";
+import { useConflict } from "../conflict/store";
+import { useEditor } from "../editor/store";
+import { hasUnsaved } from "../unsaved/store";
 import { useLogs } from "../logs-view/store";
-import { useTasks } from "../tasks-view/store";
+import { setToggledHandler, useTasks } from "../tasks-view/store";
 import { useWorkspace } from "../workspace/store";
 import { displayed, worktreeName } from "./labels";
 import { useSpecView } from "./store";
@@ -40,6 +43,29 @@ export function reconcileSelection(
   return to ? { kind: "switch", to } : { kind: "removed" };
 }
 
+/** After the list changes: keep the open spec and copy, or fall back, or (with unsaved
+ *  changes) keep the screen and offer to carry the edits (WAT-04, INS-04). */
+export function applyListChange(projects: readonly ProjectSummary[]): void {
+  const view = useSpecView.getState();
+  const fix = reconcileSelection(projects, view.specId, view.detail);
+  // With unsaved changes the screen stays: no silent switch, the buffer is kept, and the
+  // user may take the edits to another copy (INS-04).
+  if (fix.kind !== "none" && hasUnsaved()) {
+    useConflict.getState().setGone({ to: fix.kind === "switch" ? fix.to : null });
+    return;
+  }
+  if (fix.kind === "removed") {
+    useWorkspace.getState().select(null);
+    view.setNotice(t("live.specRemoved"));
+  } else if (fix.kind === "switch") {
+    void view.switchInstance(fix.to.id).then(() =>
+      useSpecView.getState().setNotice(
+        t("live.instanceRemoved", { branch: fix.to.branch ?? t("specView.detached"), worktree: worktreeName(fix.to) }),
+      ),
+    );
+  }
+}
+
 /** Reacts to changes on disk while the app is open (WAT-01, WAT-02, WAT-04). */
 export function useLiveUpdates(): void {
   useEffect(() => {
@@ -50,6 +76,9 @@ export function useLiveUpdates(): void {
         const view = useSpecView.getState();
         if (!affects(e.payload.specDirs, view.detail)) return;
         void view.refresh();
+        // The buffer follows the TD-14 rule: its own save is ignored, an outside change reloads
+        // a clean buffer and only warns over a dirty one (CNF-04..07).
+        void useConflict.getState().onDiskChange();
         const id = view.detail ? displayed(view.detail)?.id : undefined;
         if (id !== undefined && useTasks.getState().instanceId === id) void useTasks.getState().reload();
         if (id !== undefined && useLogs.getState().instanceId === id) void useLogs.getState().reload();
@@ -58,25 +87,26 @@ export function useLiveUpdates(): void {
         if (cancelled) fn();
         else unlisten = fn;
       });
+    // A checkbox write: the tab count and the header follow at once (CHK-05, PRG-01).
+    setToggledHandler(() => void useSpecView.getState().refresh());
+    // After the app's own save the read view and the tasks follow at once (PRG-01).
+    const unsubscribeSaves = useEditor.subscribe((state, prev) => {
+      if (state.lastSaved === prev.lastSaved) return;
+      const view = useSpecView.getState();
+      void view.refresh();
+      const id = view.detail ? displayed(view.detail)?.id : undefined;
+      if (id !== undefined && useTasks.getState().instanceId === id) void useTasks.getState().reload();
+    });
     const unsubscribe = useWorkspace.subscribe((state, prev) => {
       if (state.projects === prev.projects || !state.loaded) return;
-      const view = useSpecView.getState();
-      const fix = reconcileSelection(state.projects, view.specId, view.detail);
-      if (fix.kind === "removed") {
-        useWorkspace.getState().select(null);
-        view.setNotice(t("live.specRemoved"));
-      } else if (fix.kind === "switch") {
-        void view.switchInstance(fix.to.id).then(() =>
-          useSpecView.getState().setNotice(
-            t("live.instanceRemoved", { branch: fix.to.branch ?? t("specView.detached"), worktree: worktreeName(fix.to) }),
-          ),
-        );
-      }
+      applyListChange(state.projects);
     });
     return () => {
       cancelled = true;
       unlisten?.();
       unsubscribe();
+      unsubscribeSaves();
+      setToggledHandler(null);
     };
   }, []);
 }

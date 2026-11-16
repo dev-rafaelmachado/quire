@@ -4,8 +4,10 @@
 mod cli;
 mod cli_delivery;
 mod commands;
+mod edit;
 mod events;
 mod live;
+mod search;
 mod state;
 
 /// Runtime the commands are compiled for: the real webview in the app, the mock one in tests.
@@ -31,6 +33,14 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
             commands::get_gates,
             commands::get_lessons,
             commands::open_external::<Rt>,
+            edit::open_for_edit,
+            edit::file_fingerprint,
+            edit::save_file::<Rt>,
+            edit::save_copy::<Rt>,
+            edit::toggle_task::<Rt>,
+            edit::orphan_temps,
+            edit::remove_orphan_temp,
+            search::search,
         ])
         .events(tauri_specta::collect_events![
             events::ScanProgress,
@@ -178,8 +188,22 @@ mod tests {
         ctx
     }
 
+    const FIXTURES_CONFIG: &str = "scan_paths = [\"ws/projects\"]\n[projects.acme_gateway]\npreset = \"exban\"\n[projects.acme_billing]\npreset = \"exban\"\n";
+
     fn app_on_fixtures(
         name: &str,
+    ) -> (
+        tauri::App<MockRuntime>,
+        WebviewWindow<MockRuntime>,
+        tempfile::TempDir,
+    ) {
+        app_on_fixtures_with(name, FIXTURES_CONFIG)
+    }
+
+    /// Fresh fixtures for this test only, with `config` as quire.toml.
+    fn app_on_fixtures_with(
+        name: &str,
+        config_text: &str,
     ) -> (
         tauri::App<MockRuntime>,
         WebviewWindow<MockRuntime>,
@@ -197,7 +221,7 @@ mod tests {
                 .success()
         );
         let cfg = tmp.path().join("quire.toml");
-        std::fs::write(&cfg, "scan_paths = [\"ws/projects\"]\n[projects.acme_gateway]\npreset = \"exban\"\n[projects.acme_billing]\npreset = \"exban\"\n").unwrap();
+        std::fs::write(&cfg, config_text).unwrap();
         let config = quire_core::Config::load(&cfg).unwrap();
         let state = state::AppState::new(
             config,
@@ -219,6 +243,728 @@ mod tests {
             .build()
             .unwrap();
         (app, webview, tmp)
+    }
+
+    fn app_with_state(
+        state: state::AppState,
+    ) -> (tauri::App<MockRuntime>, WebviewWindow<MockRuntime>) {
+        let builder = specta_builder();
+        let app = mock_builder()
+            .plugin(tauri_plugin_cli::init())
+            .manage(state)
+            .invoke_handler(builder.invoke_handler())
+            .build(context_with_cli())
+            .unwrap();
+        builder.mount_events(&app);
+        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        (app, webview)
+    }
+
+    /// The default instance of ACME-142 in the fixtures: (instance id, folder on disk).
+    fn acme_142(webview: &WebviewWindow<MockRuntime>) -> (Value, PathBuf) {
+        let list = invoke(webview, "list_projects", json!({})).unwrap();
+        let spec = list[1]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "acme-142-service-tokens")
+            .unwrap()
+            .clone();
+        let detail = invoke(webview, "get_spec", json!({ "specId": spec["id"] })).unwrap();
+        let inst = &detail["spec"]["instances"][detail["instanceIndex"].as_u64().unwrap() as usize];
+        (
+            inst["id"].clone(),
+            PathBuf::from(inst["path"].as_str().unwrap()),
+        )
+    }
+
+    fn wait_scan(app: &tauri::App<MockRuntime>) {
+        let state = app.state::<state::AppState>();
+        let t0 = Instant::now();
+        // The write starts the reconciliation before returning; wait until it is done.
+        while state.scanning.load(std::sync::atomic::Ordering::SeqCst) {
+            assert!(
+                t0.elapsed() < Duration::from_secs(60),
+                "scan did not finish"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    #[test]
+    fn write_commands_over_ipc() {
+        let (app, webview, _tmp) = app_on_fixtures("write");
+        scan_and_wait(&app, &webview);
+        let (instance_id, dir) = acme_142(&webview);
+        let spec_path = dir.join("spec.md");
+        let original = std::fs::read(&spec_path).unwrap();
+
+        // Open: text, format and base; locks by name (EDT-08).
+        let file = invoke(
+            &webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_id, "name": "spec.md" }),
+        )
+        .unwrap();
+        assert_eq!(file["locked"], Value::Null);
+        assert_eq!(file["readOnly"], false);
+        let base = file["fingerprint"].as_str().unwrap().to_owned();
+        let format = file["format"].clone();
+        let text = file["text"].as_str().unwrap().to_owned();
+        assert_eq!(
+            quire_core::write::encode(&text, &serde_json::from_value(format.clone()).unwrap()),
+            original
+        );
+        for (name, code) in [
+            ("lessons.jsonl", "edit_jsonl"),
+            ("payload.json", "edit_not_markdown"),
+        ] {
+            let f = invoke(
+                &webview,
+                "open_for_edit",
+                json!({ "instanceId": instance_id, "name": name }),
+            )
+            .unwrap();
+            assert_eq!(f["locked"]["code"], code, "{name}");
+        }
+
+        // Save with the right base: written, new base returned.
+        let edited = format!("{text}\nLinha nova.\n");
+        let saved = invoke(
+            &webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": edited, "format": format,
+            "base": base, "confirmMixed": false } }),
+        )
+        .unwrap();
+        let disk = std::fs::read(&spec_path).unwrap();
+        assert_eq!(
+            disk,
+            quire_core::write::encode(&edited, &serde_json::from_value(format.clone()).unwrap())
+        );
+        let new_base = saved["fingerprint"].as_str().unwrap().to_owned();
+        assert_eq!(
+            invoke(
+                &webview,
+                "file_fingerprint",
+                json!({ "instanceId": instance_id, "name": "spec.md" })
+            )
+            .unwrap(),
+            json!(new_base)
+        );
+        wait_scan(&app);
+
+        // The old base is a conflict now; the disk keeps what is there.
+        let stale = invoke(
+            &webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": "mine", "format": format,
+            "base": base, "confirmMixed": false } }),
+        );
+        assert_eq!(stale.unwrap_err()["code"], "write_conflict");
+        assert_eq!(std::fs::read(&spec_path).unwrap(), disk);
+
+        // Names outside the Markdown files of the folder are refused by the shell (SAV-09).
+        for name in [
+            "lessons.jsonl",
+            "gates.jsonl",
+            "payload.json",
+            "../spec.md",
+            "a/b.md",
+            "missing.md",
+        ] {
+            let r = invoke(
+                &webview,
+                "save_file",
+                json!({ "input": {
+                "instanceId": instance_id, "name": name, "text": "x", "format": format,
+                "base": new_base, "confirmMixed": false } }),
+            );
+            assert_eq!(r.unwrap_err()["code"], "write_refused", "{name}");
+        }
+
+        // Mixed line endings need the confirmation (SAV-03).
+        let mut mixed = format.clone();
+        mixed["mixed"] = json!(true);
+        let r = invoke(
+            &webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": "x", "format": mixed,
+            "base": new_base, "confirmMixed": false } }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "write_mixed_eol");
+        assert_eq!(std::fs::read(&spec_path).unwrap(), disk);
+
+        // Copy: a new file, the original untouched (CNF-08).
+        let copy = invoke(
+            &webview,
+            "save_copy",
+            json!({ "instanceId": instance_id, "name": "spec.md",
+            "text": "buffer", "format": format, "stamp": "20261116-120000" }),
+        )
+        .unwrap();
+        assert_eq!(copy["name"], "spec.conflito-20261116-120000.md");
+        assert_eq!(
+            std::fs::read(dir.join("spec.conflito-20261116-120000.md")).unwrap(),
+            b"buffer"
+        );
+        assert_eq!(std::fs::read(&spec_path).unwrap(), disk);
+        wait_scan(&app);
+
+        // Checkbox writes are refused while the project has not opted in (CHK-01).
+        let tasks = invoke(&webview, "get_tasks", json!({ "instanceId": instance_id })).unwrap();
+        assert_eq!(tasks["checkbox"], false);
+        let r = invoke(
+            &webview,
+            "toggle_task",
+            json!({ "instanceId": instance_id, "taskId": "T8",
+            "line": 1, "done": false, "base": tasks["fingerprint"] }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "checkbox_off");
+
+        // Orphan temps: listed on request, never in the file list, removed only by name (SAV-10).
+        let orphan = quire_core::write::temp_name("spec.md", 4242, 1);
+        std::fs::write(dir.join(&orphan), b"partial").unwrap();
+        assert_eq!(
+            invoke(
+                &webview,
+                "orphan_temps",
+                json!({ "instanceId": instance_id })
+            )
+            .unwrap(),
+            json!([orphan])
+        );
+        scan_and_wait(&app, &webview);
+        let (instance_id, _) = acme_142(&webview);
+        let detail_files = invoke(&webview, "get_spec", json!({ "specId": invoke(&webview, "list_projects", json!({})).unwrap()[1]["specs"].as_array().unwrap().iter().find(|s| s["folder"] == "acme-142-service-tokens").unwrap()["id"] })).unwrap();
+        assert!(
+            !detail_files["others"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|o| o.as_str().unwrap().ends_with(".tmp")),
+            "{detail_files}"
+        );
+        invoke(
+            &webview,
+            "remove_orphan_temp",
+            json!({ "instanceId": instance_id, "name": orphan }),
+        )
+        .unwrap();
+        assert!(!dir.join(&orphan).exists());
+        let r = invoke(
+            &webview,
+            "remove_orphan_temp",
+            json!({ "instanceId": instance_id, "name": "spec.md" }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "write_refused");
+        assert!(spec_path.exists());
+    }
+
+    #[test]
+    fn a_save_settles_without_a_reload_cycle() {
+        // T19 / TD-14: the app's own write is reconciled (by the write itself and maybe once
+        // more by the watcher, merged when they overlap), and then everything stays quiet.
+        use tauri::Listener;
+        let (app, webview, _tmp) = app_on_fixtures("no-cycle");
+        scan_and_wait(&app, &webview);
+        let (instance_id, dir) = acme_142(&webview);
+        // Let the watcher start and the first events of the scan pass.
+        std::thread::sleep(Duration::from_millis(800));
+        wait_scan(&app);
+        let changed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = changed.clone();
+        app.listen("spec://changed", move |_| {
+            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        });
+        let state = app.state::<state::AppState>();
+        let runs = |s: &state::AppState| s.live.runs.load(std::sync::atomic::Ordering::SeqCst);
+        let before = runs(&state);
+        let file = invoke(
+            &webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_id, "name": "spec.md" }),
+        )
+        .unwrap();
+        let text = format!("{}\nOutra linha.\n", file["text"].as_str().unwrap());
+        invoke(
+            &webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": text, "format": file["format"],
+            "base": file["fingerprint"], "confirmMixed": false } }),
+        )
+        .unwrap();
+        std::thread::sleep(Duration::from_secs(3));
+        wait_scan(&app);
+        let after_save = runs(&state);
+        let events = changed.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            (1..=2).contains(&(after_save - before)),
+            "{} reconciliations",
+            after_save - before
+        );
+        assert!((1..=2).contains(&events), "{events} spec://changed events");
+        // Quiet afterwards: nothing writes again, so nothing reconciles again.
+        std::thread::sleep(Duration::from_secs(3));
+        assert_eq!(
+            runs(&state),
+            after_save,
+            "reconciliation cycle after a save"
+        );
+        assert_eq!(changed.load(std::sync::atomic::Ordering::SeqCst), events);
+        assert!(
+            std::fs::read_to_string(dir.join("spec.md"))
+                .unwrap()
+                .ends_with("Outra linha.\n")
+        );
+    }
+
+    #[test]
+    fn saving_one_identical_copy_makes_the_versions_badge_appear() {
+        // INS-03: ACME-142 has identical copies in the fixtures (three: main, the acme-142
+        // worktree and the acme-170 one); a save in one of them makes them diverge, and the
+        // badge appears within 2 s with the number of copies, as in DUP-03 of v0.1.
+        let (app, webview, _tmp) = app_on_fixtures("versions");
+        scan_and_wait(&app, &webview);
+        let spec_of = |w: &WebviewWindow<MockRuntime>| -> Value {
+            let list = invoke(w, "list_projects", json!({})).unwrap();
+            list[1]["specs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|s| s["folder"] == "acme-142-service-tokens")
+                .unwrap()
+                .clone()
+        };
+        let before = spec_of(&webview);
+        assert_eq!(before["versionsBadge"], Value::Null, "{before}");
+        assert!(before["instances"].as_array().unwrap().len() >= 2);
+        let (instance_id, _) = acme_142(&webview);
+        let file = invoke(
+            &webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_id, "name": "spec.md" }),
+        )
+        .unwrap();
+        let t0 = Instant::now();
+        invoke(&webview, "save_file", json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": format!("{}\nSó nesta cópia.\n", file["text"].as_str().unwrap()),
+            "format": file["format"], "base": file["fingerprint"], "confirmMixed": false } })).unwrap();
+        wait_scan(&app);
+        let after = spec_of(&webview);
+        let copies = after["instances"].as_array().unwrap().len();
+        assert_eq!(after["versionsBadge"], json!(copies), "{after}");
+        let detail = invoke(
+            &webview,
+            "get_spec",
+            json!({ "specId": after["id"], "instanceId": instance_id }),
+        )
+        .unwrap();
+        assert_eq!(detail["spec"]["versionsBadge"], json!(copies));
+        assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
+    }
+
+    #[test]
+    fn search_groups_by_spec_and_shows_identical_copies_once() {
+        // SRC-04..06 over IPC, on fixtures generated for this test.
+        let (app, webview, _tmp) = app_on_fixtures("search");
+        scan_and_wait(&app, &webview);
+        let found = invoke(&webview, "search", json!({ "input": { "text": "Tokens de serviço para integrações", "projectId": null, "file": "spec.md", "specId": null } })).unwrap();
+        let groups = found["groups"].as_array().unwrap();
+        let g142: Vec<&Value> = groups
+            .iter()
+            .filter(|g| g["folder"] == "acme-142-service-tokens")
+            .collect();
+        assert_eq!(g142.len(), 1, "{found}");
+        // Three identical copies hold the title section: listed once.
+        let title_hits: Vec<&Value> = g142[0]["hits"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|h| h["line"] == 1)
+            .collect();
+        assert_eq!(title_hits.len(), 1, "{found}");
+        assert_eq!(
+            found["terms"],
+            json!(["Tokens", "de", "serviço", "para", "integrações"])
+        );
+
+        // A text only in the divergent copy (acme-170 worktree) points to that copy.
+        let only_there = invoke(&webview, "search", json!({ "input": { "text": "2b3c4d5", "projectId": null, "file": null, "specId": null } })).unwrap();
+        let hit = &only_there["groups"][0]["hits"][0];
+        let list = invoke(&webview, "list_projects", json!({})).unwrap();
+        let s170 = list[1]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "acme-170-rate-limit")
+            .unwrap()
+            .clone();
+        let holder = s170["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == hit["instanceId"])
+            .unwrap();
+        assert!(
+            holder["path"]
+                .as_str()
+                .unwrap()
+                .replace('\\', "/")
+                .contains("external/acme-170"),
+            "{only_there}"
+        );
+        assert!(
+            hit["snippet"]
+                .as_str()
+                .unwrap()
+                .contains("\u{2}2b3c4d5\u{3}"),
+            "{only_there}"
+        );
+
+        // Scope to one spec and FTS syntax typed as text.
+        let scoped = invoke(&webview, "search", json!({ "input": { "text": "tarefa", "projectId": null, "file": null, "specId": s170["id"] } })).unwrap();
+        assert!(
+            scoped["groups"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|g| g["specId"] == s170["id"])
+        );
+        for text in ["\"", "AND", "NEAR(", "a:b", ""] {
+            assert!(invoke(&webview, "search", json!({ "input": { "text": text, "projectId": null, "file": null, "specId": null } })).is_ok(), "{text}");
+        }
+    }
+
+    /// The default instance of bill-40-refunds (the text format cases of T26).
+    fn bill_40(webview: &WebviewWindow<MockRuntime>) -> (Value, PathBuf) {
+        let list = invoke(webview, "list_projects", json!({})).unwrap();
+        let spec = list[0]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "bill-40-refunds")
+            .unwrap()
+            .clone();
+        let inst = &spec["instances"][spec["defaultIndex"].as_u64().unwrap() as usize];
+        (
+            inst["id"].clone(),
+            PathBuf::from(inst["path"].as_str().unwrap()),
+        )
+    }
+
+    /// Opens `name`, appends a line through the editor's text and saves; returns the bytes
+    /// before and after.
+    fn append_and_save(
+        webview: &WebviewWindow<MockRuntime>,
+        instance_id: &Value,
+        dir: &Path,
+        name: &str,
+        confirm_mixed: bool,
+    ) -> (Vec<u8>, Result<Value, Value>) {
+        let before = std::fs::read(dir.join(name)).unwrap();
+        let file = invoke(
+            webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_id, "name": name }),
+        )
+        .unwrap();
+        let text = file["text"].as_str().unwrap();
+        let edited = if text.ends_with('\n') {
+            format!("{text}Linha nova.\n")
+        } else {
+            format!("{text}\nLinha nova.")
+        };
+        let r = invoke(
+            webview,
+            "save_file",
+            json!({ "input": {
+            "instanceId": instance_id, "name": name, "text": edited, "format": file["format"],
+            "base": file["fingerprint"], "confirmMixed": confirm_mixed } }),
+        );
+        (before, r)
+    }
+
+    #[test]
+    fn text_formats_survive_a_save_byte_for_byte() {
+        // T26 fixtures, through the IPC: BOM + CRLF, no final newline, mixed line endings.
+        let (app, webview, _tmp) = app_on_fixtures("formats");
+        scan_and_wait(&app, &webview);
+        let (id, dir) = bill_40(&webview);
+
+        let (before, r) = append_and_save(&webview, &id, &dir, "formato-crlf-bom.md", false);
+        r.unwrap();
+        let mut expected = before.clone();
+        expected.extend_from_slice(b"Linha nova.\r\n");
+        assert_eq!(
+            std::fs::read(dir.join("formato-crlf-bom.md")).unwrap(),
+            expected
+        );
+
+        let (before, r) = append_and_save(&webview, &id, &dir, "formato-sem-newline.md", false);
+        r.unwrap();
+        let mut expected = before.clone();
+        expected.extend_from_slice(b"\nLinha nova.");
+        assert_eq!(
+            std::fs::read(dir.join("formato-sem-newline.md")).unwrap(),
+            expected
+        );
+
+        // Mixed: refused until confirmed, then normalized to the most used (CRLF here).
+        let (before, r) = append_and_save(&webview, &id, &dir, "formato-misto.md", false);
+        assert_eq!(r.unwrap_err()["code"], "write_mixed_eol");
+        assert_eq!(std::fs::read(dir.join("formato-misto.md")).unwrap(), before);
+        let (_, r) = append_and_save(&webview, &id, &dir, "formato-misto.md", true);
+        r.unwrap();
+        let after =
+            String::from_utf8(std::fs::read(dir.join("formato-misto.md")).unwrap()).unwrap();
+        assert!(!after.replace("\r\n", "").contains('\n'), "{after:?}");
+        assert!(after.ends_with("Linha nova.\r\n"));
+
+        #[cfg(unix)]
+        {
+            // The link stays a link and its target gets the content (SAV-05).
+            let link = dir.join("formato-link.md");
+            let target = std::fs::canonicalize(&link).unwrap();
+            let (_, r) = append_and_save(&webview, &id, &dir, "formato-link.md", false);
+            r.unwrap();
+            assert!(
+                std::fs::symlink_metadata(&link)
+                    .unwrap()
+                    .file_type()
+                    .is_symlink()
+            );
+            assert!(
+                std::fs::read_to_string(&target)
+                    .unwrap()
+                    .ends_with("Linha nova.\n")
+            );
+            // Read-only: refused, untouched, and the copy works (SAV-04).
+            let ro = dir.join("formato-somente-leitura.md");
+            let before = std::fs::read(&ro).unwrap();
+            let f = invoke(
+                &webview,
+                "open_for_edit",
+                json!({ "instanceId": id, "name": "formato-somente-leitura.md" }),
+            )
+            .unwrap();
+            assert_eq!(f["readOnly"], true);
+            let (_, r) = append_and_save(&webview, &id, &dir, "formato-somente-leitura.md", false);
+            assert_eq!(r.unwrap_err()["code"], "write_read_only");
+            assert_eq!(std::fs::read(&ro).unwrap(), before);
+            let copy = invoke(
+                &webview,
+                "save_copy",
+                json!({ "instanceId": id, "name": "formato-somente-leitura.md",
+                "text": "cópia", "format": f["format"], "stamp": "20261116-150000" }),
+            )
+            .unwrap();
+            assert!(dir.join(copy["name"].as_str().unwrap()).exists());
+        }
+        // No temporary file is left anywhere in the folder.
+        assert!(
+            std::fs::read_dir(&dir).unwrap().all(|e| !e
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".tmp"))
+        );
+    }
+
+    #[test]
+    fn checkbox_and_progress_without_the_watcher() {
+        // Polling every 60 s: within this test, only the write itself can update the list.
+        let cfg = "scan_paths = [\"ws/projects\"]\npoll_interval_ms = 60000\n\n[watch]\nmode = \"poll\"\n\n[projects.acme_gateway]\npreset = \"exban\"\ntasks_checkbox = true\n\n[projects.acme_billing]\npreset = \"exban\"\n";
+        let (app, webview, _tmp) = app_on_fixtures_with("checkbox", cfg);
+        scan_and_wait(&app, &webview);
+        let (instance_id, dir) = acme_142(&webview);
+        let before = std::fs::read(dir.join("tasks.md")).unwrap();
+        let tasks = invoke(&webview, "get_tasks", json!({ "instanceId": instance_id })).unwrap();
+        assert_eq!(tasks["checkbox"], true);
+        assert_eq!(
+            (tasks["done"].as_u64(), tasks["total"].as_u64()),
+            (Some(7), Some(8))
+        );
+        let pending = tasks["phases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|p| p["tasks"].as_array().unwrap().iter())
+            .find(|t| t["done"] == false)
+            .unwrap()
+            .clone();
+
+        // A stale base is refused and nothing changes (CHK-03).
+        let r = invoke(
+            &webview,
+            "toggle_task",
+            json!({ "instanceId": instance_id, "taskId": pending["id"],
+            "line": pending["line"], "done": false, "base": "1-00000000000000000000000000000000" }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "write_conflict");
+        // The line moved: refused.
+        let r = invoke(
+            &webview,
+            "toggle_task",
+            json!({ "instanceId": instance_id, "taskId": pending["id"],
+            "line": pending["line"].as_u64().unwrap() + 1, "done": false, "base": tasks["fingerprint"] }),
+        );
+        assert_eq!(r.unwrap_err()["code"], "toggle_moved");
+        assert_eq!(std::fs::read(dir.join("tasks.md")).unwrap(), before);
+
+        let t0 = Instant::now();
+        let view = invoke(
+            &webview,
+            "toggle_task",
+            json!({ "instanceId": instance_id, "taskId": pending["id"],
+            "line": pending["line"], "done": false, "base": tasks["fingerprint"] }),
+        )
+        .unwrap();
+        assert_eq!(
+            (view["done"].as_u64(), view["total"].as_u64()),
+            (Some(8), Some(8))
+        );
+        let after = std::fs::read(dir.join("tasks.md")).unwrap();
+        assert_eq!(before.len(), after.len());
+        assert_eq!(before.iter().zip(&after).filter(|(a, b)| a != b).count(), 1);
+        // And git sees exactly one changed line in tasks.md (CHK-02).
+        let numstat = Command::new("git")
+            .args(["diff", "--numstat", "--", "tasks.md"])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&numstat.stdout)
+                .split_whitespace()
+                .take(2)
+                .collect::<Vec<_>>(),
+            ["1", "1"]
+        );
+        // The list follows from the write's own reconciliation (PRG-01, CHK-05).
+        wait_scan(&app);
+        let (instance_after, _) = acme_142(&webview);
+        let list = invoke(&webview, "list_projects", json!({})).unwrap();
+        let spec = list[1]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "acme-142-service-tokens")
+            .unwrap();
+        let inst = spec["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == instance_after)
+            .unwrap();
+        assert_eq!(inst["progress"], json!([8, 8]));
+        assert!(t0.elapsed() < Duration::from_secs(1), "{:?}", t0.elapsed());
+
+        // PRG-01 through the editor: saving tasks.md with the task unchecked again updates
+        // the list as fast, still without the watcher (60 s polling).
+        let file = invoke(
+            &webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_after, "name": "tasks.md" }),
+        )
+        .unwrap();
+        let text = file["text"].as_str().unwrap().to_owned();
+        let line = pending["line"].as_u64().unwrap() as usize;
+        let unchecked: String = text
+            .split('\n')
+            .enumerate()
+            .map(|(i, l)| {
+                if i + 1 == line {
+                    l.replacen("[x]", "[ ]", 1)
+                } else {
+                    l.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let t1 = Instant::now();
+        invoke(&webview, "save_file", json!({ "input": {
+            "instanceId": instance_after, "name": "tasks.md", "text": unchecked, "format": file["format"],
+            "base": file["fingerprint"], "confirmMixed": false } })).unwrap();
+        wait_scan(&app);
+        let list = invoke(&webview, "list_projects", json!({})).unwrap();
+        let spec = list[1]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "acme-142-service-tokens")
+            .unwrap();
+        let inst = spec["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == instance_after)
+            .unwrap();
+        assert_eq!(inst["progress"], json!([7, 8]));
+        assert!(t1.elapsed() < Duration::from_secs(1), "{:?}", t1.elapsed());
+        assert_eq!(std::fs::read(dir.join("tasks.md")).unwrap(), before);
+    }
+
+    #[test]
+    fn relative_env_paths_are_refused_and_nothing_is_written() {
+        // DEB-05, TD-21. Names unique to this test, relative to the working directory.
+        let rel_dir = format!("quire-t4-{}", std::process::id());
+        let rel_config = PathBuf::from(&rel_dir).join("quire.toml");
+        let tmp = tempfile::tempdir().unwrap();
+        let index = tmp.path().join("index.sqlite");
+
+        let state = state::AppState::from_env(
+            Some(rel_config.clone().into_os_string()),
+            Some(index.clone().into_os_string()),
+        )
+        .unwrap();
+        let (_app, webview) = app_with_state(state);
+        let view = invoke(&webview, "get_config", json!({})).unwrap();
+        assert_eq!(view["error"]["code"], "config_env_relative", "{view}");
+        assert_eq!(view["editable"], false);
+        assert_eq!(view["path"], Value::Null);
+        let saved = invoke(
+            &webview,
+            "set_config",
+            json!({ "settings": { "scanPaths": ["x"], "pollIntervalMs": 3000, "theme": null, "language": null, "projects": [] } }),
+        );
+        assert_eq!(saved.unwrap_err()["code"], "config_env_relative");
+        assert!(
+            !Path::new(&rel_dir).exists(),
+            "nothing may be created relative to the cwd"
+        );
+
+        // Index: relative, or inside a watched .specs folder, stops the start.
+        let rel_index = PathBuf::from(&rel_dir).join("index.sqlite");
+        let err = state::AppState::from_env(None, Some(rel_index.into_os_string()))
+            .err()
+            .unwrap();
+        assert!(err.contains("absolute"), "{err}");
+        let inside = tmp.path().join(".specs").join("index.sqlite");
+        let err = state::AppState::from_env(None, Some(inside.clone().into_os_string()))
+            .err()
+            .unwrap();
+        assert!(err.contains(".specs"), "{err}");
+        assert!(!Path::new(&rel_dir).exists());
+        assert!(!inside.exists() && !tmp.path().join(".specs").exists());
+
+        // Absolute paths work as before.
+        let cfg = tmp.path().join("quire.toml");
+        std::fs::write(&cfg, "scan_paths = []\n").unwrap();
+        let state = state::AppState::from_env(
+            Some(cfg.into_os_string()),
+            Some(tmp.path().join("ok.sqlite").into_os_string()),
+        )
+        .unwrap();
+        let (_app, webview) = app_with_state(state);
+        let view = invoke(&webview, "get_config", json!({})).unwrap();
+        assert_eq!(view["error"], Value::Null);
+        assert_eq!(view["editable"], true);
     }
 
     fn invoke(
@@ -395,6 +1141,73 @@ mod tests {
         cli::interpret(&app.cli().matches_from(argv).unwrap(), cwd)
     }
 
+    /// What the app prints for a command line on Linux (setup in `run`): text and exit code,
+    /// `None` when it would go on to open the window.
+    fn app_answer(app: &tauri::App<MockRuntime>, args: &[&str]) -> Option<(String, i32)> {
+        use tauri_plugin_cli::CliExt;
+        let argv = std::iter::once("quire")
+            .chain(args.iter().copied())
+            .map(String::from)
+            .collect();
+        match app.cli().matches_from(argv) {
+            Err(e) => Some((format!("quire: {e}"), 2)),
+            Ok(m) => match cli::interpret(&m, Path::new(".")) {
+                cli::CliRequest::Help(text) => Some((text, 0)),
+                cli::CliRequest::Version => {
+                    Some((format!("quire {}", app.package_info().version), 0))
+                }
+                _ => None,
+            },
+        }
+    }
+
+    #[test]
+    fn the_windows_console_helper_answers_like_the_app() {
+        // DEB-06, TD-20: same help, errors and codes as the app, from the same grammar.
+        let (app, _webview, _tmp) = app_on_fixtures("cli-parity");
+        let name = app.package_info().name.clone();
+        for args in [
+            vec!["--help"],
+            vec!["-h"],
+            vec!["open", "--help"],
+            vec!["help", "open"],
+            vec!["--bogus"],
+            vec!["open"],
+            vec!["open", "a", "b"],
+            vec![],
+            vec!["."],
+            vec!["open", "ACME-142"],
+        ] {
+            let argv: Vec<std::ffi::OsString> = std::iter::once("quire")
+                .chain(args.iter().copied())
+                .map(Into::into)
+                .collect();
+            let helper = match quire_cli::decide(&argv) {
+                quire_cli::Outcome::Print { text, code } => Some((text, code)),
+                quire_cli::Outcome::Launch(rest) => {
+                    assert_eq!(rest, argv[1..].to_vec());
+                    None
+                }
+            };
+            // The mock app may carry another package name; the helper always says `quire`.
+            let ours = app_answer(&app, &args)
+                .map(|(t, c)| (t.replace(&format!("Usage: {name}"), "Usage: quire"), c));
+            assert_eq!(helper, ours, "{args:?}");
+        }
+        // The version comes from the same tauri.conf.json.
+        let conf: Value = serde_json::from_str(
+            &std::fs::read_to_string(manifest_dir().join("tauri.conf.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            quire_cli::decide(&["quire".into(), "--version".into()]),
+            quire_cli::Outcome::Print {
+                text: format!("quire {}", conf["version"].as_str().unwrap()),
+                code: 0
+            }
+        );
+    }
+
     #[test]
     fn command_line_grammar() {
         let (app, _webview, _tmp) = app_on_fixtures("cli-grammar");
@@ -498,8 +1311,9 @@ mod tests {
         assert_eq!(saved["pollIntervalMs"], 2000);
         let status = saved["scanPathStatus"].as_array().unwrap();
         assert_eq!(status[0]["error"], Value::Null);
+        assert_eq!(status[1]["error"]["code"], "path_not_found", "{status:?}");
         assert!(
-            status[1]["error"]
+            status[1]["error"]["message"]
                 .as_str()
                 .unwrap()
                 .contains("does not exist"),
@@ -531,14 +1345,14 @@ mod tests {
             "set_config",
             json!({ "settings": { "scanPaths": [], "pollIntervalMs": 10, "theme": null, "projects": [] } }),
         );
-        assert_eq!(bad.unwrap_err()["code"], "invalid");
+        assert_eq!(bad.unwrap_err()["code"], "poll_interval_range");
         let bad_preset = invoke(
             &webview,
             "set_config",
             json!({ "settings": { "scanPaths": [], "pollIntervalMs": 3000, "theme": null,
                 "projects": [{ "name": "x", "preset": "nope", "alias": null, "issueUrlBase": null }] } }),
         );
-        assert_eq!(bad_preset.unwrap_err()["code"], "invalid");
+        assert_eq!(bad_preset.unwrap_err()["code"], "config_invalid");
         assert_eq!(
             std::fs::read_to_string(tmp.path().join("quire.toml")).unwrap(),
             text,

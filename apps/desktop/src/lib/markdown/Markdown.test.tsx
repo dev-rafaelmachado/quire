@@ -6,12 +6,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const openExternal = vi.fn(async (_url: string) => null);
 vi.mock("../ipc", () => ({ commands: { openExternal: (url: string) => openExternal(url) } }));
 vi.mock("./mermaid", () => ({
+  cachedMermaid: () => undefined,
   renderMermaid: async (code: string) => {
     if (code.includes("quebrado")) throw new Error("Parse error on line 2");
     return "<svg data-testid='diagram'></svg>";
   },
 }));
-vi.mock("./highlight", () => ({ highlight: async () => null, canHighlight: () => false }));
+vi.mock("./highlight", () => ({ highlight: async () => null, cachedHighlight: () => undefined, canHighlight: () => false }));
 
 const { Markdown } = await import("./Markdown");
 const { buildDoc, toHast } = await import("./pipeline");

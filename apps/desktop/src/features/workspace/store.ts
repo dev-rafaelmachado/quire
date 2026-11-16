@@ -1,13 +1,15 @@
+import { devParam } from "../../lib/devParams";
 import { create } from "zustand";
 import { applyConfiguredTheme } from "../../app/theme";
-import { asCmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type WatchStatus } from "../../lib/ipc";
+import { applyConfiguredLanguage } from "../../lib/i18n/locale";
+import { asCmdError, type CmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type SettingsInput, type WatchStatus } from "../../lib/ipc";
 import type { StatusFilter } from "./model";
 
 interface WorkspaceState {
   projects: ProjectSummary[];
   /** The first list (from the cache) arrived. */
   loaded: boolean;
-  error: string | null;
+  error: CmdError | null;
   config: ConfigView | null;
   scan: ScanProgress | null;
   /** File watcher state for the status bar (WAT-03). */
@@ -32,6 +34,11 @@ interface WorkspaceState {
   select: (specId: number | null) => void;
   /** Lists from the cache (fast, IDX-03), then scans in the background (DSC-04). */
   init: () => Promise<void>;
+  /** Suggestions of a preset hidden by the user, for this session only (DEB-03). */
+  dismissedSuggestions: Readonly<Record<number, true>>;
+  dismissSuggestion: (projectId: number) => void;
+  /** Writes `preset` for the project into config.toml (an explicit click, DEB-03). */
+  applyPreset: (projectName: string, preset: string) => Promise<void>;
   reload: () => Promise<void>;
   rescan: () => Promise<void>;
 }
@@ -40,8 +47,22 @@ interface WorkspaceState {
 let initRun: Promise<void> | null = null;
 // `?open=<folder>` selects that spec once it is listed (screenshots and demos, until the CLI).
 let pendingOpen: string | null =
-  typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("open");
+  devParam("open");
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** The settings to save so that only the preset of `projectName` changes. */
+export function settingsWithPreset(config: ConfigView, projectName: string, preset: string): SettingsInput {
+  const projects = config.projects.some((p) => p.name === projectName)
+    ? config.projects.map((p) => (p.name === projectName ? { ...p, preset } : p))
+    : [...config.projects, { name: projectName, preset, alias: null, issueUrlBase: null }];
+  return {
+    scanPaths: config.scanPaths,
+    pollIntervalMs: config.pollIntervalMs,
+    theme: config.theme,
+    language: config.language,
+    projects,
+  };
+}
 
 export const useWorkspace = create<WorkspaceState>((set, get) => ({
   projects: [],
@@ -55,11 +76,25 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   collapsed: {},
   selectedSpecId: null,
   // `?prefs` opens the preferences on start (screenshots and demos).
-  prefsOpen: typeof window !== "undefined" && new URLSearchParams(window.location.search).has("prefs"),
+  prefsOpen: devParam("prefs") !== null,
   setPrefsOpen: (prefsOpen) => set({ prefsOpen }),
-  setConfig: (config) => set({ config }),
+  setConfig: (config) => {
+    applyConfiguredLanguage(config.language);
+    set({ config });
+  },
   highlight: null,
   pick: null,
+  dismissedSuggestions: {},
+  dismissSuggestion: (id) => set(({ dismissedSuggestions }) => ({ dismissedSuggestions: { ...dismissedSuggestions, [id]: true } })),
+  applyPreset: async (projectName, preset) => {
+    const config = get().config;
+    if (!config?.editable) return;
+    try {
+      get().setConfig(await commands.setConfig(settingsWithPreset(config, projectName, preset)));
+    } catch (e) {
+      set({ error: asCmdError(e) });
+    }
+  },
   setHighlight: (highlight) => set({ highlight }),
   setPick: (pick) => set({ pick }),
   setText: (text) => set({ text }),
@@ -84,14 +119,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         }
       }
     } catch (e) {
-      set({ loaded: true, error: asCmdError(e).message });
+      set({ loaded: true, error: asCmdError(e) });
     }
   },
   rescan: async () => {
     try {
       await commands.startScan();
     } catch (e) {
-      set({ error: asCmdError(e).message });
+      set({ error: asCmdError(e) });
     }
   },
   init: () => {
@@ -113,9 +148,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       try {
         const config = await commands.getConfig();
         applyConfiguredTheme(config.theme);
+        applyConfiguredLanguage(config.language);
         set({ config, watch: await commands.getWatchStatus() });
       } catch (e) {
-        set({ error: asCmdError(e).message });
+        set({ error: asCmdError(e) });
       }
       await get().reload();
       await get().rescan();

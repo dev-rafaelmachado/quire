@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "externalBin": ["binaries/quire-cli"],
+    "windows": {
+      "wix": {
+        "fragmentPaths": ["wix/quire-cli.wxs"],
+        "componentRefs": ["QuireCliCmd", "QuireCliPath"]
+      }
+    }
+  }
+}

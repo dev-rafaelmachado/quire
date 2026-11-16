@@ -15,6 +15,9 @@ import type {
   PhaseView_Serialize,
   ProjectSummary_Serialize,
   ScanProgress_Serialize,
+  SearchGroup_Serialize,
+  SearchHit,
+  SearchResults_Serialize,
   SpecDetail_Serialize,
   SpecSummary_Serialize,
   TaskDetail,
@@ -23,7 +26,7 @@ import type {
 } from "./bindings";
 
 export { commands, events } from "./bindings";
-export type { CmdError, FileKind, InstanceKind, ListFilter, PhaseState, ScanPhase, WatchStatus } from "./bindings";
+export type { CmdError, Eol, FileKind, InstanceKind, ListFilter, PhaseState, ScanPhase, SettingsInput, TextFormat, WatchStatus } from "./bindings";
 export type { CliOpen_Serialize as CliOpen } from "./bindings";
 
 export type ConfigView = ConfigView_Serialize;
@@ -43,6 +46,9 @@ export type GateRun = GateRun_Serialize;
 export type LessonsView = LessonsView_Serialize;
 export type Lesson = Lesson_Serialize;
 export type ScanProgress = ScanProgress_Serialize;
+export type SearchResults = SearchResults_Serialize;
+export type SearchGroup = SearchGroup_Serialize;
+export type { SearchHit };
 
 /** Narrows a rejected command promise to the typed error the Rust side returns. */
 export function asCmdError(e: unknown): CmdError {

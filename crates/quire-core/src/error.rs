@@ -16,6 +16,16 @@ pub enum ScanError {
 }
 
 impl ScanError {
+    /// Stable code for the UI, which translates it (DEB-02).
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NotFound(_) => "path_not_found",
+            Self::NotADirectory(_) => "path_not_directory",
+            Self::PermissionDenied(_) => "path_permission_denied",
+            Self::Io { .. } => "path_io",
+        }
+    }
+
     pub(crate) fn from_io(path: PathBuf, err: &std::io::Error) -> Self {
         match err.kind() {
             std::io::ErrorKind::NotFound => Self::NotFound(path),
@@ -65,6 +75,17 @@ pub enum ConfigError {
     },
     #[error("cannot read {path}: {message}")]
     Io { path: PathBuf, message: String },
+}
+
+impl ConfigError {
+    /// Stable code for the UI, which translates it (DEB-02).
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Parse { .. } => "config_parse",
+            Self::Invalid { .. } => "config_invalid",
+            Self::Io { .. } => "config_io",
+        }
+    }
 }
 
 /// Failure of the SQLite cache. The cache is disposable: callers may delete it and rescan.

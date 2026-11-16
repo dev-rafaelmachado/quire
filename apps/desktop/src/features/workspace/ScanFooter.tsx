@@ -1,6 +1,7 @@
 import { RotateCw } from "lucide-react";
 import { t } from "../../lib/i18n";
-import { IconButton, StatusDot, type DotTone } from "../../ui";
+import { errorText } from "../../lib/i18n/errors";
+import { ErrorText, IconButton, StatusDot, type DotTone } from "../../ui";
 import { counts } from "./model";
 import { useWorkspace } from "./store";
 
@@ -31,7 +32,7 @@ export function ScanFooter() {
     label = t("scan.done");
   } else if (scan?.phase === "failed") {
     tone = "warn";
-    label = t("scan.failed", { message: scan.message ?? "" });
+    label = t("scan.failed", { message: errorText({ code: "index" }) });
   }
 
   return (
@@ -58,13 +59,16 @@ export function ScanFooter() {
       </span>
       {scan?.errors.map((e) => (
         <span key={e.path} className="pl-[15px] text-[11px] break-all text-warn">
-          {t("scan.pathError", { path: e.path, message: e.message })}
+          {t("scan.pathError", { path: e.path, message: errorText(e) })}
         </span>
       ))}
       {config?.error ? (
-        <span className="pl-[15px] text-[11px] text-warn">{t("scan.configError", { message: config.error })}</span>
+        <span className="pl-[15px] text-[11px] text-warn">
+          {t("scan.configError")}{" "}
+          <ErrorText error={config.error} />
+        </span>
       ) : null}
-      {error ? <span className="pl-[15px] text-[11px] text-warn">{error}</span> : null}
+      {error ? <ErrorText error={error} className="pl-[15px] text-[11px] text-warn" /> : null}
     </div>
   );
 }

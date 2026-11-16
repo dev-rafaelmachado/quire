@@ -25,7 +25,8 @@ use crate::parse;
 use crate::preset::{self, Preset, TasksGrammar};
 use crate::scan::{Discovery, ScanEvent, scan_with_worktrees};
 
-const SCHEMA_VERSION: i64 = 1;
+/// 2: full-text search tables (v0.2, TD-15). A cache with another version is rebuilt.
+const SCHEMA_VERSION: i64 = 2;
 const BATCH: usize = 50;
 
 const SCHEMA: &str = "
@@ -181,6 +182,10 @@ pub struct ReconcileReport {
     /// Instances skipped because every file kept its size and mtime.
     #[cfg_attr(feature = "specta", specta(type = u32))]
     pub unchanged: usize,
+    /// Sections added to the full-text index (0 when only unchanged or identical content
+    /// was seen, SRC-02).
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub fts_sections: usize,
     #[cfg_attr(feature = "specta", specta(type = u32))]
     pub removed: usize,
 }
@@ -266,10 +271,20 @@ impl Index {
                 });
             }
             conn.execute_batch(SCHEMA).map_err(sql)?;
+            conn.execute_batch(crate::search::SCHEMA).map_err(sql)?;
             conn.pragma_update(None, "user_version", SCHEMA_VERSION)
                 .map_err(sql)?;
         }
         Ok(Self { conn })
+    }
+
+    /// Full-text search (SRC-03..07): sections that match, best first, one row per instance
+    /// holding the section.
+    pub fn search(
+        &self,
+        query: &crate::search::SearchQuery,
+    ) -> Result<Vec<crate::search::SearchRow>, IndexError> {
+        crate::search::search(&self.conn, query)
     }
 
     /// Projects, specs and instances from the cache only (IDX-03).
@@ -454,8 +469,9 @@ impl Index {
         self.conn.execute_batch("BEGIN").map_err(sql)?;
         for (n, d) in discoveries.iter().enumerate() {
             match self.process(d, config, git, &mut projects) {
-                Ok(Some((id, reprocessed))) => {
+                Ok(Some((id, reprocessed, sections))) => {
                     seen.insert(id);
+                    report.fts_sections += sections;
                     if reprocessed {
                         report.reprocessed += 1;
                     } else {
@@ -478,6 +494,7 @@ impl Index {
         }
         report.removed = self.remove_unseen(&seen)?;
         self.finish_projects(&projects)?;
+        crate::search::gc(&self.conn)?;
         self.conn.execute_batch("COMMIT").map_err(sql)?;
         on_event(IndexEvent::Progress {
             processed: discoveries.len(),
@@ -486,15 +503,15 @@ impl Index {
         Ok(report)
     }
 
-    /// Upserts one folder. Returns the instance id and whether it was re-read, or `None` when
-    /// the folder has no primary file for its project's preset.
+    /// Upserts one folder. Returns the instance id, whether it was re-read and how many search
+    /// sections were added, or `None` when the folder has no primary file for its preset.
     fn process(
         &self,
         d: &Discovery,
         config: &Config,
         git: &mut GitResolver,
         projects: &mut BTreeMap<PathBuf, ProjectState>,
-    ) -> Result<Option<(i64, bool)>, IndexError> {
+    ) -> Result<Option<(i64, bool, usize)>, IndexError> {
         let identity = git.project(&d.repo_root);
         let preset = config.preset_for(&identity.name);
         if !d.files.iter().any(|f| preset.is_primary(f)) {
@@ -582,7 +599,7 @@ impl Index {
                     params![id, facts.branch, kind, d.repo_root.to_string_lossy()],
                 )
                 .map_err(sql)?;
-            return Ok(Some((id, false)));
+            return Ok(Some((id, false, 0)));
         }
 
         let (content_hash, mtime) =
@@ -630,7 +647,30 @@ impl Index {
                 ],
             )
             .map_err(sql)?;
-        Ok(Some((id, true)))
+        // Full text of the Markdown files (SRC-01, SRC-02): identical content is linked, not
+        // indexed again; the rest of the folder (JSONL, JSON, text) is never indexed (P7).
+        self.conn
+            .execute("DELETE FROM file_docs WHERE instance_id = ?1", [id])
+            .map_err(sql)?;
+        let mut sections = 0;
+        for (name, size, _) in &stats {
+            if !crate::search::indexable(name) || *size > crate::search::MAX_INDEXED_BYTES {
+                continue;
+            }
+            let Ok(bytes) = fs::read(d.spec_dir.join(name)) else {
+                continue;
+            };
+            let Ok(text) = String::from_utf8(bytes) else {
+                continue;
+            };
+            sections += crate::search::index_file(
+                &self.conn,
+                id,
+                name,
+                text.trim_start_matches('\u{feff}'),
+            )?;
+        }
+        Ok(Some((id, true, sections)))
     }
 
     fn files_match(

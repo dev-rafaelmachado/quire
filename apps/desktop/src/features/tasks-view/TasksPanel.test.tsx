@@ -21,6 +21,9 @@ const view: TasksView = {
   structured: true,
   done: 3,
   total: 5,
+  fingerprint: "1-00000000000000000000000000000000",
+  checkbox: false,
+  locked: null,
   phases: [
     { number: 1, title: "Fundações", repo: null, diagram: [["T1", "T2"]], tasks: [task("T1", true, "a1b2c3d"), task("T2", true, "79ae831,36609d2", [], "gate passou, aguardando revisão visual")], line: 1, done: 2, total: 2, state: "complete" },
     { number: 2, title: "Emissão", repo: null, diagram: [["T3", "T4"], ["T3", "T5"]], tasks: [task("T3", true, "e5f6a7b", ["TOK-01"]), task("T4", false, null, ["TOK-03"]), task("T5", false)], line: 5, done: 1, total: 3, state: "inProgress" },
@@ -61,7 +64,8 @@ describe("tasks view", () => {
     const diagram = screen.getByRole("group", { name: "Dependências da fase" });
     expect(within(diagram).getAllByText("T3")).toHaveLength(2);
     expect(screen.getByText("e5f6a7b")).toBeTruthy();
-    expect(screen.getByText("TOK-03")).toBeTruthy();
+    expect(screen.getAllByText("TOK-03").length).toBeGreaterThan(0);
+    expect(screen.getByText("Requisitos: TOK-03")).toBeTruthy();
     expect(screen.getByRole("img", { name: "próxima" })).toBeTruthy();
   });
 
