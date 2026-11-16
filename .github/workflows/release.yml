@@ -62,7 +62,9 @@ jobs:
         with:
           projectPath: apps/desktop
           tauriScript: pnpm tauri
-          args: --bundles ${{ matrix.bundles }}
+          # Windows: the console helper and its WiX fragment come from a config passed only to
+          # the bundling build (TD-20), after "Stage the console helper".
+          args: --bundles ${{ matrix.bundles }}${{ matrix.os == 'windows-latest' && format(' --config {0}/apps/desktop/src-tauri/tauri.bundle-windows.conf.json', github.workspace) || '' }}
           tagName: ${{ github.ref_name }}
           releaseName: Quire ${{ github.ref_name }}
           releaseBody: See README.md for installation and docs/e2e.md for the test script.

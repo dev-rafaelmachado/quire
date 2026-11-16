@@ -44,11 +44,14 @@ pnpm -r test
 
 CI runs the same on Linux and Windows. A release build is `pnpm --filter desktop tauri build` (a plain `cargo build --release` compiles, but the binary expects the Vite dev server).
 
-On Windows, `tauri dev` and `tauri build` also need the console helper behind the `quire` command (`crates/quire-cli`, bundled through `tauri.windows.conf.json`). Stage it first, from Git Bash:
+On Windows, the MSI also carries the console helper behind the `quire` command (`crates/quire-cli`). It is declared in `apps/desktop/src-tauri/tauri.bundle-windows.conf.json`, which is passed only to the bundling build, so `cargo check`, `clippy`, `test` and `tauri dev` work without it. To build the MSI with it, from Git Bash:
 
 ```sh
 scripts/stage-quire-cli.sh
+pnpm --filter desktop tauri build --bundles msi --config "$PWD/apps/desktop/src-tauri/tauri.bundle-windows.conf.json"
 ```
+
+Without `--config`, the MSI has no `quire` command on the `PATH`.
 
 The MSI installs `quire-cli.exe` next to `quire.exe` and `bin\quire.cmd`, and adds only that `bin` folder to the system `PATH`.
 

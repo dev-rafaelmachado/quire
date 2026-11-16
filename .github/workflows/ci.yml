@@ -127,8 +127,10 @@ jobs:
         shell: bash
         run: scripts/stage-quire-cli.sh
 
+      # The helper is declared only here (not in a tauri.windows.conf.json, which Tauri would
+      # merge into every build, cargo check included, before the helper exists).
       - name: Build the MSI
-        run: pnpm --filter desktop tauri build --bundles msi
+        run: pnpm --filter desktop tauri build --bundles msi --config "${{ github.workspace }}/apps/desktop/src-tauri/tauri.bundle-windows.conf.json"
 
       - name: Install silently and run quire from the PATH
         shell: pwsh

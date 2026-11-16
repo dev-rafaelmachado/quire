@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Builds the console helper and puts it where tauri.windows.conf.json (bundle.externalBin)
-# expects it: apps/desktop/src-tauri/binaries/quire-cli-<target triple>[.exe]. Run it from the
-# repository root before `tauri build` on Windows (TD-20). Linux and macOS bundles do not use it.
+# Builds the console helper and puts it where tauri.bundle-windows.conf.json (bundle.externalBin)
+# expects it: apps/desktop/src-tauri/binaries/quire-cli-<target triple>[.exe]. Run it before
+# `tauri build --config <absolute path to tauri.bundle-windows.conf.json>` (TD-20). That config
+# is passed only when bundling, so `cargo check`, `clippy`, `test` and `tauri dev` never need it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 triple=$(rustc -vV | sed -n 's/^host: //p')

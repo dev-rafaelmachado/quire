@@ -2,7 +2,8 @@
 <!-- The `quire` command for Windows terminals (DEB-06, TD-20): installs bin\quire.cmd, which
      calls the console helper quire-cli.exe (bundle.externalBin, next to quire.exe), and adds
      only the bin folder to the system PATH, so `quire` never resolves to the GUI quire.exe.
-     Referenced from tauri.windows.conf.json (fragmentPaths and componentRefs). -->
+     Referenced from tauri.bundle-windows.conf.json (fragmentPaths and componentRefs), which
+     is passed only to the bundling build: tauri build --config <that file>. -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <DirectoryRef Id="INSTALLDIR">
