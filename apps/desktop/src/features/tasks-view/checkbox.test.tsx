@@ -15,7 +15,7 @@ vi.mock("../../lib/ipc", () => ({
 }));
 
 const { TasksPanel } = await import("./TasksPanel");
-const { useTasks } = await import("./store");
+const { setToggledHandler, useTasks } = await import("./store");
 const { useEditor } = await import("../editor/store");
 
 const task = (id: string, done: boolean, line: number) => ({ id, title: `Tarefa ${id}`, done, commits: [], note: null, requirements: [], line });
@@ -87,5 +87,16 @@ describe("tasks.md checkbox (CHK-01..05)", () => {
     expect(getTasks).toHaveBeenCalledWith(7);
     expect(useTasks.getState().view?.fingerprint).toBe("41-bb");
     expect(toggleTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("after a write the spec view is told at once, not at the next watcher event (PRG-01)", async () => {
+    const followed = vi.fn();
+    setToggledHandler(followed);
+    toggleTask.mockResolvedValue(view({ done: 2 }));
+    renderPanel();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Marcar T2: Tarefa T2" }));
+    await waitFor(() => expect(followed).toHaveBeenCalledOnce());
+    expect(useTasks.getState().view?.done).toBe(2);
+    setToggledHandler(null);
   });
 });

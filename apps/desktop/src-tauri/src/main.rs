@@ -728,7 +728,51 @@ mod tests {
             .find(|i| i["id"] == instance_after)
             .unwrap();
         assert_eq!(inst["progress"], json!([8, 8]));
-        assert!(t0.elapsed() < Duration::from_secs(5), "{:?}", t0.elapsed());
+        assert!(t0.elapsed() < Duration::from_secs(1), "{:?}", t0.elapsed());
+
+        // PRG-01 through the editor: saving tasks.md with the task unchecked again updates
+        // the list as fast, still without the watcher (60 s polling).
+        let file = invoke(
+            &webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_after, "name": "tasks.md" }),
+        )
+        .unwrap();
+        let text = file["text"].as_str().unwrap().to_owned();
+        let line = pending["line"].as_u64().unwrap() as usize;
+        let unchecked: String = text
+            .split('\n')
+            .enumerate()
+            .map(|(i, l)| {
+                if i + 1 == line {
+                    l.replacen("[x]", "[ ]", 1)
+                } else {
+                    l.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let t1 = Instant::now();
+        invoke(&webview, "save_file", json!({ "input": {
+            "instanceId": instance_after, "name": "tasks.md", "text": unchecked, "format": file["format"],
+            "base": file["fingerprint"], "confirmMixed": false } })).unwrap();
+        wait_scan(&app);
+        let list = invoke(&webview, "list_projects", json!({})).unwrap();
+        let spec = list[1]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "acme-142-service-tokens")
+            .unwrap();
+        let inst = spec["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == instance_after)
+            .unwrap();
+        assert_eq!(inst["progress"], json!([7, 8]));
+        assert!(t1.elapsed() < Duration::from_secs(1), "{:?}", t1.elapsed());
+        assert_eq!(std::fs::read(dir.join("tasks.md")).unwrap(), before);
     }
 
     #[test]
