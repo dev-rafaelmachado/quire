@@ -12,6 +12,8 @@ import { EditBar } from "../editor/EditBar";
 import { SplitView } from "../editor/SplitView";
 import { useEditor } from "../editor/store";
 import { guard } from "../unsaved/store";
+import { clearHighlights, highlightTerms } from "../search/highlight";
+import { useSearch } from "../search/store";
 import { DiskNotice } from "../conflict/DiskNotice";
 import { GoneNotice } from "../conflict/GoneNotice";
 import { OrphanNotice } from "../conflict/OrphanNotice";
@@ -61,6 +63,7 @@ export function SpecView() {
   const setActive = useSpecView((s) => s.setActive);
   const scrollRequest = useSpecView((s) => s.scrollRequest);
   const error = useSpecView((s) => s.error);
+  const navigate = useSpecView((s) => s.navigate);
   const file = useSpecView((s) => s.file);
   const scroller = useRef<HTMLDivElement>(null);
   const mode = useEditor((s) => s.mode);
@@ -98,6 +101,24 @@ export function SpecView() {
     if (!scrollRequest || !active) return;
     document.getElementById(active)?.scrollIntoView({ block: "start" });
   }, [scrollRequest, active]);
+
+  // A search result: scroll to its section and highlight the terms (SRC-06).
+  const pendingLine = useSpecView((s) => s.pendingLine);
+  const terms = useSearch((s) => s.terms);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || !doc) return;
+    if (terms.length > 0) highlightTerms(el, terms);
+    if (pendingLine === null) return;
+    const target = [...el.querySelectorAll<HTMLElement>(".md [data-line]")]
+      .filter((n) => Number(n.dataset["line"]) <= pendingLine)
+      .at(-1);
+    const heading = target?.closest("section")?.querySelector<HTMLElement>(".md-heading[id]") ?? (target?.matches(".md-heading[id]") ? target : null);
+    useSpecView.getState().requestLine(null);
+    if (heading?.id) navigate(heading.id);
+    else target?.scrollIntoView({ block: "start" });
+  }, [doc, pendingLine, terms, navigate]);
+  useEffect(() => () => clearHighlights(), []);
 
   // The editor follows the file of the center column (its buffer, lock and base).
   const editorInstance = detail ? displayed(detail)?.id : undefined;

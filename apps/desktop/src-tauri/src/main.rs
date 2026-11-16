@@ -7,6 +7,7 @@ mod commands;
 mod edit;
 mod events;
 mod live;
+mod search;
 mod state;
 
 /// Runtime the commands are compiled for: the real webview in the app, the mock one in tests.
@@ -39,6 +40,7 @@ fn specta_builder() -> tauri_specta::Builder<Rt> {
             edit::toggle_task::<Rt>,
             edit::orphan_temps,
             edit::remove_orphan_temp,
+            search::search,
         ])
         .events(tauri_specta::collect_events![
             events::ScanProgress,
@@ -566,6 +568,78 @@ mod tests {
         .unwrap();
         assert_eq!(detail["spec"]["versionsBadge"], json!(copies));
         assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
+    }
+
+    #[test]
+    fn search_groups_by_spec_and_shows_identical_copies_once() {
+        // SRC-04..06 over IPC, on fixtures generated for this test.
+        let (app, webview, _tmp) = app_on_fixtures("search");
+        scan_and_wait(&app, &webview);
+        let found = invoke(&webview, "search", json!({ "input": { "text": "Tokens de serviço para integrações", "projectId": null, "file": "spec.md", "specId": null } })).unwrap();
+        let groups = found["groups"].as_array().unwrap();
+        let g142: Vec<&Value> = groups
+            .iter()
+            .filter(|g| g["folder"] == "acme-142-service-tokens")
+            .collect();
+        assert_eq!(g142.len(), 1, "{found}");
+        // Three identical copies hold the title section: listed once.
+        let title_hits: Vec<&Value> = g142[0]["hits"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|h| h["line"] == 1)
+            .collect();
+        assert_eq!(title_hits.len(), 1, "{found}");
+        assert_eq!(
+            found["terms"],
+            json!(["Tokens", "de", "serviço", "para", "integrações"])
+        );
+
+        // A text only in the divergent copy (acme-170 worktree) points to that copy.
+        let only_there = invoke(&webview, "search", json!({ "input": { "text": "2b3c4d5", "projectId": null, "file": null, "specId": null } })).unwrap();
+        let hit = &only_there["groups"][0]["hits"][0];
+        let list = invoke(&webview, "list_projects", json!({})).unwrap();
+        let s170 = list[1]["specs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["folder"] == "acme-170-rate-limit")
+            .unwrap()
+            .clone();
+        let holder = s170["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == hit["instanceId"])
+            .unwrap();
+        assert!(
+            holder["path"]
+                .as_str()
+                .unwrap()
+                .replace('\\', "/")
+                .contains("external/acme-170"),
+            "{only_there}"
+        );
+        assert!(
+            hit["snippet"]
+                .as_str()
+                .unwrap()
+                .contains("\u{2}2b3c4d5\u{3}"),
+            "{only_there}"
+        );
+
+        // Scope to one spec and FTS syntax typed as text.
+        let scoped = invoke(&webview, "search", json!({ "input": { "text": "tarefa", "projectId": null, "file": null, "specId": s170["id"] } })).unwrap();
+        assert!(
+            scoped["groups"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|g| g["specId"] == s170["id"])
+        );
+        for text in ["\"", "AND", "NEAR(", "a:b", ""] {
+            assert!(invoke(&webview, "search", json!({ "input": { "text": text, "projectId": null, "file": null, "specId": null } })).is_ok(), "{text}");
+        }
     }
 
     #[test]

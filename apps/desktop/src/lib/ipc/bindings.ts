@@ -60,6 +60,7 @@ export const commands = {
 	orphanTemps: (instanceId: number, options?: InvokeOptions) => __TAURI_INVOKE<string[]>("orphan_temps", { instanceId }, options),
 	/**  Removes one of them, on an explicit click (SAV-10). */
 	removeOrphanTemp: (instanceId: number, name: string, options?: InvokeOptions) => __TAURI_INVOKE<null>("remove_orphan_temp", { instanceId, name }, options),
+	search: (input: SearchInput_Deserialize, options?: InvokeOptions) => __TAURI_INVOKE<SearchResults_Serialize>("search", { input }, options),
 };
 
 /** Events */
@@ -618,6 +619,83 @@ export type ScanProgress_Serialize = {
 	errors: ScanPathError[],
 	/**  Set when `phase` is `failed`. */
 	message: string | null,
+};
+
+export type SearchGroup = SearchGroup_Serialize | SearchGroup_Deserialize;
+
+export type SearchGroup_Deserialize = {
+	specId: number,
+	folder: string,
+	issueKey?: string | null,
+	title?: string | null,
+	projectId: number,
+	project: string,
+	hits: SearchHit[],
+};
+
+export type SearchGroup_Serialize = {
+	specId: number,
+	folder: string,
+	issueKey: string | null,
+	title: string | null,
+	projectId: number,
+	project: string,
+	hits: SearchHit[],
+};
+
+export type SearchHit = {
+	/**
+	 *  The instance to open: the default copy when the section is in it, else the first copy
+	 *  that holds it (design, "Agrupamento").
+	 */
+	instanceId: number,
+	file: string,
+	heading: string,
+	/**  First source line of the section (SRC-06). */
+	line: number,
+	/**
+	 *  Excerpt with matches between U+0002 and U+0003; the UI turns them into `<mark>` and
+	 *  never renders HTML from here.
+	 */
+	snippet: string,
+};
+
+export type SearchInput = SearchInput_Serialize | SearchInput_Deserialize;
+
+export type SearchInput_Deserialize = {
+	text: string,
+	projectId?: number | null,
+	/**  File name, e.g. `spec.md`. */
+	file?: string | null,
+	/**  Only the open spec (SRC-05). */
+	specId?: number | null,
+};
+
+export type SearchInput_Serialize = {
+	text: string,
+	projectId: number | null,
+	/**  File name, e.g. `spec.md`. */
+	file: string | null,
+	/**  Only the open spec (SRC-05). */
+	specId: number | null,
+};
+
+export type SearchResults = SearchResults_Serialize | SearchResults_Deserialize;
+
+export type SearchResults_Deserialize = {
+	groups: SearchGroup_Deserialize[],
+	/**  The limit was reached: the UI asks to refine (spec, edge cases). */
+	truncated: boolean,
+	/**  The terms as searched, for highlighting the opened file. */
+	terms: string[],
+};
+
+export type SearchResults_Serialize = {
+	groups: SearchGroup_Serialize[],
+	/**  The limit was reached: the UI asks to refine (spec, edge cases). */
+	truncated: boolean,
+	/**  The terms as searched, for highlighting the opened file. */
+	terms: string[],
 };
 
 /**  What the preferences screen saves (T23). */

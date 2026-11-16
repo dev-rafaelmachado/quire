@@ -15,6 +15,9 @@ import type {
   PhaseView_Serialize,
   ProjectSummary_Serialize,
   ScanProgress_Serialize,
+  SearchGroup_Serialize,
+  SearchHit,
+  SearchResults_Serialize,
   SpecDetail_Serialize,
   SpecSummary_Serialize,
   TaskDetail,
@@ -43,6 +46,9 @@ export type GateRun = GateRun_Serialize;
 export type LessonsView = LessonsView_Serialize;
 export type Lesson = Lesson_Serialize;
 export type ScanProgress = ScanProgress_Serialize;
+export type SearchResults = SearchResults_Serialize;
+export type SearchGroup = SearchGroup_Serialize;
+export type { SearchHit };
 
 /** Narrows a rejected command promise to the typed error the Rust side returns. */
 export function asCmdError(e: unknown): CmdError {

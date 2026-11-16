@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { asCmdError, type CmdError, commands, type FileContent, type SpecDetail } from "../../lib/ipc";
-import { stripHeader } from "../../lib/markdown/header";
+import { stripHeaderMapped } from "../../lib/markdown/header";
 import { ancestry, buildDoc, type Doc, outline, type OutlineEntry, toHast } from "../../lib/markdown/pipeline";
 import { displayed } from "./labels";
 
@@ -31,6 +31,9 @@ interface SpecViewState {
   chosen: Readonly<Record<number, number>>;
   /** File to show when the next spec opens (`quire open <file>`). */
   requestedTab: string | null;
+  /** Source line of a section to scroll to once the file is rendered (search, SRC-06). */
+  pendingLine: number | null;
+  requestLine: (line: number | null) => void;
   /** Shows a file of the open spec: its tab, or the "outros" tab on that file. */
   showFile: (file: string) => Promise<void>;
   /** Message about a change made outside the app (WAT-04). */
@@ -50,6 +53,14 @@ interface SpecViewState {
 }
 
 const EMPTY: ReadonlySet<string> = new Set();
+
+/** The rendered document; `data-line` keeps the file's line numbers even without the header
+ *  block, so search results and the split view point at the right place. */
+function docOf(text: string, header: boolean): Doc {
+  if (!header) return buildDoc(toHast(text));
+  const { text: shown, mapLine } = stripHeaderMapped(text);
+  return buildDoc(toHast(shown, mapLine));
+}
 // `?tab=<file>` opens that tab of the first spec opened (screenshots and demos, with `?open=`).
 let pendingTab: string | null =
   typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
@@ -84,6 +95,8 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
   error: null,
   chosen: {},
   requestedTab: null,
+  pendingLine: null,
+  requestLine: (pendingLine) => set({ pendingLine }),
   notice: null,
   setNotice: (notice) => set({ notice }),
   open: async (specId) => {
@@ -125,8 +138,7 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       if (get().file !== file || get().specId !== specId) return;
       let doc: Doc | null = null;
       if (content.kind === "markdown" && content.text !== null) {
-        const text = next.headerFiles.includes(file) ? stripHeader(content.text) : content.text;
-        doc = buildDoc(toHast(text));
+        doc = docOf(content.text, next.headerFiles.includes(file));
       }
       // Collapsed sections and the active heading are kept: ids come from the heading text.
       set({ content, doc, outline: doc ? outline(doc) : [] });
@@ -176,8 +188,7 @@ export const useSpecView = create<SpecViewState>((set, get) => ({
       if (get().file !== file) return;
       let doc: Doc | null = null;
       if (content.kind === "markdown" && content.text !== null) {
-        const text = detail.headerFiles.includes(file) ? stripHeader(content.text) : content.text;
-        doc = buildDoc(toHast(text));
+        doc = docOf(content.text, detail.headerFiles.includes(file));
       }
       set({ content, doc, outline: doc ? outline(doc) : [] });
     } catch (e) {

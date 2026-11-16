@@ -21,6 +21,8 @@ import { guard, hasUnsaved } from "./features/unsaved/store";
 import { UnsavedDialog } from "./features/unsaved/UnsavedDialog";
 import { ConflictDialog } from "./features/conflict/ConflictDialog";
 import { startConflictDemo } from "./features/conflict/demo";
+import { SearchPanel } from "./features/search/SearchPanel";
+import { useSearch } from "./features/search/store";
 
 export function App() {
   // Subscribing here re-renders the whole tree when the language changes (no restart).
@@ -34,6 +36,7 @@ export function App() {
   const setPrefsOpen = useWorkspace((s) => s.setPrefsOpen);
   const config = useWorkspace((s) => s.config);
   const showPrefs = prefsOpen && config !== null;
+  const searchOpen = useSearch((s) => s.open);
   const selected = findSelected(projects, selectedSpecId);
 
   useEffect(() => {
@@ -49,6 +52,19 @@ export function App() {
 
   useEffect(() => startConflictDemo(), []);
 
+  // Ctrl+Shift+F opens the search (SRC); the palette (Ctrl+K) reaches it too.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        // Opening the search replaces the center column: same guard as any navigation.
+        guard(() => useSearch.getState().setOpen(true));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Closing the window with unsaved changes asks first (SAV-06).
   useEffect(() => onWindowClose(hasUnsaved, (close) => guard(close)), []);
   useCliNavigation();
@@ -62,8 +78,9 @@ export function App() {
       top={
         <TopBar
           crumbs={selected ? { project: selected.project.alias ?? selected.project.name, spec: selected.spec.folder } : undefined}
-          actions={selected && !showPrefs ? <InstanceBadge /> : null}
+          actions={selected && !showPrefs && !searchOpen ? <InstanceBadge /> : null}
           onPreferences={() => guard(() => setPrefsOpen(!prefsOpen))}
+          onSearch={() => (searchOpen ? useSearch.getState().setOpen(false) : guard(() => useSearch.getState().setOpen(true)))}
         />
       }
       side={<Sidebar />}
@@ -73,10 +90,10 @@ export function App() {
           <ConflictDialog />
           <Notice />
           <CliPicker />
-          {showPrefs ? <Preferences config={config} /> : selected ? <SpecView /> : <EmptyView />}
+          {searchOpen ? <SearchPanel /> : showPrefs ? <Preferences config={config} /> : selected ? <SpecView /> : <EmptyView />}
         </>
       }
-      right={selected && right.kind && !showPrefs ? <SpecRight /> : undefined}
+      right={selected && right.kind && !showPrefs && !searchOpen ? <SpecRight /> : undefined}
       rightWidth={right.width}
       status={<WorkspaceStatus />}
     />
