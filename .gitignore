@@ -2,6 +2,7 @@
 node_modules/
 dist/
 dist-spike/
+dist-spike-editor/
 target/
 .vite/
 *.log
