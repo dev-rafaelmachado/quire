@@ -25,14 +25,14 @@ Editar qualquer `.md` de uma spec dentro do Quire, com preview e escrita que nun
 
 ## Onde parou
 
-- **Fase / tarefa:** Fase 1, T9 (spike do CodeMirror 6)
+- **Fase / tarefa:** Fase 1, T10 (spike do FTS5)
 - **Concluídas:** T1, T27, T2, T4, T7
-- **Em andamento:** T9
+- **Em andamento:** T10
 - **Aguardando revisão visual:** T3 (`/tmp/quire-shots/v0-2/T3-*.png`)
 - **Aguardando decisão do autor:** T6 (orçamento de memória do modo Dividir: ≤ 456 MB, ver "Medições")
 - **Aguardando CI do Windows (só roda depois do push):** T5 (passo "console helper (Windows)" e job "msi install" do `ci.yml`)
-- **NÃO VERIFICADO (depende de ambiente que não há aqui):** idioma pelo sistema no WebView2 (T27); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
-- **Próximo passo:** T9, depois T10
+- **NÃO VERIFICADO (depende de ambiente que não há aqui):** teclas mortas, composição e IME no Wayland com teclado pt-BR, e o editor no WebView2 (T9: roteiro manual em `apps/desktop/src/spike-editor/README.md`); idioma pelo sistema no WebView2 (T27); T5 inteira no Windows: `bin\quire.cmd` em `cmd` e PowerShell, códigos de saída, fragmento WiX (`INSTALLDIR`, `$(sys.SOURCEFILEDIR)`), `PATH` depois do MSI, `quire .` abrindo o app sem prender o terminal
+- **Próximo passo:** T10, depois T11
 - **Pré-requisitos vindos da v0.1:** merge do PR da v0.1 feito (PR #1, `f256af3`). A tag `v0.1.0` e as revisões visuais de T14, T16, T18, T19, T20, T22 e T24 continuam pendentes na v0.1 e não bloqueiam a v0.2 (P10)
 - **Bloqueios:** T8 (precisa do autor numa máquina com WSL: spike T2 da v0.1 no WSLg e T3 em WSL2 ext4, DrvFs e `\\wsl$`; a pasta `apps/desktop/src/spike/` só sai depois disso). Também dependem de máquina partes de T9 (teclas mortas/IME com o autor; WebView2) e T11 (WSL, DrvFs, 9p, `\\wsl$`)
 - **Arquivos sem commit:** nenhum
@@ -84,6 +84,29 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 
 **Orçamento proposto para o modo Dividir (editor + preview, T16 e T26):** base de 396 MB + 60 MB = **≤ 456 MB** de PSS total na mediana de 3 rodadas, mesmas condições. **Aguardando aprovação do autor**; até lá a T16 e a T26 usam esse número.
 
+### T9: CodeMirror 6 no WebKitGTK (EDT-02, EDT-07, EDT-09)
+
+**Como:** página isolada `apps/desktop/src/spike-editor/` (build de produção do Vite servido pelo `vite preview` dentro do `tauri dev`), webkit2gtk-4.1 2.54.2 no Hyprland, saída headless a 60 Hz. Documento: o mesmo `generateMarkdown` do spike da v0.1. Latência = da transação ao próximo frame pintado, 200 caracteres digitados um por transação no meio do documento (não inclui a entrega do evento de tecla pelo SO).
+
+| Documento | Carregar o chunk (ms) | Montar até o 1º frame (ms) | Tecla p50 / p95 / máx (ms) |
+| --- | --- | --- | --- |
+| 40 KB (786 linhas), 1ª rodada | 39 | 45 | 17 / 17 / 19 |
+| 40 KB, 2ª e 3ª rodadas | 13, 13 | 17, 16 | 17 / 17–18 / 19–21 |
+| 500 KB (9.348 linhas) | 14 | 19 | 17 / 18 / 24 |
+| 2 MB (37.368 linhas) | 13 | 19 | 17 / 18 / 24 |
+
+**Bundle do chunk do editor** (view, state, commands, search, language, markdown, highlight, line numbers):
+
+| Variante | Bruto | gzip |
+| --- | --- | --- |
+| Núcleo do CodeMirror sem linguagem markdown | 303 KB | 98 KB |
+| Com `@codemirror/lang-markdown` (puxa HTML, CSS e JS) | 532 KB | 184 KB |
+| Com a linguagem enxuta sobre `@lezer/markdown` (GFM) | 339 KB | 110 KB |
+
+**Memória da página do spike** (só o editor, sem o pipeline de markdown; binário de debug do Rust, 5 s depois de montar): 288 MB (40 KB), 295 MB (500 KB), 312 MB (2 MB); WebKit 167, 176 e 193 MB.
+
+**Decisão:** CodeMirror 6 confirmado pelos números (TD-11), com a linguagem markdown enxuta (`@lezer/markdown` + GFM, sem sub-linguagens) e orçamento do chunk do editor de **≤ 120 KB gzip**. O limite de edição (A8) fica em **2 MB** (`LARGE_FILE_BYTES`), porque o editor monta e digita igual a 40 KB nesse tamanho; o gargalo de arquivo grande continua sendo o preview, que já fica sem realce acima de 2 MB. **NÃO VERIFICADO:** teclas mortas, composição e IME (ibus, fcitx5) no Wayland com teclado pt-BR, e o WebView2 do Windows: o roteiro manual está no `README.md` do spike e é do autor; um teste automático por teclado virtual exigiria tirar o foco da sessão do autor, o que não fiz.
+
 ## Journal
 
 - 2026-11-16 · planejamento · spec, design e tarefas da v0.2 escritos na branch `docs/v0-2-spec`. Escopo do pedido do autor: edição com preview (CodeMirror 6), escrita segura, conflito com agentes, busca full-text (FTS5), command palette, checkbox opt-in, progresso x/y, edição com várias instâncias, Fase 0 de dívidas e três spikes antes das features
@@ -104,3 +127,4 @@ Levantadas no Journal da v0.1 (`.specs/features/quire-v0-1/summary.md`):
 - 2026-11-16 · T6 · memória medida no binário de produção (f945633, `scripts/pss-tree.py`): app vazio 257–258 MB, spec de 40 KB no modo Ler 395–447 MB (mediana 396), tabela em "Medições". Orçamento proposto para o modo Dividir: mediana ≤ 456 MB (base + 60 MB), **aguardando aprovação do autor**; a tarefa fica sem `[x]` só por isso. A medição usa uma saída headless do Hyprland em vez de janela visível; o efeito disso no PSS não foi medido separadamente. Captura de conferência: `/tmp/quire-shots/v0-2/T6-40kb-read.png`
 - 2026-11-16 · T7 · verificado em 2026-11-16 na API do crates.io: não existe versão estável. Mais recentes: `tauri-specta` 2.0.0-rc.29 (2026-11-13), `specta` 2.0.0-rc.28 (2026-11-05), `specta-typescript` 0.0.15 (2026-11-05), exatamente as versões já fixadas. **Decisão:** manter `=2.0.0-rc.29` / `=2.0.0-rc.28` / `0.0.15` fixadas (TD-07 da v0.1 continua); o teste `bindings_are_up_to_date` segue protegendo contra mudança silenciosa. Reverificar antes da tag da v0.2
 - 2026-11-16 · T8 · **bloqueada por ambiente:** não há WSL nesta máquina, e as rodadas pendentes (spike T2 da v0.1 no WSLg; T3 em WSL2 ext4, DrvFs `/mnt/c` e `\\\\wsl$` a partir do Windows) precisam do autor. A remoção de `apps/desktop/src/spike/` espera essas rodadas (DEB-09). Nada foi inferido. Sigo para a Fase 1, como o `tasks.md` permite para tarefas que dependem de máquina específica
+- 2026-11-16 · T9 · spike do CodeMirror 6 (b2cc963). Números em "Medições": latência por tecla presa ao frame (p95 17–18 ms em 40 KB, 500 KB e 2 MB; meta ≤ 50 ms), montar ≤ 45 ms, chunk de 110 KB gzip. **Decisão (registrada):** CodeMirror confirmado, limite de edição A8 = 2 MB, orçamento do chunk ≤ 120 KB gzip. **Decisão fora do design:** o design citava `@codemirror/lang-markdown`; ele puxa os parsers de HTML, CSS e JavaScript (+74 KB gzip) só para realçar HTML embutido e blocos de código. Uso a linguagem montada direto sobre `@lezer/markdown` com GFM (`lean.ts`); o TD-11 (CodeMirror por import dinâmico) não muda. **NÃO VERIFICADO:** teclas mortas e IME (roteiro do autor no README do spike, repetido no app real na T16) e WebView2. A tarefa fica sem `[x]` até o roteiro manual; as fases seguintes seguem com os números medidos, já que nada falhou
