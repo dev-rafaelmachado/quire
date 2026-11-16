@@ -123,6 +123,7 @@ export const en: Catalog = {
     where: "Where",
     dependsOn: "Depends on",
     requirement: "Requirement",
+    requirementsList: "Requirements: {list}",
     readyWhen: "Done when",
     tests: "Tests",
     gate: "Gate",

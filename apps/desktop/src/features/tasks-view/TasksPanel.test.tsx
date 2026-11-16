@@ -61,7 +61,8 @@ describe("tasks view", () => {
     const diagram = screen.getByRole("group", { name: "Dependências da fase" });
     expect(within(diagram).getAllByText("T3")).toHaveLength(2);
     expect(screen.getByText("e5f6a7b")).toBeTruthy();
-    expect(screen.getByText("TOK-03")).toBeTruthy();
+    expect(screen.getAllByText("TOK-03").length).toBeGreaterThan(0);
+    expect(screen.getByText("Requisitos: TOK-03")).toBeTruthy();
     expect(screen.getByRole("img", { name: "próxima" })).toBeTruthy();
   });
 

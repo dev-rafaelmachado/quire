@@ -67,8 +67,9 @@ export function GatesPanel({ gates }: { gates: GatesView }) {
   return (
     <>
       <div role="group" aria-label={t("logs.filtersLabel")} className="flex min-h-12 flex-none flex-wrap items-center gap-3 border-b border-line px-6 py-2">
-        <span className="text-xs text-muted">{t("logs.level")}</span>
-        <Segmented<LevelFilter>
+        <span className="flex items-center gap-2">
+          <span className="text-xs text-muted">{t("logs.level")}</span>
+          <Segmented<LevelFilter>
           label={t("logs.levelLabel")}
           value={level}
           onChange={setLevel}
@@ -79,8 +80,10 @@ export function GatesPanel({ gates }: { gates: GatesView }) {
             { value: "e2e", label: t("logs.levelE2e") },
           ]}
         />
-        <span className="ml-2 text-xs text-muted">{t("logs.status")}</span>
-        <Segmented<StatusFilter>
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="text-xs text-muted">{t("logs.status")}</span>
+          <Segmented<StatusFilter>
           label={t("logs.statusLabel")}
           value={status}
           onChange={setStatus}
@@ -90,12 +93,15 @@ export function GatesPanel({ gates }: { gates: GatesView }) {
             { value: "fail", label: t("logs.fail") },
           ]}
         />
-        <div className="flex-1" />
-        <span className="text-xs text-muted">
-          {t("logs.counts", { runs: t("logs.runs", { n: c.runs }), passes: c.passes, fails: c.fails })}
         </span>
-        <span title={t("logs.readOnlyHint")}>
-          <Chip icon={<Lock aria-hidden="true" className="size-3" />}>{t("logs.readOnly")}</Chip>
+        <div className="flex-1" />
+        <span className="flex items-center gap-3">
+          <span className="text-xs whitespace-nowrap text-muted">
+            {t("logs.counts", { runs: t("logs.runs", { n: c.runs }), passes: c.passes, fails: c.fails })}
+          </span>
+          <span title={t("logs.readOnlyHint")}>
+            <Chip icon={<Lock aria-hidden="true" className="size-3" />}>{t("logs.readOnly")}</Chip>
+          </span>
         </span>
       </div>
       <SkippedNotice file="gates.jsonl" skipped={gates.skipped} lines={gates.skippedLines} />

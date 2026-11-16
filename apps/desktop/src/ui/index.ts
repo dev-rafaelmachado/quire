@@ -5,3 +5,4 @@ export { ProgressBar, type BarTone } from "./ProgressBar";
 export { Segmented, type SegmentOption } from "./Segmented";
 export { StatusDot, type DotTone } from "./StatusDot";
 export { ErrorDetail, ErrorText } from "./ErrorText";
+export { ChipList, chipsThatFit } from "./ChipList";

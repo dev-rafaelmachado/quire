@@ -121,6 +121,7 @@ export const ptBR = {
     where: "Onde",
     dependsOn: "Depende de",
     requirement: "Requirement",
+    requirementsList: "Requisitos: {list}",
     readyWhen: "Pronto quando",
     tests: "Testes",
     gate: "Gate",

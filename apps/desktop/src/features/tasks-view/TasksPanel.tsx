@@ -1,7 +1,7 @@
 import { Check, ChevronDown, ChevronRight, CircleCheck, CircleDot, Circle, Hourglass, Lock } from "lucide-react";
 import { t } from "../../lib/i18n";
 import type { PhaseView, Task, TasksView } from "../../lib/ipc";
-import { Chip, cx, ProgressBar, Segmented, type BarTone, type Tone } from "../../ui";
+import { Chip, ChipList, cx, ProgressBar, Segmented, type BarTone, type Tone } from "../../ui";
 import { fieldText, markOf, nextTaskId, phaseKey, type TaskMark } from "./model";
 import { type TaskFilter, useTasks } from "./store";
 
@@ -49,27 +49,24 @@ function TaskRow({ task, mark, selected, gate }: { task: Task; mark: TaskMark; s
       aria-current={selected ? "true" : undefined}
       onClick={() => select(task.id)}
       className={cx(
-        "flex min-h-10 w-full items-center gap-3 rounded-[var(--radius-md)] border px-3 py-1.5 text-left",
+        "flex min-h-10 w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-1.5 text-left @[560px]:gap-3 @[560px]:px-3",
         selected ? "border-acc bg-acc-bg/40" : "border-transparent hover:bg-raise",
       )}
     >
       <MarkIcon mark={mark} />
       <span className="w-10 flex-none font-code text-xs text-muted">{task.id}</span>
-      <span className="min-w-24 flex-1 truncate">{task.title}</span>
+      <span className="min-w-24 flex-1 truncate @[640px]:min-w-44">{task.title}</span>
       {task.note ? (
         // Gives way before the title does: shrinks down to the icon in narrow windows.
         <span className="flex min-w-7 max-w-56 shrink">
           <NoteBadge note={task.note} />
         </span>
       ) : null}
-      <span className="flex flex-none gap-1">
-        {task.requirements.map((r) => (
-          <Chip key={r} tone="acc" mono>
-            {r}
-          </Chip>
-        ))}
-      </span>
-      <span className="flex min-w-16 flex-none justify-center gap-1 font-code text-xs">
+      {task.requirements.length > 0 ? (
+        // Gives way before the title: shows the chips that fit and "+N" (DEB-04).
+        <ChipList items={task.requirements} label={t("tasks.requirementsList", { list: task.requirements.join(", ") })} />
+      ) : null}
+      <span className="flex flex-none justify-center gap-1 font-code text-xs @[520px]:min-w-16">
         {task.commits.length > 0 ? (
           task.commits.map((hash) => <CommitChip key={hash} hash={hash} />)
         ) : (
@@ -78,7 +75,8 @@ function TaskRow({ task, mark, selected, gate }: { task: Task; mark: TaskMark; s
           </span>
         )}
       </span>
-      <span className="w-12 flex-none text-right">{gate ? <Chip>{gate}</Chip> : null}</span>
+      {/* The gate level is also in the task panel; narrow cards drop it before anything overflows. */}
+      <span className="hidden w-12 flex-none text-right @[520px]:block">{gate ? <Chip>{gate}</Chip> : null}</span>
     </button>
   );
 }
@@ -117,7 +115,7 @@ function PhaseCard({ phase, index, next, filter }: { phase: PhaseView; index: nu
         </button>
       </h3>
       {expanded ? (
-        <div className="flex flex-col gap-1 px-3 pb-3">
+        <div className="@container flex flex-col gap-1 px-3 pb-3">
           {phase.diagram.length > 0 ? (
             <div role="group" aria-label={t("tasks.diagram")} className="flex flex-col gap-1.5 px-2 pb-2">
               {phase.diagram.map((chain, ci) => (
