@@ -195,7 +195,8 @@ export function Preferences({ config }: { config: ConfigView }) {
         </Section>
 
         <Section title={t("prefs.appearance")}>
-          <Segmented
+          <div className="flex">
+            <Segmented
             label={t("prefs.theme")}
             value={theme}
             onChange={setThemeDraft}
@@ -203,7 +204,8 @@ export function Preferences({ config }: { config: ConfigView }) {
               { value: "dark", label: t("prefs.themeDark") },
               { value: "light", label: t("prefs.themeLight") },
             ]}
-          />
+            />
+          </div>
         </Section>
 
         <div className="flex items-center gap-3 border-t border-line pt-5">
