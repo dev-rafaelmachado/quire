@@ -679,8 +679,13 @@ preset = "team"
             "# my config\nscan_paths = [\"/old\"]\n\n[projects.a]\npreset = \"exban\" # team\n\n[projects.gone]\nalias = \"x\"\n\n[watch]\nmode = \"poll\"\n",
         )
         .unwrap();
+        // An absolute path for the running OS: `/srv/specs` has no drive, so on Windows `load`
+        // resolves it against the drive of the config file (same as in `missing_file_loads_defaults`).
+        let other = tempfile::tempdir().unwrap();
+        let abs = other.path().join("specs");
+        let abs_text = abs.display().to_string();
         let settings = Settings {
-            scan_paths: vec!["~/code".into(), "/srv/specs".into()],
+            scan_paths: vec!["~/code".into(), abs_text.clone(), "/srv/specs".into()],
             poll_interval_ms: 2000,
             theme: Some(Theme::Light),
             projects: vec![
@@ -718,7 +723,11 @@ preset = "team"
             Some("https://t.example/")
         );
         assert_eq!(c.watch_mode, WatchMode::Poll);
-        assert_eq!(c.scan_paths[1], PathBuf::from("/srv/specs"));
+        // Saving writes the paths exactly as chosen, on every OS; only `load` resolves them.
+        let raw = Config::parse(&text).unwrap();
+        assert_eq!(raw.scan_paths[1], PathBuf::from(&abs_text));
+        assert_eq!(raw.scan_paths[2], PathBuf::from("/srv/specs"));
+        assert_eq!(c.scan_paths[1], abs);
     }
 
     #[test]
