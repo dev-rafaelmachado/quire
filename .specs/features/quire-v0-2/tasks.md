@@ -95,7 +95,7 @@ T21 → T22 → T23
 
 - [x] T21: Índice FTS5 incremental (c85dd8d)
 - [ ] T22: Busca global e na spec aberta (85cf54c) (gate passou, aguardando revisão visual)
-- [ ] T23: Command palette
+- [ ] T23: Command palette (3589deb) (gate passou, aguardando revisão visual)
 
 ### Fase 5: Tasks e progresso
 
