@@ -312,6 +312,14 @@ export const ptBR = {
     eolLf: "LF",
     eolCrlf: "CRLF",
   },
+  unsaved: {
+    title: "Salvar as alterações em {name}?",
+    body: "Se você sair agora sem salvar, as alterações deste arquivo se perdem. Nada é gravado sem a sua escolha.",
+    mixed: "Este arquivo mistura fins de linha (CRLF e LF). Salvar vai normalizar todas as linhas para o tipo mais usado.",
+    save: "Salvar",
+    discard: "Descartar",
+    cancel: "Cancelar",
+  },
   main: {
     emptyTitle: "Nenhuma spec aberta",
     emptyHint: "Escolha uma spec na lista à esquerda.",

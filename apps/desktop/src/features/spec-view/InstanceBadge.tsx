@@ -4,6 +4,7 @@ import { t } from "../../lib/i18n";
 import type { InstanceSummary, SpecDetail } from "../../lib/ipc";
 import { Button, Chip, cx } from "../../ui";
 import { ago, displayed, shortInstancePath, worktreeName } from "./labels";
+import { guard } from "../unsaved/store";
 import { useSpecView } from "./store";
 
 type State = "open" | "diverges" | "identical";
@@ -85,7 +86,7 @@ function Popover({ detail, onClose }: { detail: SpecDetail; onClose: () => void 
           disabled={picked === shown.id}
           onClick={() => {
             onClose();
-            void switchInstance(picked);
+            guard(() => switchInstance(picked));
           }}
         >
           {t("instances.openThis")}

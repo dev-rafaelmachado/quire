@@ -21,7 +21,7 @@ function anchorsOf(container: HTMLElement): Anchor[] {
 
 /** Dividir: the editor and the live preview side by side, scrolling together without echo
  *  (EDT-03, EDT-04). Only the side the user scrolls drives the other. */
-export function SplitView({ name, header }: { name: string; header: boolean }) {
+export function SplitView({ name, header, preview: showPreview }: { name: string; header: boolean; preview: boolean }) {
   const saved = useEditor((s) => s.buffer?.savedText ?? "");
   const [text, setText] = useState(saved);
   const editor = useRef<EditorHandle | null>(null);
@@ -116,10 +116,12 @@ export function SplitView({ name, header }: { name: string; header: boolean }) {
     [syncFromPreview],
   );
 
+  // Editar and Dividir share this component, so switching between them keeps the editor (and
+  // its unsaved text and history) mounted; only the preview column comes and goes.
   return (
-    <div className="grid h-full grid-cols-2">
+    <div className={showPreview ? "grid h-full grid-cols-2" : "h-full"}>
       <EditorPane onChange={onChange} onReady={onReady} />
-      <PreviewPane name={name} text={text} header={header} scrollRef={previewRef} />
+      {showPreview ? <PreviewPane name={name} text={text} header={header} scrollRef={previewRef} /> : null}
     </div>
   );
 }

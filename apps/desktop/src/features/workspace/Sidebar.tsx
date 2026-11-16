@@ -5,6 +5,7 @@ import type { ProjectSummary, SpecSummary } from "../../lib/ipc";
 import { cx, IconButton, ProgressBar, Segmented, type BarTone, type SegmentOption } from "../../ui";
 import { filterProjects, specState, specTitle, type SpecState, type StatusFilter } from "./model";
 import { ScanFooter } from "./ScanFooter";
+import { guard } from "../unsaved/store";
 import { useWorkspace } from "./store";
 
 const STATE_LABEL = {
@@ -114,7 +115,7 @@ function ProjectGroup({ project }: { project: ProjectSummary }) {
               spec={spec}
               selected={spec.id === selectedSpecId}
               highlighted={highlight?.specIds.includes(spec.id) ?? false}
-              onSelect={() => select(spec.id)}
+              onSelect={() => guard(() => select(spec.id))}
             />
           ))}
     </div>

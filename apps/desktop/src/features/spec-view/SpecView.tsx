@@ -9,9 +9,9 @@ import { TaskDetailPanel } from "../tasks-view/TaskDetailPanel";
 import { TasksPanel } from "../tasks-view/TasksPanel";
 import { useTasks } from "../tasks-view/store";
 import { EditBar } from "../editor/EditBar";
-import { EditorPane } from "../editor/EditorPane";
 import { SplitView } from "../editor/SplitView";
 import { useEditor } from "../editor/store";
+import { guard } from "../unsaved/store";
 import { FileView } from "./FileView";
 import { displayed } from "./labels";
 import { MetaStrip } from "./MetaStrip";
@@ -31,7 +31,7 @@ function OthersBar() {
           key={name}
           type="button"
           aria-pressed={name === file}
-          onClick={() => void show(name)}
+          onClick={() => guard(() => show(name))}
           className={cx(
             "h-6 rounded-[var(--radius-md)] px-2 font-code text-xs",
             name === file ? "bg-acc-bg text-acc" : "bg-raise text-muted hover:text-text",
@@ -133,7 +133,7 @@ export function SpecView() {
     if (onLogs && instanceId !== undefined) void loadLogs(instanceId, { gates: hasGates, lessons: hasLessons });
   }, [onLogs, instanceId, hasGates, hasLessons, loadLogs]);
 
-  const tabs = detail ? <Tabs detail={detail} counts={counts} tab={tab} unsaved={unsaved} onSelect={(next) => void selectTab(next)} /> : null;
+  const tabs = detail ? <Tabs detail={detail} counts={counts} tab={tab} unsaved={unsaved} onSelect={(next) => guard(() => selectTab(next))} /> : null;
   const editing = mode !== "read" && buffer !== null && buffer.name === file && buffer.locked === null && buffer.format !== null;
   if (detail && editing && file !== null) {
     return (
@@ -141,11 +141,7 @@ export function SpecView() {
         {tabs}
         <EditBar />
         <div role="tabpanel" className="min-h-0 flex-1">
-          {mode === "edit" ? (
-            <EditorPane />
-          ) : (
-            <SplitView key={file} name={file} header={detail.headerFiles.includes(file)} />
-          )}
+          <SplitView key={`${buffer.instanceId}\u0000${file}`} name={file} header={detail.headerFiles.includes(file)} preview={mode === "split"} />
         </div>
       </>
     );
@@ -219,7 +215,7 @@ export function SpecRight() {
   const lessons = useLogs((s) => s.lessons);
   const selectTab = useSpecView((s) => s.selectTab);
   if (kind === "tasks") return <TaskDetailPanel />;
-  if (kind === "lessons" && lessons) return <LessonsAside lessons={lessons} onOpen={() => void selectTab("lessons.jsonl")} />;
+  if (kind === "lessons" && lessons) return <LessonsAside lessons={lessons} onOpen={() => guard(() => selectTab("lessons.jsonl"))} />;
   return <SpecOutline />;
 }
 

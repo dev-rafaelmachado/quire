@@ -2,6 +2,7 @@ import { Lock, Save, TriangleAlert } from "lucide-react";
 import { t } from "../../lib/i18n";
 import { errorText } from "../../lib/i18n/errors";
 import { Button, Chip, ErrorText, Segmented } from "../../ui";
+import { guard } from "../unsaved/store";
 import { type EditMode, useEditor } from "./store";
 
 /** Ler / Editar / Dividir, Save, and the state of the buffer (EDT-01, EDT-05, EDT-06, EDT-08,
@@ -26,7 +27,8 @@ export function EditBar() {
         <Segmented<EditMode>
           label={t("editor.modeLabel")}
           value={mode}
-          onChange={setMode}
+          // Leaving Editar/Dividir for Ler drops the editor: same guard as any navigation (SAV-06).
+          onChange={(next) => (next === "read" ? guard(() => setMode(next)) : setMode(next))}
           options={[
             { value: "read", label: t("editor.read") },
             { value: "edit", label: t("editor.edit"), disabled: locked !== null },

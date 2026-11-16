@@ -314,6 +314,14 @@ export const en: Catalog = {
     eolLf: "LF",
     eolCrlf: "CRLF",
   },
+  unsaved: {
+    title: "Save the changes to {name}?",
+    body: "If you leave now without saving, the changes to this file are lost. Nothing is written without your choice.",
+    mixed: "This file mixes line endings (CRLF and LF). Saving will normalize every line to the most used one.",
+    save: "Save",
+    discard: "Discard",
+    cancel: "Cancel",
+  },
   main: {
     emptyTitle: "No spec open",
     emptyHint: "Choose a spec in the list on the left.",

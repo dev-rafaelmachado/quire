@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "../../lib/i18n";
 import { setWindowTitle } from "../../lib/window";
+import { guard } from "../unsaved/store";
 import type { EditorHandle } from "./codemirror";
 import { useEditor } from "./store";
 
@@ -47,7 +48,13 @@ export function EditorPane({ onChange, onReady }: { onChange?: () => void; onRea
       setReady(true);
       readyRef.current?.(h);
       h.focus();
-      const bench = new URLSearchParams(window.location.search).get("bench");
+      const params = new URLSearchParams(window.location.search);
+      // `?demo=unsaved` (screenshots only): an edit in memory, then the guard. Nothing is saved.
+      if (params.get("demo") === "unsaved") {
+        h.view.dispatch({ changes: { from: h.view.state.doc.length, insert: "\nRascunho ainda não salvo.\n" } });
+        guard(() => undefined);
+      }
+      const bench = params.get("bench");
       if (bench === "type" || bench === "preview") {
         const t0 = performance.now();
         void typingBenchmark(h.view, (r) => setWindowTitle(`${r} open=${(t0 - mountedAt).toFixed(0)}`));

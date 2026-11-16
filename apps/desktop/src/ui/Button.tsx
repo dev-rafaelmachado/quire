@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { cx } from "./cx";
 
 type Variant = "outline" | "ghost";
@@ -6,6 +6,7 @@ type Variant = "outline" | "ghost";
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   icon?: ReactNode;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 /** Text button (wireframes: 30 px, bordered panel or ghost). */
