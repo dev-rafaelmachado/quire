@@ -1,0 +1,19 @@
+[package]
+name = "quire-cli"
+description = "Console helper for the quire command on Windows (TD-20): answers --help, --version and argument errors in the terminal and starts the app for the rest. No Tauri dependency."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "quire-cli"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.6.7", features = ["string"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+
+[lints]
+workspace = true

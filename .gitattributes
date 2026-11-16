@@ -3,3 +3,5 @@
 *.png binary
 *.ico binary
 *.icns binary
+# Windows batch files need CRLF (bin\quire.cmd, TD-20).
+*.cmd text eol=crlf

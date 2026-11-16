@@ -48,6 +48,12 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
+      # The MSI ships the console helper behind the quire command (TD-20).
+      - name: Stage the console helper (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: scripts/stage-quire-cli.sh
+
       # tauri build compiles the frontend (beforeBuildCommand) and the binary with the
       # custom protocol, then bundles.
       - uses: tauri-apps/tauri-action@v1

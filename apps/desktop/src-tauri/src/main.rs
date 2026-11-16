@@ -469,6 +469,73 @@ mod tests {
         cli::interpret(&app.cli().matches_from(argv).unwrap(), cwd)
     }
 
+    /// What the app prints for a command line on Linux (setup in `run`): text and exit code,
+    /// `None` when it would go on to open the window.
+    fn app_answer(app: &tauri::App<MockRuntime>, args: &[&str]) -> Option<(String, i32)> {
+        use tauri_plugin_cli::CliExt;
+        let argv = std::iter::once("quire")
+            .chain(args.iter().copied())
+            .map(String::from)
+            .collect();
+        match app.cli().matches_from(argv) {
+            Err(e) => Some((format!("quire: {e}"), 2)),
+            Ok(m) => match cli::interpret(&m, Path::new(".")) {
+                cli::CliRequest::Help(text) => Some((text, 0)),
+                cli::CliRequest::Version => {
+                    Some((format!("quire {}", app.package_info().version), 0))
+                }
+                _ => None,
+            },
+        }
+    }
+
+    #[test]
+    fn the_windows_console_helper_answers_like_the_app() {
+        // DEB-06, TD-20: same help, errors and codes as the app, from the same grammar.
+        let (app, _webview, _tmp) = app_on_fixtures("cli-parity");
+        let name = app.package_info().name.clone();
+        for args in [
+            vec!["--help"],
+            vec!["-h"],
+            vec!["open", "--help"],
+            vec!["help", "open"],
+            vec!["--bogus"],
+            vec!["open"],
+            vec!["open", "a", "b"],
+            vec![],
+            vec!["."],
+            vec!["open", "ACME-142"],
+        ] {
+            let argv: Vec<std::ffi::OsString> = std::iter::once("quire")
+                .chain(args.iter().copied())
+                .map(Into::into)
+                .collect();
+            let helper = match quire_cli::decide(&argv) {
+                quire_cli::Outcome::Print { text, code } => Some((text, code)),
+                quire_cli::Outcome::Launch(rest) => {
+                    assert_eq!(rest, argv[1..].to_vec());
+                    None
+                }
+            };
+            // The mock app may carry another package name; the helper always says `quire`.
+            let ours = app_answer(&app, &args)
+                .map(|(t, c)| (t.replace(&format!("Usage: {name}"), "Usage: quire"), c));
+            assert_eq!(helper, ours, "{args:?}");
+        }
+        // The version comes from the same tauri.conf.json.
+        let conf: Value = serde_json::from_str(
+            &std::fs::read_to_string(manifest_dir().join("tauri.conf.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            quire_cli::decide(&["quire".into(), "--version".into()]),
+            quire_cli::Outcome::Print {
+                text: format!("quire {}", conf["version"].as_str().unwrap()),
+                code: 0
+            }
+        );
+    }
+
     #[test]
     fn command_line_grammar() {
         let (app, _webview, _tmp) = app_on_fixtures("cli-grammar");
