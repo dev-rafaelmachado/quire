@@ -1,3 +1,4 @@
+import { devParam } from "../../lib/devParams";
 import { create } from "zustand";
 import { asCmdError, type CmdError, commands, type TextFormat } from "../../lib/ipc";
 
@@ -78,13 +79,10 @@ export function lockByName(name: string): CmdError | null {
 
 let loadSeq = 0;
 // `?mode=edit|split` starts in that mode (screenshots and measurements, like `?open=`).
-const URL_MODE: EditMode =
-  typeof window === "undefined"
-    ? "read"
-    : (() => {
-        const m = new URLSearchParams(window.location.search).get("mode");
-        return m === "edit" || m === "split" ? m : "read";
-      })();
+const URL_MODE: EditMode = (() => {
+  const m = devParam("mode");
+  return m === "edit" || m === "split" ? m : "read";
+})();
 
 export const useEditor = create<EditorState>((set, get) => ({
   mode: URL_MODE,

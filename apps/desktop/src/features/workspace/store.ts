@@ -1,3 +1,4 @@
+import { devParam } from "../../lib/devParams";
 import { create } from "zustand";
 import { applyConfiguredTheme } from "../../app/theme";
 import { applyConfiguredLanguage } from "../../lib/i18n/locale";
@@ -46,7 +47,7 @@ interface WorkspaceState {
 let initRun: Promise<void> | null = null;
 // `?open=<folder>` selects that spec once it is listed (screenshots and demos, until the CLI).
 let pendingOpen: string | null =
-  typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("open");
+  devParam("open");
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** The settings to save so that only the preset of `projectName` changes. */
@@ -75,7 +76,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   collapsed: {},
   selectedSpecId: null,
   // `?prefs` opens the preferences on start (screenshots and demos).
-  prefsOpen: typeof window !== "undefined" && new URLSearchParams(window.location.search).has("prefs"),
+  prefsOpen: devParam("prefs") !== null,
   setPrefsOpen: (prefsOpen) => set({ prefsOpen }),
   setConfig: (config) => {
     applyConfiguredLanguage(config.language);

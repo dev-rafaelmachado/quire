@@ -1,3 +1,4 @@
+import { devParam } from "../../lib/devParams";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { setWindowTitle } from "../../lib/window";
 import type { EditorHandle } from "./codemirror";
@@ -51,7 +52,7 @@ export function SplitView({ name, header, preview: showPreview }: { name: string
   // `?bench=preview` (measurement only): parse + render time of the preview after the pause;
   // the delay seen by the user is that plus PREVIEW_DEBOUNCE_MS.
   useEffect(() => {
-    if (firedAt.current === 0 || new URLSearchParams(window.location.search).get("bench") !== "preview") return;
+    if (!import.meta.env.DEV || firedAt.current === 0 || devParam("bench") !== "preview") return;
     setWindowTitle(`bench preview render=${(performance.now() - firedAt.current).toFixed(0)} bytes=${text.length}`);
   }, [text]);
 

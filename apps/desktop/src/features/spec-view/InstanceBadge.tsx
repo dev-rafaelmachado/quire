@@ -1,3 +1,4 @@
+import { devParam } from "../../lib/devParams";
 import { GitBranch, Layers } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../../lib/i18n";
@@ -101,7 +102,7 @@ function Popover({ detail, onClose }: { detail: SpecDetail; onClose: () => void 
 export function InstanceBadge() {
   const detail = useSpecView((s) => s.detail);
   // `?picker` opens the switcher on first render (screenshots and demos).
-  const [open, setOpen] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("picker"));
+  const [open, setOpen] = useState(() => devParam("picker") !== null);
   const instance = detail ? displayed(detail) : undefined;
   if (!detail || !instance) return null;
   const branch = instance.branch ?? t("specView.detached");

@@ -1,8 +1,9 @@
+import { devParam } from "../../lib/devParams";
 import { create } from "zustand";
 
 const RECENT_MAX = 8;
 // `?palette=<text>` opens the palette with that text (screenshots and demos).
-const URL_PALETTE = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("palette");
+const URL_PALETTE = devParam("palette");
 
 interface PaletteState {
   open: boolean;

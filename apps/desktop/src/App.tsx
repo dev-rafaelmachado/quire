@@ -20,7 +20,6 @@ import { setWindowTitle, onWindowClose } from "./lib/window";
 import { guard, hasUnsaved } from "./features/unsaved/store";
 import { UnsavedDialog } from "./features/unsaved/UnsavedDialog";
 import { ConflictDialog } from "./features/conflict/ConflictDialog";
-import { startConflictDemo } from "./features/conflict/demo";
 import { SearchPanel } from "./features/search/SearchPanel";
 import { Palette, usePaletteShortcut } from "./features/palette/Palette";
 import { useSearch } from "./features/search/store";
@@ -51,7 +50,10 @@ export function App() {
     setWindowTitle(dirtyName ? `• ${dirtyName} — ${t("app.name")}` : t("app.name"));
   }, [dirtyName]);
 
-  useEffect(() => startConflictDemo(), []);
+  // Screenshot demos: development builds only (the import is removed from production).
+  useEffect(() => {
+    if (import.meta.env.DEV) void import("./app/devHooks").then((d) => d.startDevHooks());
+  }, []);
   usePaletteShortcut();
 
   // Ctrl+Shift+F opens the search (SRC); the palette (Ctrl+K) reaches it too.

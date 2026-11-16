@@ -1,10 +1,11 @@
+import { devParam } from "../lib/devParams";
 import { create } from "zustand";
 
 export type Theme = "dark" | "light";
 
 const CLASS: Record<Theme, string> = { dark: "qd", light: "ql" };
 
-const URL_THEME = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("theme");
+const URL_THEME = devParam("theme");
 
 function initialTheme(): Theme {
   // Dark is the default; `?theme=light|dark` (screenshots and demos) wins over config.toml.

@@ -1,3 +1,4 @@
+import { devParam } from "../../lib/devParams";
 import { create } from "zustand";
 import { asCmdError, type CmdError, commands, type FileContent, type SpecDetail } from "../../lib/ipc";
 import { stripHeaderMapped } from "../../lib/markdown/header";
@@ -63,7 +64,7 @@ function docOf(text: string, header: boolean): Doc {
 }
 // `?tab=<file>` opens that tab of the first spec opened (screenshots and demos, with `?open=`).
 let pendingTab: string | null =
-  typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
+  devParam("tab");
 
 async function loadCounts(detail: SpecDetail): Promise<TabCounts> {
   const instance = displayed(detail);

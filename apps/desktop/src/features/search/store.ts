@@ -1,3 +1,4 @@
+import { devParam } from "../../lib/devParams";
 import { create } from "zustand";
 import { asCmdError, type CmdError, commands, type SearchGroup, type SearchHit, type SearchResults } from "../../lib/ipc";
 import { useSpecView } from "../spec-view/store";
@@ -30,9 +31,8 @@ interface SearchState {
 let timer: ReturnType<typeof setTimeout> | null = null;
 // `?search=<text>` opens the panel with that text; `?highlight=<terms>` marks terms in the open
 // file (screenshots and demos, like `?open=`).
-const URL_PARAMS = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
-const URL_SEARCH = URL_PARAMS?.get("search") ?? null;
-const URL_HIGHLIGHT = URL_PARAMS?.get("highlight")?.split(/\s+/).filter(Boolean) ?? [];
+const URL_SEARCH = devParam("search");
+const URL_HIGHLIGHT = devParam("highlight")?.split(/\s+/).filter(Boolean) ?? [];
 let seq = 0;
 
 export const useSearch = create<SearchState>((set, get) => ({
