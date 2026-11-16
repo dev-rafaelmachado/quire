@@ -2,6 +2,7 @@ import { CircleCheck, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { t } from "../../lib/i18n";
 import { Chip } from "../../ui";
+import { CommitChip, NoteBadge } from "./TasksPanel";
 import { dependsOn, fieldItems, fieldList, fieldText, markOf, nextTaskId } from "./model";
 import { useTasks } from "./store";
 
@@ -48,7 +49,10 @@ export function TaskDetailPanel() {
   const ready = fieldItems(detail, "Pronto quando");
   const tests = fieldList(detail, "Testes");
   const what = fieldText(detail, "What");
-  const gate = task?.hash ? gates.find((g) => g.head?.startsWith(task.hash ?? "")) : undefined;
+  const commits = task?.commits ?? [];
+  // The last commit of the task is the one its gate ran on; earlier ones are looked up too.
+  const gated = [...commits].reverse().find((c) => gates.some((g) => g.head?.startsWith(c)));
+  const gate = gated ? gates.find((g) => g.head?.startsWith(gated)) : undefined;
   return (
     <section aria-label={t("tasks.detail")} className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-4 pb-4">
@@ -57,7 +61,15 @@ export function TaskDetailPanel() {
           <Chip tone={mark === "done" ? "ok" : mark === "next" ? "acc" : "neutral"}>
             {t(mark === "done" ? "tasks.taskDone" : mark === "next" ? "tasks.taskNext" : "tasks.taskPending")}
           </Chip>
+          {commits.map((hash) => (
+            <CommitChip key={hash} hash={hash} />
+          ))}
         </div>
+        {task?.note ? (
+          <div>
+            <NoteBadge note={task.note} />
+          </div>
+        ) : null}
         <h3 className="m-0 text-base leading-snug font-semibold">{task?.title ?? detail?.title}</h3>
         {!detail ? <p className="m-0 text-[12.5px] text-muted">{t("tasks.noDetail", { id: selected })}</p> : null}
         {what ? (
@@ -123,7 +135,7 @@ export function TaskDetailPanel() {
                 <span className="text-xs text-muted">
                   {t("tasks.lastGate", {
                     level: gate.level ?? "",
-                    hash: task?.hash ?? "",
+                    hash: gated ?? "",
                     status: gate.status === "fail" ? t("tasks.gateFail") : t("tasks.gatePass"),
                   })}
                 </span>

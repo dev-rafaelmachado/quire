@@ -113,6 +113,7 @@ export const ptBR = {
     taskPending: "pendente",
     noHash: "sem commit",
     commit: "Commit {hash}",
+    note: "Nota:",
     detail: "Detalhe da tarefa",
     what: "O quê",
     where: "Onde",

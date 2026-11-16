@@ -7,12 +7,12 @@ import { TasksPanel } from "./TasksPanel";
 import { useTasks } from "./store";
 import { defaultExpanded, nextTaskId } from "./model";
 
-const task = (id: string, done: boolean, hash: string | null = null, requirements: string[] = []) => ({
+const task = (id: string, done: boolean, hash: string | null = null, requirements: string[] = [], note: string | null = null) => ({
   id,
   title: `Tarefa ${id}`,
   done,
-  hash,
-  note: null,
+  commits: hash === null ? [] : hash.split(","),
+  note,
   requirements,
   line: 1,
 });
@@ -22,7 +22,7 @@ const view: TasksView = {
   done: 3,
   total: 5,
   phases: [
-    { number: 1, title: "Fundações", repo: null, diagram: [["T1", "T2"]], tasks: [task("T1", true, "a1b2c3d"), task("T2", true)], line: 1, done: 2, total: 2, state: "complete" },
+    { number: 1, title: "Fundações", repo: null, diagram: [["T1", "T2"]], tasks: [task("T1", true, "a1b2c3d"), task("T2", true, "79ae831,36609d2", [], "gate passou, aguardando revisão visual")], line: 1, done: 2, total: 2, state: "complete" },
     { number: 2, title: "Emissão", repo: null, diagram: [["T3", "T4"], ["T3", "T5"]], tasks: [task("T3", true, "e5f6a7b", ["TOK-01"]), task("T4", false, null, ["TOK-03"]), task("T5", false)], line: 5, done: 1, total: 3, state: "inProgress" },
   ],
   details: [
@@ -63,6 +63,17 @@ describe("tasks view", () => {
     expect(screen.getByText("e5f6a7b")).toBeTruthy();
     expect(screen.getByText("TOK-03")).toBeTruthy();
     expect(screen.getByRole("img", { name: "próxima" })).toBeTruthy();
+  });
+
+  it("shows commits as chips and the note as a badge, apart from the title", () => {
+    render(<TasksPanel view={view} />);
+    fireEvent.click(screen.getByRole("button", { name: "Expandir Fase 1: Fundações" }));
+    const row = screen.getByRole("button", { name: /T2/ });
+    expect(within(row).getByText("Tarefa T2")).toBeTruthy();
+    expect(within(row).getByText("79ae831")).toBeTruthy();
+    expect(within(row).getByText("36609d2")).toBeTruthy();
+    expect(within(row).getByText("gate passou, aguardando revisão visual")).toBeTruthy();
+    expect(within(row).getByText("Nota:")).toBeTruthy();
   });
 
   it("selects a task and shows its detail; everything is read-only (TSK-04, TSK-05)", () => {

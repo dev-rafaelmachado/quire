@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PhaseView, TaskDetail } from "../../lib/ipc";
 import { defaultExpanded, dependsOn, fieldList, fieldText, markOf, nextTaskId } from "./model";
 
-const task = (id: string, done: boolean) => ({ id, title: id, done, hash: null, note: null, requirements: [], line: 1 });
+const task = (id: string, done: boolean) => ({ id, title: id, done, commits: [], note: null, requirements: [], line: 1 });
 const phase = (number: number, tasks: ReturnType<typeof task>[], state: PhaseView["state"]): PhaseView => ({
   number,
   title: `F${number}`,

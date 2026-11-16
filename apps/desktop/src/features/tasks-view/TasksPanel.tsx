@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronRight, CircleCheck, CircleDot, Circle, Lock } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, CircleCheck, CircleDot, Circle, Hourglass, Lock } from "lucide-react";
 import { t } from "../../lib/i18n";
 import type { PhaseView, Task, TasksView } from "../../lib/ipc";
 import { Chip, cx, ProgressBar, Segmented, type BarTone, type Tone } from "../../ui";
@@ -20,6 +20,27 @@ function MarkIcon({ mark }: { mark: TaskMark }) {
   return <Circle role="img" aria-label={label} className="size-4 flex-none text-faint" />;
 }
 
+/** Short commit hash of a task line. */
+export function CommitChip({ hash }: { hash: string }) {
+  return (
+    <span title={t("tasks.commit", { hash })}>
+      <Chip tone="acc" mono>
+        {hash}
+      </Chip>
+    </span>
+  );
+}
+
+/** Annotation of a task line, such as "aguardando revisão visual"; never part of the title. */
+export function NoteBadge({ note }: { note: string }) {
+  return (
+    <Chip tone="warn" icon={<Hourglass aria-hidden="true" className="size-3 flex-none" />} className="max-w-full min-w-0 overflow-hidden">
+      <span className="sr-only">{t("tasks.note")} </span>
+      <span className="min-w-0 truncate">{note}</span>
+    </Chip>
+  );
+}
+
 function TaskRow({ task, mark, selected, gate }: { task: Task; mark: TaskMark; selected: boolean; gate: string | null }) {
   const select = useTasks((s) => s.select);
   return (
@@ -34,7 +55,13 @@ function TaskRow({ task, mark, selected, gate }: { task: Task; mark: TaskMark; s
     >
       <MarkIcon mark={mark} />
       <span className="w-10 flex-none font-code text-xs text-muted">{task.id}</span>
-      <span className="min-w-0 flex-1 truncate">{task.title}</span>
+      <span className="min-w-24 flex-1 truncate">{task.title}</span>
+      {task.note ? (
+        // Gives way before the title does: shrinks down to the icon in narrow windows.
+        <span className="flex min-w-7 max-w-56 shrink">
+          <NoteBadge note={task.note} />
+        </span>
+      ) : null}
       <span className="flex flex-none gap-1">
         {task.requirements.map((r) => (
           <Chip key={r} tone="acc" mono>
@@ -42,11 +69,9 @@ function TaskRow({ task, mark, selected, gate }: { task: Task; mark: TaskMark; s
           </Chip>
         ))}
       </span>
-      <span className="w-16 flex-none text-center font-code text-xs">
-        {task.hash ? (
-          <span className="text-acc" title={t("tasks.commit", { hash: task.hash })}>
-            {task.hash}
-          </span>
+      <span className="flex min-w-16 flex-none justify-center gap-1 font-code text-xs">
+        {task.commits.length > 0 ? (
+          task.commits.map((hash) => <CommitChip key={hash} hash={hash} />)
         ) : (
           <span className="text-faint" aria-label={t("tasks.noHash")}>
             —

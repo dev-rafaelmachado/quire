@@ -597,9 +597,12 @@ export type Task_Deserialize = {
 	id: string,
 	title: string,
 	done: boolean,
-	/**  Short commit hash at the end of the line, if any. */
-	hash?: string | null,
-	/**  Text between the id and the colon, e.g. `aguardando CI no GitHub`. */
+	/**  Short commit hashes at the end of the line, in order (`(a1b2c3d, e4f5a6b)`). */
+	commits: string[],
+	/**
+	 *  Annotation of the task: the text between the id and the colon (`T4 (aguardando CI):`)
+	 *  and the parenthesized text after the hashes (`(a1b2c3d) (aguardando revisão)`).
+	 */
 	note?: string | null,
 	/**  Requirement ids from the task's detail section (TSK-03). */
 	requirements: string[],
@@ -610,9 +613,12 @@ export type Task_Serialize = {
 	id: string,
 	title: string,
 	done: boolean,
-	/**  Short commit hash at the end of the line, if any. */
-	hash: string | null,
-	/**  Text between the id and the colon, e.g. `aguardando CI no GitHub`. */
+	/**  Short commit hashes at the end of the line, in order (`(a1b2c3d, e4f5a6b)`). */
+	commits: string[],
+	/**
+	 *  Annotation of the task: the text between the id and the colon (`T4 (aguardando CI):`)
+	 *  and the parenthesized text after the hashes (`(a1b2c3d) (aguardando revisão)`).
+	 */
 	note: string | null,
 	/**  Requirement ids from the task's detail section (TSK-03). */
 	requirements: string[],
