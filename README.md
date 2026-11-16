@@ -86,13 +86,13 @@ mode = "auto"                    # auto | native | poll
 - **Watching.** Quire watches only the `.specs` folders and the repository roots. It switches to polling on network and WSL mounts (9p, drvfs, cifs, nfs, fuse) and on `\\wsl$` / UNC paths, or where `[watch]` says so.
 - **Index cache.** `~/.local/share/quire/index.sqlite` (Linux). Deleting it is safe: the next start rebuilds it.
 
-`QUIRE_CONFIG` and `QUIRE_INDEX` point to another config file and cache, which is how the demo below runs.
+`QUIRE_CONFIG` and `QUIRE_INDEX` point to another config file and cache, which is how the demo below runs. Give them absolute paths: `pnpm --filter desktop tauri dev` runs the app from `apps/desktop/src-tauri`, so a relative path would point to a file that does not exist there, and saving Preferences would create it.
 
 ## Try it on the synthetic workspace
 
 ```bash
 scripts/make-fixtures.sh                                         # builds fixtures/workspace (git repos and worktrees)
-QUIRE_CONFIG=fixtures/quire.toml pnpm --filter desktop tauri dev
+QUIRE_CONFIG="$PWD/fixtures/quire.toml" pnpm --filter desktop tauri dev
 ```
 
 ## Docs

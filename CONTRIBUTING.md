@@ -17,7 +17,7 @@ Thanks for helping. Quire is small on purpose: read [AGENTS.md](AGENTS.md) first
 ```bash
 pnpm install
 scripts/make-fixtures.sh
-QUIRE_CONFIG=fixtures/quire.toml pnpm --filter desktop tauri dev
+QUIRE_CONFIG="$PWD/fixtures/quire.toml" pnpm --filter desktop tauri dev
 ```
 
 ## Layout

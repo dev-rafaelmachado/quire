@@ -8,7 +8,7 @@ Roteiro manual sobre o workspace sintético (`fixtures/`), cobrindo os critério
 pnpm install
 scripts/make-fixtures.sh                     # recria fixtures/workspace do zero (idempotente)
 rm -f /tmp/quire-e2e.sqlite
-QUIRE_CONFIG=fixtures/quire.toml QUIRE_INDEX=/tmp/quire-e2e.sqlite pnpm --filter desktop tauri dev
+QUIRE_CONFIG="$PWD/fixtures/quire.toml" QUIRE_INDEX=/tmp/quire-e2e.sqlite pnpm --filter desktop tauri dev
 ```
 
 O workspace tem dois projetos fictícios: `acme_gateway` (com origin, uma worktree idêntica dentro do scan path e uma divergente em `fixtures/workspace/external/`, fora dele) e `acme_billing` (sem origin), além de pastas `.specs` de isca dentro de `node_modules`, `target` e `dist`.
