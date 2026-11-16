@@ -31,6 +31,8 @@ export const en: Catalog = {
     emptyHint: "Set the scan folders in config.toml.",
     gitWarning: "git unavailable: project name taken from the folder ({message})",
     suggestPreset: "Structure of the {preset} preset detected",
+    usePreset: "Use {preset}",
+    dismissSuggestion: "Dismiss suggestion",
   },
   specState: {
     complete: "Done",
@@ -220,6 +222,7 @@ export const en: Catalog = {
     project: "Project",
     preset: "Preset",
     presetDefault: "default (generic)",
+    suggested: "{preset} structure detected: use {preset}",
     alias: "Alias",
     trackerUrl: "Tracker URL",
     presetFor: "Preset of {name}",

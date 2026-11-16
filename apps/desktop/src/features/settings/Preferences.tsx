@@ -170,6 +170,19 @@ export function Preferences({ config }: { config: ConfigView }) {
                           </option>
                         ))}
                       </select>
+                      {(() => {
+                        const suggested = projects.find((p) => p.name === r.name)?.suggestedPreset;
+                        return suggested && r.preset === "" ? (
+                          <button
+                            type="button"
+                            disabled={!editable}
+                            onClick={() => update(r.name, { preset: suggested })}
+                            className="mt-1 block text-[11.5px] text-acc underline decoration-dotted disabled:opacity-60"
+                          >
+                            {t("prefs.suggested", { preset: suggested })}
+                          </button>
+                        ) : null;
+                      })()}
                     </td>
                     <td className="py-2 pr-3">
                       <input aria-label={t("prefs.aliasFor", { name: r.name })} value={r.alias} onChange={(e) => update(r.name, { alias: e.target.value })} disabled={!editable} className={`${input} w-28`} />

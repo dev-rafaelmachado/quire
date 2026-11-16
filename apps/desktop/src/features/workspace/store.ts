@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { applyConfiguredTheme } from "../../app/theme";
 import { applyConfiguredLanguage } from "../../lib/i18n/locale";
-import { asCmdError, type CmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type WatchStatus } from "../../lib/ipc";
+import { asCmdError, type CmdError, commands, events, type ConfigView, type ProjectSummary, type ScanProgress, type SettingsInput, type WatchStatus } from "../../lib/ipc";
 import type { StatusFilter } from "./model";
 
 interface WorkspaceState {
@@ -33,6 +33,11 @@ interface WorkspaceState {
   select: (specId: number | null) => void;
   /** Lists from the cache (fast, IDX-03), then scans in the background (DSC-04). */
   init: () => Promise<void>;
+  /** Suggestions of a preset hidden by the user, for this session only (DEB-03). */
+  dismissedSuggestions: Readonly<Record<number, true>>;
+  dismissSuggestion: (projectId: number) => void;
+  /** Writes `preset` for the project into config.toml (an explicit click, DEB-03). */
+  applyPreset: (projectName: string, preset: string) => Promise<void>;
   reload: () => Promise<void>;
   rescan: () => Promise<void>;
 }
@@ -43,6 +48,20 @@ let initRun: Promise<void> | null = null;
 let pendingOpen: string | null =
   typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("open");
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** The settings to save so that only the preset of `projectName` changes. */
+export function settingsWithPreset(config: ConfigView, projectName: string, preset: string): SettingsInput {
+  const projects = config.projects.some((p) => p.name === projectName)
+    ? config.projects.map((p) => (p.name === projectName ? { ...p, preset } : p))
+    : [...config.projects, { name: projectName, preset, alias: null, issueUrlBase: null }];
+  return {
+    scanPaths: config.scanPaths,
+    pollIntervalMs: config.pollIntervalMs,
+    theme: config.theme,
+    language: config.language,
+    projects,
+  };
+}
 
 export const useWorkspace = create<WorkspaceState>((set, get) => ({
   projects: [],
@@ -64,6 +83,17 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   highlight: null,
   pick: null,
+  dismissedSuggestions: {},
+  dismissSuggestion: (id) => set(({ dismissedSuggestions }) => ({ dismissedSuggestions: { ...dismissedSuggestions, [id]: true } })),
+  applyPreset: async (projectName, preset) => {
+    const config = get().config;
+    if (!config?.editable) return;
+    try {
+      get().setConfig(await commands.setConfig(settingsWithPreset(config, projectName, preset)));
+    } catch (e) {
+      set({ error: asCmdError(e) });
+    }
+  },
   setHighlight: (highlight) => set({ highlight }),
   setPick: (pick) => set({ pick }),
   setText: (text) => set({ text }),

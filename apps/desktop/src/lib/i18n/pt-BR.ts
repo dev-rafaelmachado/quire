@@ -29,6 +29,8 @@ export const ptBR = {
     emptyHint: "Configure as pastas de busca em config.toml.",
     gitWarning: "git indisponível: nome do projeto vindo da pasta ({message})",
     suggestPreset: "Estrutura do preset {preset} detectada",
+    usePreset: "Usar {preset}",
+    dismissSuggestion: "Dispensar sugestão",
   },
   specState: {
     complete: "Concluído",
@@ -218,6 +220,7 @@ export const ptBR = {
     project: "Projeto",
     preset: "Preset",
     presetDefault: "padrão (generic)",
+    suggested: "Estrutura do {preset} detectada: usar {preset}",
     alias: "Apelido",
     trackerUrl: "URL do tracker",
     presetFor: "Preset de {name}",

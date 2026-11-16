@@ -125,4 +125,15 @@ describe("preferences", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(setConfig.mock.calls[0]?.[0]).toMatchObject({ language: "fr" });
   });
+
+  it("offers the suggested preset as a draft change, written only on save (DEB-03)", () => {
+    useWorkspace.setState({
+      projects: [{ id: 2, key: "k", name: "acme_billing", alias: null, preset: "generic", suggestedPreset: "exban", gitWarning: null, specs: [] }],
+    });
+    render(<Preferences config={config} />);
+    fireEvent.click(screen.getByRole("button", { name: "Estrutura do exban detectada: usar exban" }));
+    expect((screen.getByLabelText("Preset de acme_billing") as HTMLSelectElement).value).toBe("exban");
+    expect(setConfig).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Estrutura do exban detectada: usar exban" })).toBeNull();
+  });
 });

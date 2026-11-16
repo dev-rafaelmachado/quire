@@ -1,4 +1,5 @@
-import { AlertTriangle, ChevronDown, ChevronRight, Folder, GitBranch, Layers, Search, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Folder, GitBranch, Layers, Search, Sparkles, X } from "lucide-react";
+import { useState } from "react";
 import { t } from "../../lib/i18n";
 import type { ProjectSummary, SpecSummary } from "../../lib/ipc";
 import { cx, IconButton, ProgressBar, Segmented, type BarTone, type SegmentOption } from "../../ui";
@@ -104,6 +105,7 @@ function ProjectGroup({ project }: { project: ProjectSummary }) {
           {project.specs.length}
         </span>
       </button>
+      {!collapsed && project.suggestedPreset ? <PresetSuggestion project={project} preset={project.suggestedPreset} /> : null}
       {collapsed
         ? null
         : project.specs.map((spec) => (
@@ -115,6 +117,35 @@ function ProjectGroup({ project }: { project: ProjectSummary }) {
               onSelect={() => select(spec.id)}
             />
           ))}
+    </div>
+  );
+}
+
+/** The preset the index recognized from the folders (PST-01), with an explicit action that
+ *  writes it (DEB-03). Dismissing lasts for the session; nothing is written without the click. */
+function PresetSuggestion({ project, preset }: { project: ProjectSummary; preset: string }) {
+  const dismissed = useWorkspace((s) => Boolean(s.dismissedSuggestions[project.id]));
+  const dismiss = useWorkspace((s) => s.dismissSuggestion);
+  const apply = useWorkspace((s) => s.applyPreset);
+  const editable = useWorkspace((s) => s.config?.editable ?? false);
+  const [busy, setBusy] = useState(false);
+  if (dismissed) return null;
+  return (
+    <div role="status" className="mx-3 mb-1 flex items-center gap-2 rounded-[var(--radius-md)] bg-acc-bg px-2.5 py-1.5 text-xs text-acc">
+      <Sparkles aria-hidden="true" className="size-3.5 flex-none" />
+      <span className="min-w-0 flex-1">{t("sidebar.suggestPreset", { preset })}</span>
+      <button
+        type="button"
+        disabled={!editable || busy}
+        onClick={() => {
+          setBusy(true);
+          void apply(project.name, preset).finally(() => setBusy(false));
+        }}
+        className="flex-none rounded-[5px] px-1.5 py-0.5 font-medium underline decoration-dotted hover:bg-acc/15 disabled:opacity-60"
+      >
+        {t("sidebar.usePreset", { preset })}
+      </button>
+      <IconButton label={t("sidebar.dismissSuggestion")} icon={<X className="size-3.5" />} onClick={() => dismiss(project.id)} className="size-5 text-acc" />
     </div>
   );
 }
