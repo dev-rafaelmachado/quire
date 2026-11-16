@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { asCmdError, type CmdError, commands, type TextFormat } from "../../lib/ipc";
+import { asCmdError, type CmdError, commands, type InstanceSummary, type TextFormat } from "../../lib/ipc";
 import { currentEditor } from "../editor/EditorPane";
 import { setConflictHandler, useEditor } from "../editor/store";
 
@@ -38,6 +38,10 @@ interface ConflictState {
   error: CmdError | null;
   /** Name of the copy just saved (CNF-08). */
   copied: string | null;
+  /** The copy being edited disappeared with unsaved changes; `to` is where they can go
+   *  (INS-04). The view does not switch on its own. */
+  gone: { to: InstanceSummary | null } | null;
+  setGone: (gone: { to: InstanceSummary | null } | null) => void;
   openDialog: () => Promise<void>;
   close: () => void;
   toggleDiff: () => void;
@@ -69,6 +73,8 @@ export const useConflict = create<ConflictState>((set, get) => ({
   busy: false,
   error: null,
   copied: null,
+  gone: null,
+  setGone: (gone) => set({ gone }),
   openDialog: async () => {
     set({ open: true, busy: true, error: null, copied: null });
     try {
@@ -140,7 +146,7 @@ export const useConflict = create<ConflictState>((set, get) => ({
       set({ busy: false, error: asCmdError(err) });
     }
   },
-  clear: () => set({ open: false, disk: null, notice: null, showDiff: false, busy: false, error: null, copied: null }),
+  clear: () => set({ open: false, disk: null, notice: null, showDiff: false, busy: false, error: null, copied: null, gone: null }),
 }));
 
 setConflictHandler(() => void useConflict.getState().openDialog());

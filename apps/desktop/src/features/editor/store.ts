@@ -16,6 +16,9 @@ export interface Buffer {
   readOnly: boolean;
   /** Why Editar and Dividir are disabled (EDT-08). */
   locked: CmdError | null;
+  /** Text the editor starts with when it is not the saved one: edits carried over from a
+   *  copy that disappeared (INS-04). */
+  initialText?: string;
 }
 
 export type SaveResult = "saved" | "unchanged" | "failed" | "needs-confirm";
@@ -59,6 +62,10 @@ interface EditorState {
   /** Saves the buffer (EDT-05): nothing is written when it is clean. */
   save: (opts?: SaveOptions) => Promise<SaveResult>;
   cancelMixed: () => void;
+  /** Edits waiting to land in another instance of the same file (INS-04). */
+  carry: { instanceId: number; name: string; text: string } | null;
+  /** Takes the unsaved text to `instanceId` before the view switches to it (INS-04). */
+  carryTo: (instanceId: number) => void;
 }
 
 /** Lock reason of a file the backend is not even asked about (EDT-08). */
@@ -89,6 +96,12 @@ export const useEditor = create<EditorState>((set, get) => ({
   savedVersion: 0,
   lastSaved: 0,
   getText: null,
+  carry: null,
+  carryTo: (instanceId) => {
+    const { buffer, getText } = get();
+    if (!buffer || !getText) return;
+    set({ carry: { instanceId, name: buffer.name, text: getText() } });
+  },
   adopt: (disk) => {
     const buffer = get().buffer;
     if (!buffer) return;
@@ -117,6 +130,8 @@ export const useEditor = create<EditorState>((set, get) => ({
     try {
       const file = await commands.openForEdit(instanceId, name);
       if (seq !== loadSeq) return;
+      const carry = get().carry;
+      const carried = carry !== null && carry.instanceId === instanceId && carry.name === name && !file.locked ? carry.text : null;
       set({
         buffer: {
           instanceId,
@@ -126,10 +141,15 @@ export const useEditor = create<EditorState>((set, get) => ({
           format: file.format,
           readOnly: file.readOnly,
           locked: file.locked,
+          ...(carried !== null ? { initialText: carried } : {}),
         },
         mode: file.locked ? "read" : get().mode,
         savedVersion: get().savedVersion + 1,
+        carry: null,
+        dirty: carried !== null && carried !== (file.text ?? ""),
       });
+      // The carried edits meet this copy's content: the conflict dialog decides (INS-04).
+      if (carried !== null && carried !== (file.text ?? "")) onConflict?.();
     } catch (e) {
       if (seq !== loadSeq) return;
       set({ buffer: { ...base, locked: asCmdError(e) }, mode: "read" });

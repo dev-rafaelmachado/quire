@@ -524,6 +524,51 @@ mod tests {
     }
 
     #[test]
+    fn saving_one_identical_copy_makes_the_versions_badge_appear() {
+        // INS-03: ACME-142 has identical copies in the fixtures (three: main, the acme-142
+        // worktree and the acme-170 one); a save in one of them makes them diverge, and the
+        // badge appears within 2 s with the number of copies, as in DUP-03 of v0.1.
+        let (app, webview, _tmp) = app_on_fixtures("versions");
+        scan_and_wait(&app, &webview);
+        let spec_of = |w: &WebviewWindow<MockRuntime>| -> Value {
+            let list = invoke(w, "list_projects", json!({})).unwrap();
+            list[1]["specs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|s| s["folder"] == "acme-142-service-tokens")
+                .unwrap()
+                .clone()
+        };
+        let before = spec_of(&webview);
+        assert_eq!(before["versionsBadge"], Value::Null, "{before}");
+        assert!(before["instances"].as_array().unwrap().len() >= 2);
+        let (instance_id, _) = acme_142(&webview);
+        let file = invoke(
+            &webview,
+            "open_for_edit",
+            json!({ "instanceId": instance_id, "name": "spec.md" }),
+        )
+        .unwrap();
+        let t0 = Instant::now();
+        invoke(&webview, "save_file", json!({ "input": {
+            "instanceId": instance_id, "name": "spec.md", "text": format!("{}\nSó nesta cópia.\n", file["text"].as_str().unwrap()),
+            "format": file["format"], "base": file["fingerprint"], "confirmMixed": false } })).unwrap();
+        wait_scan(&app);
+        let after = spec_of(&webview);
+        let copies = after["instances"].as_array().unwrap().len();
+        assert_eq!(after["versionsBadge"], json!(copies), "{after}");
+        let detail = invoke(
+            &webview,
+            "get_spec",
+            json!({ "specId": after["id"], "instanceId": instance_id }),
+        )
+        .unwrap();
+        assert_eq!(detail["spec"]["versionsBadge"], json!(copies));
+        assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
+    }
+
+    #[test]
     fn checkbox_and_progress_without_the_watcher() {
         // Polling every 60 s: within this test, only the write itself can update the list.
         let cfg = "scan_paths = [\"ws/projects\"]\npoll_interval_ms = 60000\n\n[watch]\nmode = \"poll\"\n\n[projects.acme_gateway]\npreset = \"exban\"\ntasks_checkbox = true\n\n[projects.acme_billing]\npreset = \"exban\"\n";

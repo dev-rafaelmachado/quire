@@ -188,6 +188,8 @@ export const en: Catalog = {
     agoHours: { one: "{n} hour ago", other: "{n} hours ago" },
     agoDays: { one: "{n} day ago", other: "{n} days ago" },
     unknownTime: "at an unknown time",
+    goneDirty: "The copy you were editing was removed from disk. Your changes are still here; nothing was switched.",
+    carryTo: "Save as a copy in another instance ({branch} · {worktree})",
   },
   live: {
     specRemoved: "The open spec was removed from disk.",
@@ -313,6 +315,8 @@ export const en: Catalog = {
     preview: "Preview of {name}",
     eolLf: "LF",
     eolCrlf: "CRLF",
+    target: "Edits go to {branch} · {worktree}",
+    otherVersions: { one: "This spec has {n} copy, and it differs from this one. The edit applies to this copy only and does not spread.", other: "This spec has {n} copies, and they are not all the same. The edit applies to this copy only and does not spread." },
   },
   conflict: {
     title: "{name} changed on disk",

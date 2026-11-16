@@ -13,6 +13,7 @@ import { SplitView } from "../editor/SplitView";
 import { useEditor } from "../editor/store";
 import { guard } from "../unsaved/store";
 import { DiskNotice } from "../conflict/DiskNotice";
+import { GoneNotice } from "../conflict/GoneNotice";
 import { OrphanNotice } from "../conflict/OrphanNotice";
 import { FileView } from "./FileView";
 import { displayed } from "./labels";
@@ -144,6 +145,7 @@ export function SpecView() {
         {tabs}
         {orphans}
         <EditBar />
+        <GoneNotice />
         <DiskNotice />
         <div role="tabpanel" className="min-h-0 flex-1">
           <SplitView key={`${buffer.instanceId}\u0000${file}`} name={file} header={detail.headerFiles.includes(file)} preview={mode === "split"} />

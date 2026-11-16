@@ -186,6 +186,8 @@ export const ptBR = {
     agoHours: { one: "há {n} hora", other: "há {n} horas" },
     agoDays: { one: "há {n} dia", other: "há {n} dias" },
     unknownTime: "em data desconhecida",
+    goneDirty: "A cópia que você estava editando foi removida do disco. Suas alterações continuam aqui; nada foi trocado.",
+    carryTo: "Salvar como cópia em outra instância ({branch} · {worktree})",
   },
   live: {
     specRemoved: "A spec aberta foi removida do disco.",
@@ -311,6 +313,8 @@ export const ptBR = {
     preview: "Pré-visualização de {name}",
     eolLf: "LF",
     eolCrlf: "CRLF",
+    target: "Edições vão para {branch} · {worktree}",
+    otherVersions: { one: "Esta spec tem {n} cópia, e ela não é igual a esta. A edição vale só para esta cópia e não se propaga.", other: "Esta spec tem {n} cópias, e elas não são todas iguais. A edição vale só para esta cópia e não se propaga." },
   },
   conflict: {
     title: "{name} mudou no disco",

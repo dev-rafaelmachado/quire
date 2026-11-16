@@ -4,6 +4,8 @@ import { errorText } from "../../lib/i18n/errors";
 import { Button, Chip, ErrorText, Segmented } from "../../ui";
 import { useConflict } from "../conflict/store";
 import { guard } from "../unsaved/store";
+import { displayed, worktreeName } from "../spec-view/labels";
+import { useSpecView } from "../spec-view/store";
 import { type EditMode, useEditor } from "./store";
 
 /** Ler / Editar / Dividir, Save, and the state of the buffer (EDT-01, EDT-05, EDT-06, EDT-08,
@@ -18,7 +20,10 @@ export function EditBar() {
   const setMode = useEditor((s) => s.setMode);
   const save = useEditor((s) => s.save);
   const cancelMixed = useEditor((s) => s.cancelMixed);
+  const detail = useSpecView((s) => s.detail);
   if (!buffer) return null;
+  const target = detail ? displayed(detail) : undefined;
+  const versions = detail?.spec.versionsBadge ?? null;
   const locked = buffer.locked;
   const editing = mode !== "read";
   const eol = buffer.format?.eol === "crlf" ? t("editor.eolCrlf") : t("editor.eolLf");
@@ -51,6 +56,12 @@ export function EditBar() {
           </Chip>
         ) : null}
         {editing && buffer.readOnly ? <Chip>{t("editor.readOnly")}</Chip> : null}
+        {editing && target ? (
+          // Which copy receives the save (INS-01).
+          <span className="font-code text-[11.5px] text-muted">
+            {t("editor.target", { branch: target.branch ?? t("specView.detached"), worktree: worktreeName(target) })}
+          </span>
+        ) : null}
         <div className="flex-1" />
         {editing ? (
           <Button onClick={() => void save()} disabled={!dirty || saving} title={t("editor.saveShortcut")} icon={<Save aria-hidden="true" className="size-3.5" />}>
@@ -58,6 +69,13 @@ export function EditBar() {
           </Button>
         ) : null}
       </div>
+      {editing && versions !== null ? (
+        // Other copies differ; this edit stays in this one (INS-02).
+        <p role="note" className="m-0 flex items-center gap-2 bg-acc-bg px-6 py-1.5 text-[12.5px] text-acc">
+          <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
+          {t("editor.otherVersions", { n: versions })}
+        </p>
+      ) : null}
       {confirming ? (
         <div role="alertdialog" aria-label={t("editor.mixed")} className="flex flex-wrap items-center gap-3 bg-warn-bg px-6 py-2 text-[12.5px] text-warn">
           <span className="min-w-0 flex-1">{t("editor.mixedConfirm", { eol })}</span>

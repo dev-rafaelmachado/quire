@@ -36,7 +36,8 @@ export function EditorPane({ onChange, onReady }: { onChange?: () => void; onRea
     void import("./codemirror").then(({ createEditor, typingBenchmark }) => {
       if (cancelled) return;
       const h = createEditor(el, {
-        text: b.savedText,
+        text: b.initialText ?? b.savedText,
+        saved: b.savedText,
         label: t("editor.textOf", { name: b.name }),
         onDirty: (dirty) => useEditor.getState().setDirty(dirty),
         onChange: () => changeRef.current?.(),

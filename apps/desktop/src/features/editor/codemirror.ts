@@ -23,6 +23,8 @@ export interface EditorHandle {
 
 export interface EditorOptions {
   text: string;
+  /** The text on disk when the editor starts with other text (carried edits, INS-04). */
+  saved?: string;
   /** Called on every change with whether the text differs from the saved one. */
   onDirty: (dirty: boolean) => void;
   /** Called after each change, for the live preview (T17). */
@@ -120,7 +122,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
       ],
     }),
   });
-  saved = view.state.doc;
+  saved = options.saved === undefined || options.saved === options.text ? view.state.doc : EditorState.create({ doc: options.saved }).doc;
+  if (!view.state.doc.eq(saved)) options.onDirty(true);
   return {
     view,
     getText: () => view.state.doc.toString(),
