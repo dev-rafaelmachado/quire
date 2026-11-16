@@ -14,7 +14,9 @@ import { Sidebar } from "./features/workspace/Sidebar";
 import { findSelected } from "./features/workspace/selection";
 import { useWorkspace } from "./features/workspace/store";
 import { WorkspaceStatus } from "./features/workspace/WorkspaceStatus";
-import { useLocale } from "./lib/i18n";
+import { useEditor } from "./features/editor/store";
+import { t, useLocale } from "./lib/i18n";
+import { setWindowTitle } from "./lib/window";
 
 export function App() {
   // Subscribing here re-renders the whole tree when the language changes (no restart).
@@ -34,6 +36,12 @@ export function App() {
     void init();
   }, [init]);
   useLiveUpdates();
+
+  // EDT-06: the window title shows the unsaved mark too.
+  const dirtyName = useEditor((s) => (s.dirty && s.buffer ? s.buffer.name : null));
+  useEffect(() => {
+    setWindowTitle(dirtyName ? `• ${dirtyName} — ${t("app.name")}` : t("app.name"));
+  }, [dirtyName]);
   useCliNavigation();
 
   useEffect(() => {

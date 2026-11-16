@@ -23,7 +23,7 @@ import type {
 } from "./bindings";
 
 export { commands, events } from "./bindings";
-export type { CmdError, FileKind, InstanceKind, ListFilter, PhaseState, ScanPhase, SettingsInput, WatchStatus } from "./bindings";
+export type { CmdError, Eol, FileKind, InstanceKind, ListFilter, PhaseState, ScanPhase, SettingsInput, TextFormat, WatchStatus } from "./bindings";
 export type { CliOpen_Serialize as CliOpen } from "./bindings";
 
 export type ConfigView = ConfigView_Serialize;
