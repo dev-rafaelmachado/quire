@@ -104,7 +104,7 @@ T21 → T22
 T23 → T24
 ```
 
-- [ ] T23: Preferências (scan paths, preset por projeto, tema)
+- [x] T23: Preferências (scan paths, preset por projeto, tema) (26d0369)
 - [ ] T24: Documentação de uso, empacotamento e roteiro E2E
 
 ## Detalhamento das tarefas
