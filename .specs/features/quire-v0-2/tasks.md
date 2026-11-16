@@ -72,7 +72,7 @@ T12 → T13 → T28 → T14 → T15
 - [x] T12: Pipeline de escrita atômica com preservação de formato (c56adbd)
 - [x] T13: Impressão digital e detecção de conflito (2785f30)
 - [x] T28: Escrita condicionada à classe do sistema de arquivos (P6) (92abad6)
-- [ ] T14: Alternância de checkbox por linha
+- [x] T14: Alternância de checkbox por linha (b80ac6e)
 - [ ] T15: Comandos de escrita no shell e bindings
 
 ### Fase 3: Editor
